@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Models
+models/
+weights/
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Datasets
+data/
+datasets/
+
+# Runtime outputs
+outputs/
+runs/
+logs/
+
+# Video / images
+*.mp4
+*.avi
+*.mov
+
+# Environment
+.env
