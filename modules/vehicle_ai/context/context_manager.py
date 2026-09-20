@@ -284,8 +284,7 @@ class ContextManager:
             # Refresh timestamp only if actual state changed.
             # ----------------------------------------------------
 
-            if changes:
-
+            if updates:
                 target.touch()
 
             return changes

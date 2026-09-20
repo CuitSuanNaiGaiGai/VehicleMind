@@ -12,20 +12,27 @@ from modules.vehicle_ai.context import (
 
 class CabinContextAdapter:
     """
-    Bridge Cabin Intelligence outputs into VehicleContext.
+    Bridge Cabin Intelligence semantic outputs into
+    VehicleMind DriverContext.
 
-    This layer only translates semantic outputs.
-    It does NOT perform fatigue estimation itself.
+    Important:
+        Driver presence must come from DriverPresenceTracker.
+
+        face_visible is only the current-frame observation and
+        must NOT be treated as the semantic driver-presence
+        state.
     """
 
     def __init__(
         self,
         context_manager: ContextManager,
     ):
-        self.context_manager = context_manager
+        self.context_manager = (
+            context_manager
+        )
 
     # ========================================================
-    # Enum normalization
+    # Enum helpers
     # ========================================================
 
     @staticmethod
@@ -36,13 +43,55 @@ class CabinContextAdapter:
         if value is None:
             return "UNKNOWN"
 
-        if hasattr(value, "value"):
-            return str(value.value)
+        if hasattr(
+            value,
+            "value",
+        ):
+            return str(
+                value.value
+            )
 
-        if hasattr(value, "name"):
-            return str(value.name)
+        if hasattr(
+            value,
+            "name",
+        ):
+            return str(
+                value.name
+            )
 
-        return str(value)
+        return str(
+            value
+        )
+
+    # ========================================================
+    # Normalize Presence
+    # ========================================================
+
+    def _presence(
+        self,
+        value: Any,
+    ) -> DriverPresence:
+
+        text = (
+            self._enum_text(
+                value
+            )
+            .upper()
+        )
+
+        try:
+            return DriverPresence(
+                text
+            )
+
+        except ValueError:
+            return (
+                DriverPresence.UNKNOWN
+            )
+
+    # ========================================================
+    # Normalize Driver State
+    # ========================================================
 
     def _driver_state(
         self,
@@ -50,34 +99,47 @@ class CabinContextAdapter:
     ) -> DriverState:
 
         text = (
-            self._enum_text(value)
+            self._enum_text(
+                value
+            )
             .upper()
         )
 
         try:
-            return DriverState(text)
+            return DriverState(
+                text
+            )
 
         except ValueError:
-            return DriverState.UNKNOWN
+            return (
+                DriverState.UNKNOWN
+            )
+
+    # ========================================================
+    # Normalize Risk
+    # ========================================================
 
     def _risk_level(
         self,
         value: Any,
     ) -> RiskLevel:
 
-        if value is None:
-            return RiskLevel.UNKNOWN
-
         text = (
-            self._enum_text(value)
+            self._enum_text(
+                value
+            )
             .upper()
         )
 
         try:
-            return RiskLevel(text)
+            return RiskLevel(
+                text
+            )
 
         except ValueError:
-            return RiskLevel.UNKNOWN
+            return (
+                RiskLevel.UNKNOWN
+            )
 
     # ========================================================
     # Update
@@ -86,46 +148,43 @@ class CabinContextAdapter:
     def update(
         self,
         *,
-        face_present: bool,
+        presence: Any,
         driver_state: Any,
-        risk: Any = None,
+        risk: Any,
         perclos: float | None = None,
-        eye_closed: bool = False,
+        eye_closed: bool | None = None,
         eye_closure_seconds: float = 0.0,
         recent_yawns: int = 0,
         blink_count: int = 0,
     ):
         """
-        Update DriverContext from one Cabin Intelligence frame.
+        Update DriverContext using semantic outputs from
+        CabinPerceptionService.
         """
-
-        presence = (
-            DriverPresence.PRESENT
-            if face_present
-            else DriverPresence.ABSENT
-        )
-
-        state = (
-            self._driver_state(
-                driver_state
-            )
-        )
-
-        risk_level = (
-            self._risk_level(
-                risk
-            )
-        )
 
         return (
             self.context_manager
             .update_driver(
-                presence=presence,
-                state=state,
-                risk=risk_level,
+                presence=(
+                    self._presence(
+                        presence
+                    )
+                ),
+                state=(
+                    self._driver_state(
+                        driver_state
+                    )
+                ),
+                risk=(
+                    self._risk_level(
+                        risk
+                    )
+                ),
                 perclos=perclos,
-                eye_closed=bool(
-                    eye_closed
+                eye_closed=(
+                    None
+                    if eye_closed is None
+                    else bool(eye_closed)
                 ),
                 eye_closure_seconds=float(
                     eye_closure_seconds

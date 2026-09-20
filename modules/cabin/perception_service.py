@@ -1,0 +1,550 @@
+from __future__ import annotations
+
+import time
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+from modules.cabin.face.landmarks import (
+    FaceLandmarkDetector,
+)
+
+from modules.cabin.fatigue.eye_state import (
+    EyeStateAnalyzer,
+)
+
+from modules.cabin.fatigue.blink import (
+    BlinkDetector,
+)
+
+from modules.cabin.fatigue.perclos import (
+    PerclosEstimator,
+)
+
+from modules.cabin.fatigue.mouth_state import (
+    MouthStateAnalyzer,
+)
+
+from modules.cabin.fatigue.yawn import (
+    YawnDetector,
+)
+
+from modules.cabin.presence.driver_presence import (
+    DriverPresence,
+    DriverPresenceTracker,
+)
+
+from modules.cabin.state.driver_state import (
+    DriverStateEstimator,
+)
+
+
+# ============================================================
+# Result
+# ============================================================
+
+
+@dataclass
+class CabinPerceptionSnapshot:
+    """
+    Semantic output of one Cabin Intelligence frame.
+
+    This is the boundary between perception and Vehicle AI.
+    """
+
+    timestamp_ms: int
+
+    face_visible: bool
+
+    presence: Any
+
+    driver_state: Any
+
+    risk: Any
+
+    perclos: float | None
+
+    perclos_ready: bool
+
+    eye_closed: bool
+
+    eye_closure_seconds: float
+
+    recent_yawns: int
+
+    blink_count: int
+
+    current_yawn: bool
+
+    # ========================================================
+    # VehicleMind adapter
+    # ========================================================
+
+    def to_context_kwargs(
+        self,
+    ) -> dict:
+
+        return {
+            "presence":
+                self.presence,
+
+            "driver_state":
+                self.driver_state,
+
+            "risk":
+                self.risk,
+
+            "perclos":
+                self.perclos,
+
+            "eye_closed":
+                self.eye_closed,
+
+            "eye_closure_seconds":
+                self.eye_closure_seconds,
+
+            "recent_yawns":
+                self.recent_yawns,
+
+            "blink_count":
+                self.blink_count,
+        }
+
+
+# ============================================================
+# Service
+# ============================================================
+
+
+class CabinPerceptionService:
+    """
+    Reusable Cabin Intelligence pipeline.
+
+    Algorithm settings are kept consistent with the current
+    apps/cabin_demo/main.py implementation.
+    """
+
+    def __init__(
+        self,
+        model_path: str | Path,
+    ):
+        # ====================================================
+        # Face
+        # ====================================================
+
+        self.face_detector = (
+            FaceLandmarkDetector(
+                model_path=(
+                    Path(model_path)
+                )
+            )
+        )
+
+        # ====================================================
+        # Presence
+        # ====================================================
+
+        self.presence_tracker = (
+            DriverPresenceTracker(
+                present_confirm_seconds=0.15,
+                absence_timeout_seconds=1.5,
+                startup_timeout_seconds=1.0,
+            )
+        )
+
+        # ====================================================
+        # Eye
+        # ====================================================
+
+        self.eye_analyzer = (
+            EyeStateAnalyzer(
+                ear_threshold=0.21,
+            )
+        )
+
+        self.blink_detector = (
+            BlinkDetector(
+                min_closed_frames=2,
+                max_closed_frames=15,
+            )
+        )
+
+        self.perclos_estimator = (
+            PerclosEstimator(
+                window_seconds=30.0,
+                min_observation_seconds=5.0,
+            )
+        )
+
+        # ====================================================
+        # Mouth / Yawn
+        # ====================================================
+
+        self.mouth_analyzer = (
+            MouthStateAnalyzer(
+                mar_threshold=0.35,
+            )
+        )
+
+        self.yawn_detector = (
+            YawnDetector(
+                min_open_seconds=1.2,
+            )
+        )
+
+        # ====================================================
+        # Driver state
+        # ====================================================
+
+        self.driver_state_estimator = (
+            DriverStateEstimator(
+                suspected_perclos=0.25,
+                drowsy_perclos=0.30,
+                suspected_closure_seconds=1.2,
+                drowsy_closure_seconds=2.0,
+                yawn_window_seconds=60.0,
+                suspected_yawns=2,
+            )
+        )
+
+        # ====================================================
+        # Runtime
+        # ====================================================
+
+        self.start_time = (
+            time.perf_counter()
+        )
+
+        self.last_driver_state_result = None
+
+        self.last_yawn_count = 0
+
+        self.last_blink_count = 0
+
+    # ========================================================
+    # Timestamp
+    # ========================================================
+
+    def current_timestamp_ms(
+        self,
+    ) -> int:
+
+        return int(
+            (
+                time.perf_counter()
+                - self.start_time
+            )
+            * 1000
+        )
+
+    # ========================================================
+    # Process one frame
+    # ========================================================
+
+    def process_frame(
+        self,
+        frame,
+        timestamp_ms: int | None = None,
+    ) -> CabinPerceptionSnapshot:
+
+        if timestamp_ms is None:
+
+            timestamp_ms = (
+                self.current_timestamp_ms()
+            )
+
+        # ====================================================
+        # Face
+        # ====================================================
+
+        faces = (
+            self.face_detector.detect(
+                frame,
+                timestamp_ms,
+            )
+        )
+
+        face_visible = (
+            len(faces) > 0
+        )
+
+        # ====================================================
+        # Presence
+        # ====================================================
+
+        presence_result = (
+            self.presence_tracker.update(
+                timestamp_ms=timestamp_ms,
+                face_detected=face_visible,
+            )
+        )
+
+        eye_closed_now = None
+
+        current_yawn = False
+
+        perclos_value = None
+
+        perclos_ready = False
+
+        # ====================================================
+        # Valid face observation
+        # ====================================================
+
+        if face_visible:
+
+            face = (
+                faces[0]
+            )
+
+            height, width = (
+                frame.shape[:2]
+            )
+
+            # ------------------------------------------------
+            # Eye
+            # ------------------------------------------------
+
+            eye_result = (
+                self.eye_analyzer.analyze(
+                    face,
+                    width,
+                    height,
+                )
+            )
+
+            eye_closed_now = bool(
+                eye_result.is_closed
+            )
+
+            # ------------------------------------------------
+            # Blink
+            # ------------------------------------------------
+
+            blink_result = (
+                self.blink_detector.update(
+                    eye_result.is_closed
+                )
+            )
+
+            self.last_blink_count = (
+                blink_result.blink_count
+            )
+
+            # ------------------------------------------------
+            # PERCLOS
+            # ------------------------------------------------
+
+            perclos_result = (
+                self.perclos_estimator.update(
+                    timestamp_ms,
+                    eye_result.is_closed,
+                )
+            )
+
+            perclos_ready = bool(
+                perclos_result.ready
+            )
+
+            if perclos_ready:
+
+                perclos_value = float(
+                    perclos_result.perclos
+                )
+
+            # ------------------------------------------------
+            # Mouth
+            # ------------------------------------------------
+
+            mouth_result = (
+                self.mouth_analyzer.analyze(
+                    face,
+                    width,
+                    height,
+                )
+            )
+
+            # ------------------------------------------------
+            # Yawn
+            # ------------------------------------------------
+
+            yawn_result = (
+                self.yawn_detector.update(
+                    timestamp_ms,
+                    mouth_result.is_open,
+                )
+            )
+
+            current_yawn = bool(
+                yawn_result.is_yawning
+            )
+
+            self.last_yawn_count = (
+                yawn_result.yawn_count
+            )
+
+            # ------------------------------------------------
+            # Driver state
+            # ------------------------------------------------
+
+            driver_state_result = (
+                self.driver_state_estimator.update(
+                    timestamp_ms=timestamp_ms,
+                    driver_presence=(
+                        presence_result.state
+                    ),
+                    eye_closed=(
+                        eye_result.is_closed
+                    ),
+                    perclos=(
+                        perclos_result.perclos
+                    ),
+                    perclos_ready=(
+                        perclos_result.ready
+                    ),
+                    yawn_count=(
+                        yawn_result.yawn_count
+                    ),
+                )
+            )
+
+            self.last_driver_state_result = (
+                driver_state_result
+            )
+
+        # ====================================================
+        # Face temporarily unavailable
+        # ====================================================
+
+        else:
+
+            # No face does not mean eyes are open.
+            perclos_result = (
+                self.perclos_estimator.update(
+                    timestamp_ms,
+                    None,
+                )
+            )
+
+            perclos_ready = bool(
+                perclos_result.ready
+            )
+
+            if perclos_ready:
+
+                perclos_value = float(
+                    perclos_result.perclos
+                )
+
+            # ------------------------------------------------
+            # Short detector dropout.
+            # Keep last reliable Driver State.
+            # ------------------------------------------------
+
+            if (
+                presence_result.state
+                == DriverPresence.PRESENT
+            ):
+
+                driver_state_result = (
+                    self.last_driver_state_result
+                )
+
+            # ------------------------------------------------
+            # Driver genuinely unavailable.
+            # ------------------------------------------------
+
+            else:
+
+                driver_state_result = (
+                    self.driver_state_estimator.update(
+                        timestamp_ms=timestamp_ms,
+                        driver_presence=(
+                            presence_result.state
+                        ),
+                        eye_closed=False,
+                        perclos=(
+                            perclos_result.perclos
+                        ),
+                        perclos_ready=(
+                            perclos_result.ready
+                        ),
+                        yawn_count=(
+                            self.last_yawn_count
+                        ),
+                    )
+                )
+
+                self.last_driver_state_result = (
+                    driver_state_result
+                )
+
+        # ====================================================
+        # Semantic result
+        # ====================================================
+
+        if driver_state_result is None:
+
+            driver_state = "UNKNOWN"
+
+            risk = "UNKNOWN"
+
+            eye_closure_seconds = 0.0
+
+            recent_yawns = 0
+
+        else:
+
+            driver_state = (
+                driver_state_result.state
+            )
+
+            risk = (
+                driver_state_result
+                .risk_level
+            )
+
+            eye_closure_seconds = float(
+                driver_state_result
+                .continuous_eye_closure
+            )
+
+            recent_yawns = int(
+                driver_state_result
+                .recent_yawns
+            )
+
+        return CabinPerceptionSnapshot(
+            timestamp_ms=timestamp_ms,
+            face_visible=face_visible,
+            presence=(
+                presence_result.state
+            ),
+            driver_state=driver_state,
+            risk=risk,
+            perclos=perclos_value,
+            perclos_ready=perclos_ready,
+            eye_closed=eye_closed_now,
+            eye_closure_seconds=(
+                eye_closure_seconds
+            ),
+            recent_yawns=recent_yawns,
+            blink_count=(
+                self.last_blink_count
+            ),
+            current_yawn=(
+                current_yawn
+            ),
+        )
+
+    # ========================================================
+    # Cleanup
+    # ========================================================
+
+    def close(
+        self,
+    ) -> None:
+
+        self.face_detector.close()
