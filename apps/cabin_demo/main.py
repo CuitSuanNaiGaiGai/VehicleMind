@@ -1,9 +1,12 @@
 import time
 from pathlib import Path
+from typing import Optional
 
 import cv2
 
-from modules.cabin.face.landmarks import FaceLandmarkDetector
+from modules.cabin.face.landmarks import (
+    FaceLandmarkDetector,
+)
 
 from modules.cabin.fatigue.eye_state import (
     EyeStateAnalyzer,
@@ -25,8 +28,9 @@ from modules.cabin.fatigue.yawn import (
     YawnDetector,
 )
 
-from modules.cabin.head_pose.estimator import (
-    HeadPoseEstimator,
+from modules.cabin.presence.driver_presence import (
+    DriverPresence,
+    DriverPresenceTracker,
 )
 
 from modules.cabin.state.driver_state import (
@@ -38,18 +42,16 @@ from modules.cabin.assistance.rest_advisor import (
     MockRestAdvisor,
 )
 
-from modules.cabin.common.visualizer import (
-    draw_driver_status_panel,
-)
-
 
 # ============================================================
 # Project paths
 # ============================================================
 
-PROJECT_ROOT = Path(
-    __file__
-).resolve().parents[2]
+PROJECT_ROOT = (
+    Path(__file__)
+    .resolve()
+    .parents[2]
+)
 
 MODEL_PATH = (
     PROJECT_ROOT
@@ -67,7 +69,7 @@ def open_camera(
     camera_id: int = 0,
 ) -> cv2.VideoCapture:
     """
-    Open MacBook camera.
+    Open local camera.
 
     AVFoundation is preferred on macOS.
     """
@@ -77,17 +79,15 @@ def open_camera(
         cv2.CAP_AVFOUNDATION,
     )
 
-    # Fallback.
     if not cap.isOpened():
         cap = cv2.VideoCapture(
             camera_id
         )
 
     if not cap.isOpened():
-
         raise RuntimeError(
             "Failed to open camera. "
-            "Please check macOS camera permission."
+            "Please check camera permission."
         )
 
     cap.set(
@@ -104,48 +104,46 @@ def open_camera(
 
 
 # ============================================================
-# Visualization utilities
+# Landmark visualization
 # ============================================================
 
 def draw_face_landmarks(
     frame,
-    face_landmarks,
+    face,
 ) -> None:
     """
-    Draw all MediaPipe facial landmarks.
+    Draw lightweight facial landmarks.
+
+    The full MediaPipe mesh contains many points, therefore
+    use small markers to keep the Cabin Demo clean.
     """
 
     height, width = (
         frame.shape[:2]
     )
 
-    for face in face_landmarks:
+    for landmark in face:
 
-        for landmark in face:
+        x = int(
+            landmark.x * width
+        )
 
-            x = int(
-                landmark.x
-                * width
+        y = int(
+            landmark.y * height
+        )
+
+        if (
+            0 <= x < width
+            and
+            0 <= y < height
+        ):
+            cv2.circle(
+                frame,
+                (x, y),
+                1,
+                (80, 220, 120),
+                -1,
             )
-
-            y = int(
-                landmark.y
-                * height
-            )
-
-            if (
-                0 <= x < width
-                and
-                0 <= y < height
-            ):
-
-                cv2.circle(
-                    frame,
-                    (x, y),
-                    1,
-                    (0, 255, 0),
-                    -1,
-                )
 
 
 def draw_eye_landmarks(
@@ -167,13 +165,11 @@ def draw_eye_landmarks(
         landmark = face[index]
 
         x = int(
-            landmark.x
-            * width
+            landmark.x * width
         )
 
         y = int(
-            landmark.y
-            * height
+            landmark.y * height
         )
 
         cv2.circle(
@@ -190,7 +186,7 @@ def draw_mouth_landmarks(
     face,
 ) -> None:
     """
-    Highlight landmarks used for MAR.
+    Highlight landmarks used for MAR / Yawn.
     """
 
     height, width = (
@@ -204,58 +200,802 @@ def draw_mouth_landmarks(
         landmark = face[index]
 
         x = int(
-            landmark.x
-            * width
+            landmark.x * width
         )
 
         y = int(
-            landmark.y
-            * height
+            landmark.y * height
         )
 
         cv2.circle(
             frame,
             (x, y),
-            4,
-            (255, 0, 255),
+            3,
+            (255, 120, 255),
             -1,
         )
 
 
-def draw_head_pose_landmarks(
+# ============================================================
+# Dashboard utilities
+# ============================================================
+
+def state_color(
+    state: DriverState,
+):
+    if state == DriverState.NORMAL:
+        return (80, 220, 80)
+
+    if state == DriverState.WARMING_UP:
+        return (0, 220, 255)
+
+    if state == DriverState.SUSPECTED:
+        return (0, 165, 255)
+
+    if state == DriverState.DROWSY:
+        return (0, 0, 255)
+
+    return (180, 180, 180)
+
+
+def presence_color(
+    state: DriverPresence,
+):
+    if state == DriverPresence.PRESENT:
+        return (80, 220, 80)
+
+    if state == DriverPresence.ABSENT:
+        return (0, 0, 255)
+
+    return (0, 220, 255)
+
+
+def draw_text(
     frame,
-    face,
-) -> None:
+    text: str,
+    x: int,
+    y: int,
+    scale: float = 0.60,
+    color=(230, 230, 230),
+    thickness: int = 1,
+):
+    cv2.putText(
+        frame,
+        text,
+        (x, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        scale,
+        color,
+        thickness,
+        cv2.LINE_AA,
+    )
+
+
+def draw_cabin_dashboard(
+    frame,
+    presence_result,
+    driver_state_result,
+    face_visible: bool,
+    eye_closed: Optional[bool],
+    current_yawn: bool,
+    blink_count: int,
+    recommendation,
+):
     """
-    Draw landmarks used by solvePnP head-pose estimation.
+    Compact high-level Cabin Perception dashboard.
+
+    The main product-facing outputs are:
+
+        Driver Presence
+        Driver State
+        Risk
+
+    PERCLOS / closure / yawns are retained only as
+    interpretable fatigue evidence.
     """
 
     height, width = (
         frame.shape[:2]
     )
 
-    for index in (
-        HeadPoseEstimator.landmark_indices()
+    panel_width = 390
+
+    x1 = max(
+        0,
+        width - panel_width,
+    )
+
+    x2 = width
+
+    # --------------------------------------------------------
+    # Semi-transparent panel
+    # --------------------------------------------------------
+
+    overlay = (
+        frame.copy()
+    )
+
+    cv2.rectangle(
+        overlay,
+        (x1, 0),
+        (x2, height),
+        (18, 18, 18),
+        -1,
+    )
+
+    cv2.addWeighted(
+        overlay,
+        0.78,
+        frame,
+        0.22,
+        0,
+        frame,
+    )
+
+    left = (
+        x1 + 25
+    )
+
+    y = 45
+
+    # ========================================================
+    # Header
+    # ========================================================
+
+    draw_text(
+        frame,
+        "VEHICLEMIND",
+        left,
+        y,
+        scale=0.82,
+        color=(255, 255, 255),
+        thickness=2,
+    )
+
+    y += 30
+
+    draw_text(
+        frame,
+        "CABIN PERCEPTION",
+        left,
+        y,
+        scale=0.52,
+        color=(170, 170, 170),
+    )
+
+    y += 35
+
+    cv2.line(
+        frame,
+        (left, y),
+        (width - 25, y),
+        (90, 90, 90),
+        1,
+    )
+
+    y += 35
+
+    # ========================================================
+    # Driver
+    # ========================================================
+
+    draw_text(
+        frame,
+        "DRIVER",
+        left,
+        y,
+        scale=0.55,
+        color=(160, 160, 160),
+        thickness=2,
+    )
+
+    y += 35
+
+    p_state = (
+        presence_result.state
+    )
+
+    draw_text(
+        frame,
+        "Presence",
+        left,
+        y,
+        scale=0.58,
+    )
+
+    draw_text(
+        frame,
+        p_state.value,
+        left + 180,
+        y,
+        scale=0.65,
+        color=presence_color(
+            p_state
+        ),
+        thickness=2,
+    )
+
+    y += 35
+
+    # --------------------------------------------------------
+    # Observation status
+    # --------------------------------------------------------
+
+    if face_visible:
+
+        observation_text = (
+            "TRACKING"
+        )
+
+        observation_color = (
+            80,
+            220,
+            80,
+        )
+
+    elif (
+        p_state
+        == DriverPresence.PRESENT
     ):
 
-        landmark = face[index]
-
-        x = int(
-            landmark.x
-            * width
+        observation_text = (
+            "TEMP LOST"
         )
 
-        y = int(
-            landmark.y
-            * height
+        observation_color = (
+            0,
+            200,
+            255,
         )
 
-        cv2.circle(
+    else:
+
+        observation_text = (
+            "NO FACE"
+        )
+
+        observation_color = (
+            170,
+            170,
+            170,
+        )
+
+    draw_text(
+        frame,
+        "Observation",
+        left,
+        y,
+        scale=0.58,
+    )
+
+    draw_text(
+        frame,
+        observation_text,
+        left + 180,
+        y,
+        scale=0.58,
+        color=observation_color,
+        thickness=2,
+    )
+
+    y += 45
+
+    # ========================================================
+    # Driver State
+    # ========================================================
+
+    draw_text(
+        frame,
+        "DRIVER STATE",
+        left,
+        y,
+        scale=0.55,
+        color=(160, 160, 160),
+        thickness=2,
+    )
+
+    y += 35
+
+    if driver_state_result is None:
+
+        state = (
+            DriverState.UNKNOWN
+        )
+
+        risk_text = (
+            "UNKNOWN"
+        )
+
+    else:
+
+        state = (
+            driver_state_result.state
+        )
+
+        risk_text = (
+            driver_state_result
+            .risk_level
+            .value
+        )
+
+    draw_text(
+        frame,
+        "State",
+        left,
+        y,
+        scale=0.58,
+    )
+
+    draw_text(
+        frame,
+        state.value,
+        left + 180,
+        y,
+        scale=0.65,
+        color=state_color(
+            state
+        ),
+        thickness=2,
+    )
+
+    y += 35
+
+    draw_text(
+        frame,
+        "Risk",
+        left,
+        y,
+        scale=0.58,
+    )
+
+    if risk_text == "LOW":
+
+        risk_color = (
+            80,
+            220,
+            80,
+        )
+
+    elif risk_text == "MEDIUM":
+
+        risk_color = (
+            0,
+            165,
+            255,
+        )
+
+    elif risk_text == "HIGH":
+
+        risk_color = (
+            0,
+            0,
+            255,
+        )
+
+    else:
+
+        risk_color = (
+            170,
+            170,
+            170,
+        )
+
+    draw_text(
+        frame,
+        risk_text,
+        left + 180,
+        y,
+        scale=0.65,
+        color=risk_color,
+        thickness=2,
+    )
+
+    y += 45
+
+    # ========================================================
+    # Fatigue Evidence
+    # ========================================================
+
+    draw_text(
+        frame,
+        "FATIGUE EVIDENCE",
+        left,
+        y,
+        scale=0.55,
+        color=(160, 160, 160),
+        thickness=2,
+    )
+
+    y += 35
+
+    # --------------------------------------------------------
+    # Driver unavailable
+    # --------------------------------------------------------
+
+    if (
+        driver_state_result is None
+        or
+        p_state != DriverPresence.PRESENT
+    ):
+
+        draw_text(
             frame,
-            (x, y),
-            4,
-            (255, 128, 0),
-            -1,
+            "PERCLOS",
+            left,
+            y,
+        )
+
+        draw_text(
+            frame,
+            "--",
+            left + 180,
+            y,
+        )
+
+        y += 32
+
+        draw_text(
+            frame,
+            "Eye Closure",
+            left,
+            y,
+        )
+
+        draw_text(
+            frame,
+            "--",
+            left + 180,
+            y,
+        )
+
+        y += 32
+
+        draw_text(
+            frame,
+            "Recent Yawns",
+            left,
+            y,
+        )
+
+        draw_text(
+            frame,
+            "--",
+            left + 180,
+            y,
+        )
+
+    else:
+
+        # ----------------------------------------------------
+        # PERCLOS
+        # ----------------------------------------------------
+
+        draw_text(
+            frame,
+            "PERCLOS",
+            left,
+            y,
+        )
+
+        if (
+            driver_state_result
+            .perclos_ready
+        ):
+
+            perclos_text = (
+                f"{driver_state_result.perclos * 100:.1f}%"
+            )
+
+        else:
+
+            perclos_text = (
+                "WARMING UP"
+            )
+
+        draw_text(
+            frame,
+            perclos_text,
+            left + 180,
+            y,
+            color=(220, 220, 220),
+        )
+
+        y += 32
+
+        # ----------------------------------------------------
+        # Continuous closure
+        # ----------------------------------------------------
+
+        draw_text(
+            frame,
+            "Eye Closure",
+            left,
+            y,
+        )
+
+        draw_text(
+            frame,
+            (
+                f"{driver_state_result.continuous_eye_closure:.1f}s"
+            ),
+            left + 180,
+            y,
+        )
+
+        y += 32
+
+        # ----------------------------------------------------
+        # Yawn
+        # ----------------------------------------------------
+
+        draw_text(
+            frame,
+            "Recent Yawns",
+            left,
+            y,
+        )
+
+        draw_text(
+            frame,
+            str(
+                driver_state_result
+                .recent_yawns
+            ),
+            left + 180,
+            y,
+        )
+
+    y += 45
+
+    # ========================================================
+    # Monitoring
+    # ========================================================
+
+    draw_text(
+        frame,
+        "MONITORING",
+        left,
+        y,
+        scale=0.55,
+        color=(160, 160, 160),
+        thickness=2,
+    )
+
+    y += 32
+
+    # --------------------------------------------------------
+    # Eye state
+    # --------------------------------------------------------
+
+    if eye_closed is None:
+
+        eye_text = (
+            "--"
+        )
+
+        eye_color = (
+            170,
+            170,
+            170,
+        )
+
+    elif eye_closed:
+
+        eye_text = (
+            "CLOSED"
+        )
+
+        eye_color = (
+            0,
+            0,
+            255,
+        )
+
+    else:
+
+        eye_text = (
+            "OPEN"
+        )
+
+        eye_color = (
+            80,
+            220,
+            80,
+        )
+
+    draw_text(
+        frame,
+        "Eye",
+        left,
+        y,
+    )
+
+    draw_text(
+        frame,
+        eye_text,
+        left + 180,
+        y,
+        color=eye_color,
+        thickness=2,
+    )
+
+    y += 30
+
+    # --------------------------------------------------------
+    # Blink
+    # --------------------------------------------------------
+
+    draw_text(
+        frame,
+        "Blinks",
+        left,
+        y,
+    )
+
+    draw_text(
+        frame,
+        str(
+            blink_count
+        ),
+        left + 180,
+        y,
+    )
+
+    y += 30
+
+    # --------------------------------------------------------
+    # Current yawn
+    # --------------------------------------------------------
+
+    draw_text(
+        frame,
+        "Yawn",
+        left,
+        y,
+    )
+
+    if current_yawn:
+
+        draw_text(
+            frame,
+            "DETECTED",
+            left + 180,
+            y,
+            color=(0, 165, 255),
+            thickness=2,
+        )
+
+    else:
+
+        draw_text(
+            frame,
+            "NO",
+            left + 180,
+            y,
+        )
+
+    y += 40
+
+    # ========================================================
+    # Safety Assistant
+    # ========================================================
+
+    cv2.line(
+        frame,
+        (left, y),
+        (width - 25, y),
+        (90, 90, 90),
+        1,
+    )
+
+    y += 30
+
+    draw_text(
+        frame,
+        "SAFETY ASSISTANT",
+        left,
+        y,
+        scale=0.55,
+        color=(160, 160, 160),
+        thickness=2,
+    )
+
+    y += 32
+
+    if state == DriverState.DROWSY:
+
+        draw_text(
+            frame,
+            "FATIGUE WARNING",
+            left,
+            y,
+            scale=0.68,
+            color=(0, 0, 255),
+            thickness=2,
+        )
+
+        y += 30
+
+        draw_text(
+            frame,
+            "Consider taking a break.",
+            left,
+            y,
+            scale=0.52,
+            color=(230, 230, 230),
+        )
+
+        y += 28
+
+        if recommendation is not None:
+
+            draw_text(
+                frame,
+                recommendation.name,
+                left,
+                y,
+                scale=0.52,
+                color=(255, 255, 255),
+                thickness=2,
+            )
+
+            y += 25
+
+            draw_text(
+                frame,
+                (
+                    f"{recommendation.distance_km:.1f} km"
+                    f"  |  ETA {recommendation.eta_minutes} min"
+                ),
+                left,
+                y,
+                scale=0.50,
+                color=(200, 200, 200),
+            )
+
+    elif state == DriverState.SUSPECTED:
+
+        draw_text(
+            frame,
+            "Fatigue signs detected.",
+            left,
+            y,
+            scale=0.55,
+            color=(0, 165, 255),
+            thickness=2,
+        )
+
+    elif state == DriverState.NORMAL:
+
+        draw_text(
+            frame,
+            "Driver condition normal.",
+            left,
+            y,
+            scale=0.55,
+            color=(80, 220, 80),
+        )
+
+    elif state == DriverState.WARMING_UP:
+
+        draw_text(
+            frame,
+            "Collecting observations...",
+            left,
+            y,
+            scale=0.52,
+            color=(0, 220, 255),
+        )
+
+    else:
+
+        draw_text(
+            frame,
+            "Driver unavailable.",
+            left,
+            y,
+            scale=0.52,
+            color=(170, 170, 170),
         )
 
 
@@ -266,17 +1006,29 @@ def draw_head_pose_landmarks(
 def main() -> None:
 
     # ========================================================
-    # 1. Face landmark detector
+    # 1. Face perception
     # ========================================================
 
-    detector = (
+    face_detector = (
         FaceLandmarkDetector(
             model_path=MODEL_PATH,
         )
     )
 
     # ========================================================
-    # 2. Eye analysis
+    # 2. Driver Presence
+    # ========================================================
+
+    presence_tracker = (
+        DriverPresenceTracker(
+            present_confirm_seconds=0.15,
+            absence_timeout_seconds=1.5,
+            startup_timeout_seconds=1.0,
+        )
+    )
+
+    # ========================================================
+    # 3. Eye monitoring
     # ========================================================
 
     eye_analyzer = (
@@ -300,7 +1052,7 @@ def main() -> None:
     )
 
     # ========================================================
-    # 3. Mouth / Yawn analysis
+    # 4. Mouth / Yawn
     # ========================================================
 
     mouth_analyzer = (
@@ -316,28 +1068,22 @@ def main() -> None:
     )
 
     # ========================================================
-    # 4. Head Pose
-    # ========================================================
-
-    head_pose_estimator = (
-        HeadPoseEstimator()
-    )
-
-    # ========================================================
-    # 5. Driver-state estimation
+    # 5. Driver State
     # ========================================================
 
     driver_state_estimator = (
         DriverStateEstimator(
-            suspected_perclos=0.15,
+            suspected_perclos=0.25,
             drowsy_perclos=0.30,
             suspected_closure_seconds=1.2,
-            drowsy_closure_seconds=2.5,
+            drowsy_closure_seconds=2.0,
+            yawn_window_seconds=60.0,
+            suspected_yawns=2,
         )
     )
 
     # ========================================================
-    # 6. Safety assistance
+    # 6. Safety Assistant
     # ========================================================
 
     rest_advisor = (
@@ -356,15 +1102,34 @@ def main() -> None:
         time.perf_counter()
     )
 
+    # --------------------------------------------------------
+    # FPS
+    # --------------------------------------------------------
+
     fps = 0.0
-    frame_count = 0
+    fps_counter = 0
 
     fps_start = (
         time.perf_counter()
     )
 
+    # --------------------------------------------------------
+    # Persistent state
+    # --------------------------------------------------------
+
+    last_driver_state_result = None
+
+    last_yawn_count = 0
+
+    last_blink_count = 0
+
     print(
-        "Camera started."
+        "[VehicleMind] Cabin Perception started."
+    )
+
+    print(
+        "[VehicleMind] "
+        "Outputs: Driver Presence + Driver State"
     )
 
     print(
@@ -382,23 +1147,24 @@ def main() -> None:
             if not success:
 
                 print(
-                    "Failed to read frame."
+                    "[VehicleMind] "
+                    "Failed to read camera frame."
                 )
 
                 break
 
-            # ------------------------------------------------
-            # Mirror MacBook front-facing camera
-            # ------------------------------------------------
+            # =================================================
+            # Mirror front camera
+            # =================================================
 
             frame = cv2.flip(
                 frame,
                 1,
             )
 
-            # ------------------------------------------------
-            # Runtime timestamp
-            # ------------------------------------------------
+            # =================================================
+            # Timestamp
+            # =================================================
 
             timestamp_ms = int(
                 (
@@ -409,165 +1175,87 @@ def main() -> None:
             )
 
             # =================================================
-            # Face detection / landmark estimation
-            # =================================================
-
-            faces = detector.detect(
-                frame,
-                timestamp_ms,
-            )
-
-            draw_face_landmarks(
-                frame,
-                faces,
-            )
-
-            # =================================================
             # FPS
             # =================================================
 
-            frame_count += 1
+            fps_counter += 1
 
-            elapsed = (
+            fps_elapsed = (
                 time.perf_counter()
                 - fps_start
             )
 
-            if elapsed >= 1.0:
+            if fps_elapsed >= 1.0:
 
                 fps = (
-                    frame_count
-                    / elapsed
+                    fps_counter
+                    / fps_elapsed
                 )
 
-                frame_count = 0
+                fps_counter = 0
 
                 fps_start = (
                     time.perf_counter()
                 )
 
             # =================================================
-            # Reset frame-level results
+            # Face perception
             # =================================================
 
-            driver_state_result = None
+            faces = (
+                face_detector.detect(
+                    frame,
+                    timestamp_ms,
+                )
+            )
+
+            face_visible = (
+                len(faces) > 0
+            )
+
+            # =================================================
+            # Driver Presence
+            # =================================================
+
+            presence_result = (
+                presence_tracker.update(
+                    timestamp_ms=timestamp_ms,
+                    face_detected=face_visible,
+                )
+            )
+
+            # =================================================
+            # Current-frame evidence
+            # =================================================
+
+            eye_closed_now = None
+
+            yawn_now = False
+
             recommendation = None
 
             # =================================================
-            # Driver perception
+            # Valid face observation
             # =================================================
 
-            if len(faces) > 0:
+            if face_visible:
 
-                face = faces[0]
+                face = (
+                    faces[0]
+                )
 
                 height, width = (
                     frame.shape[:2]
                 )
 
-                # =============================================
-                # Head Pose
-                # =============================================
+                # -------------------------------------------------
+                # Visualization
+                # -------------------------------------------------
 
-                head_pose_result = (
-                    head_pose_estimator.estimate(
-                        face,
-                        width,
-                        height,
-                    )
+                draw_face_landmarks(
+                    frame,
+                    face,
                 )
-
-                # =============================================
-                # Eye State
-                # =============================================
-
-                eye_result = (
-                    eye_analyzer.analyze(
-                        face,
-                        width,
-                        height,
-                    )
-                )
-
-                # =============================================
-                # Blink
-                # =============================================
-
-                blink_result = (
-                    blink_detector.update(
-                        eye_result.is_closed
-                    )
-                )
-
-                # =============================================
-                # PERCLOS
-                # =============================================
-
-                perclos_result = (
-                    perclos_estimator.update(
-                        timestamp_ms,
-                        eye_result.is_closed,
-                    )
-                )
-
-                # =============================================
-                # Mouth State
-                # =============================================
-
-                mouth_result = (
-                    mouth_analyzer.analyze(
-                        face,
-                        width,
-                        height,
-                    )
-                )
-
-                # =============================================
-                # Yawn
-                # =============================================
-
-                yawn_result = (
-                    yawn_detector.update(
-                        timestamp_ms,
-                        mouth_result.is_open,
-                    )
-                )
-
-                # =============================================
-                # Driver State
-                # =============================================
-
-                driver_state_result = (
-                    driver_state_estimator.update(
-                        timestamp_ms=timestamp_ms,
-                        eye_closed=(
-                            eye_result.is_closed
-                        ),
-                        perclos=(
-                            perclos_result.perclos
-                        ),
-                        perclos_ready=(
-                            perclos_result.ready
-                        ),
-                    )
-                )
-
-                # =============================================
-                # Safety Assistance
-                # =============================================
-
-                if (
-                    driver_state_result.state
-                    == DriverState.DROWSY
-                ):
-
-                    recommendation = (
-                        rest_advisor.recommend()
-                    )
-
-                # =============================================
-                # Landmark Visualization
-                # =============================================
 
                 draw_eye_landmarks(
                     frame,
@@ -579,344 +1267,231 @@ def main() -> None:
                     face,
                 )
 
-                draw_head_pose_landmarks(
-                    frame,
-                    face,
+                # =================================================
+                # Eye
+                # =================================================
+
+                eye_result = (
+                    eye_analyzer.analyze(
+                        face,
+                        width,
+                        height,
+                    )
                 )
 
-                # =============================================
-                # Eye state text
-                # =============================================
-
-                eye_state = (
-                    "CLOSED"
-                    if eye_result.is_closed
-                    else "OPEN"
+                eye_closed_now = (
+                    eye_result.is_closed
                 )
 
-                cv2.putText(
-                    frame,
-                    (
-                        f"Left EAR: "
-                        f"{eye_result.left_ear:.3f}"
-                    ),
-                    (20, 110),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 255, 255),
-                    2,
-                )
-
-                cv2.putText(
-                    frame,
-                    (
-                        f"Right EAR: "
-                        f"{eye_result.right_ear:.3f}"
-                    ),
-                    (20, 140),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 255, 255),
-                    2,
-                )
-
-                cv2.putText(
-                    frame,
-                    (
-                        f"Mean EAR: "
-                        f"{eye_result.mean_ear:.3f}"
-                    ),
-                    (20, 170),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 255, 255),
-                    2,
-                )
-
-                cv2.putText(
-                    frame,
-                    (
-                        f"Eye State: "
-                        f"{eye_state}"
-                    ),
-                    (20, 205),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.75,
-                    (
-                        (0, 0, 255)
-                        if eye_result.is_closed
-                        else (0, 255, 0)
-                    ),
-                    2,
-                )
-
-                # =============================================
+                # =================================================
                 # Blink
-                # =============================================
+                # =================================================
 
-                cv2.putText(
-                    frame,
-                    (
-                        f"Blinks: "
-                        f"{blink_result.blink_count}"
-                    ),
-                    (20, 240),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.75,
-                    (255, 255, 0),
-                    2,
+                blink_result = (
+                    blink_detector.update(
+                        eye_result.is_closed
+                    )
                 )
 
-                cv2.putText(
-                    frame,
-                    (
-                        "Closed Frames: "
-                        f"{blink_result.closed_frames}"
-                    ),
-                    (20, 275),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 255, 255),
-                    2,
+                last_blink_count = (
+                    blink_result.blink_count
                 )
 
-                # =============================================
+                # =================================================
                 # PERCLOS
-                # =============================================
+                # =================================================
 
-                if (
-                    perclos_result.ready
-                ):
-
-                    perclos_text = (
-                        "PERCLOS: "
-                        f"{perclos_result.perclos * 100:.1f}%"
+                perclos_result = (
+                    perclos_estimator.update(
+                        timestamp_ms,
+                        eye_result.is_closed,
                     )
-
-                else:
-
-                    perclos_text = (
-                        "PERCLOS: warming up "
-                        f"("
-                        f"{perclos_result.observed_duration:.1f}s"
-                        f")"
-                    )
-
-                cv2.putText(
-                    frame,
-                    perclos_text,
-                    (20, 310),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (0, 255, 255),
-                    2,
                 )
 
-                # =============================================
+                # =================================================
                 # Mouth
-                # =============================================
+                # =================================================
 
-                mouth_state = (
-                    "OPEN"
-                    if mouth_result.is_open
-                    else "CLOSED"
+                mouth_result = (
+                    mouth_analyzer.analyze(
+                        face,
+                        width,
+                        height,
+                    )
                 )
 
-                cv2.putText(
-                    frame,
-                    (
-                        f"MAR: "
-                        f"{mouth_result.mar:.3f}"
-                    ),
-                    (20, 350),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 255, 255),
-                    2,
-                )
-
-                cv2.putText(
-                    frame,
-                    (
-                        f"Mouth: "
-                        f"{mouth_state}"
-                    ),
-                    (20, 385),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (
-                        (0, 165, 255)
-                        if mouth_result.is_open
-                        else (0, 255, 0)
-                    ),
-                    2,
-                )
-
-                # =============================================
+                # =================================================
                 # Yawn
-                # =============================================
+                # =================================================
 
-                cv2.putText(
-                    frame,
-                    (
-                        f"Yawn Count: "
-                        f"{yawn_result.yawn_count}"
-                    ),
-                    (20, 420),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 255, 0),
-                    2,
+                yawn_result = (
+                    yawn_detector.update(
+                        timestamp_ms,
+                        mouth_result.is_open,
+                    )
                 )
 
-                cv2.putText(
-                    frame,
-                    (
-                        "Mouth Open: "
-                        f"{yawn_result.open_duration:.1f}s"
-                    ),
-                    (20, 455),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 255, 255),
-                    2,
-                )
-
-                if (
+                yawn_now = (
                     yawn_result.is_yawning
-                ):
+                )
 
-                    cv2.putText(
-                        frame,
-                        "YAWN DETECTED",
-                        (20, 500),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.9,
-                        (0, 0, 255),
-                        2,
-                    )
+                last_yawn_count = (
+                    yawn_result.yawn_count
+                )
 
-                # =============================================
-                # Head Pose
-                # =============================================
+                # =================================================
+                # Driver State
+                # =================================================
 
-                if (
-                    head_pose_result.success
-                ):
-
-                    cv2.putText(
-                        frame,
-                        (
-                            "Yaw: "
-                            f"{head_pose_result.yaw:.1f} deg"
+                driver_state_result = (
+                    driver_state_estimator.update(
+                        timestamp_ms=timestamp_ms,
+                        driver_presence=(
+                            presence_result.state
                         ),
-                        (20, 545),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.65,
-                        (255, 255, 255),
-                        2,
-                    )
-
-                    cv2.putText(
-                        frame,
-                        (
-                            "Pitch: "
-                            f"{head_pose_result.pitch:.1f} deg"
+                        eye_closed=(
+                            eye_result.is_closed
                         ),
-                        (20, 580),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.65,
-                        (255, 255, 255),
-                        2,
-                    )
-
-                    cv2.putText(
-                        frame,
-                        (
-                            "Roll: "
-                            f"{head_pose_result.roll:.1f} deg"
+                        perclos=(
+                            perclos_result.perclos
                         ),
-                        (20, 615),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.65,
-                        (255, 255, 255),
-                        2,
+                        perclos_ready=(
+                            perclos_result.ready
+                        ),
+                        yawn_count=(
+                            yawn_result.yawn_count
+                        ),
                     )
+                )
 
-                else:
+                last_driver_state_result = (
+                    driver_state_result
+                )
 
-                    cv2.putText(
-                        frame,
-                        "Head Pose: unavailable",
-                        (20, 545),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.65,
-                        (0, 165, 255),
-                        2,
-                    )
+            # =================================================
+            # Face unavailable
+            # =================================================
 
             else:
 
-                # =================================================
-                # No reliable face observation
-                # =================================================
+                # -------------------------------------------------
+                # Tell PERCLOS that this interval is invalid.
+                #
+                # No face does NOT mean eyes are open.
+                # -------------------------------------------------
 
-                perclos_estimator.update(
-                    timestamp_ms,
-                    None,
+                perclos_result = (
+                    perclos_estimator.update(
+                        timestamp_ms,
+                        None,
+                    )
                 )
 
-            # =================================================
-            # Basic system information
-            # =================================================
+                # -------------------------------------------------
+                # Short detector dropout:
+                #
+                # Presence Tracker still considers the driver
+                # PRESENT. Keep the last reliable Driver State
+                # instead of feeding fake "eyes open" evidence.
+                # -------------------------------------------------
 
-            cv2.putText(
-                frame,
-                (
-                    f"Faces: "
-                    f"{len(faces)}"
-                ),
-                (20, 35),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 0),
-                2,
-            )
+                if (
+                    presence_result.state
+                    == DriverPresence.PRESENT
+                ):
 
-            cv2.putText(
-                frame,
-                (
-                    f"FPS: "
-                    f"{fps:.1f}"
-                ),
-                (20, 70),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 0),
-                2,
-            )
+                    driver_state_result = (
+                        last_driver_state_result
+                    )
+
+                # -------------------------------------------------
+                # Driver truly unavailable:
+                #
+                # Force Driver State -> UNKNOWN.
+                # -------------------------------------------------
+
+                else:
+
+                    driver_state_result = (
+                        driver_state_estimator.update(
+                            timestamp_ms=timestamp_ms,
+                            driver_presence=(
+                                presence_result.state
+                            ),
+                            eye_closed=False,
+                            perclos=(
+                                perclos_result.perclos
+                            ),
+                            perclos_ready=(
+                                perclos_result.ready
+                            ),
+                            yawn_count=(
+                                last_yawn_count
+                            ),
+                        )
+                    )
+
+                    last_driver_state_result = (
+                        driver_state_result
+                    )
 
             # =================================================
-            # High-level Dashboard
+            # Safety Assistant
             # =================================================
 
             if (
-                driver_state_result
-                is not None
+                driver_state_result is not None
+                and
+                driver_state_result.state
+                == DriverState.DROWSY
+                and
+                presence_result.state
+                == DriverPresence.PRESENT
             ):
 
-                draw_driver_status_panel(
-                    frame,
-                    driver_state_result,
-                    recommendation,
+                recommendation = (
+                    rest_advisor.recommend()
                 )
+
+            # =================================================
+            # Minimal system information
+            # =================================================
+
+            draw_text(
+                frame,
+                (
+                    f"FPS {fps:.1f}"
+                ),
+                20,
+                35,
+                scale=0.62,
+                color=(220, 220, 220),
+                thickness=2,
+            )
+
+            # =================================================
+            # Cabin Dashboard
+            # =================================================
+
+            draw_cabin_dashboard(
+                frame=frame,
+                presence_result=presence_result,
+                driver_state_result=(
+                    driver_state_result
+                ),
+                face_visible=face_visible,
+                eye_closed=eye_closed_now,
+                current_yawn=yawn_now,
+                blink_count=last_blink_count,
+                recommendation=recommendation,
+            )
 
             # =================================================
             # Display
             # =================================================
 
             cv2.imshow(
-                "VehicleMind - Cabin Intelligence",
+                "VehicleMind - Cabin Perception",
                 frame,
             )
 
@@ -925,21 +1500,17 @@ def main() -> None:
                 & 0xFF
             )
 
-            if (
-                key == ord("q")
-            ):
-
+            if key == ord("q"):
                 break
 
     finally:
 
         cap.release()
 
-        detector.close()
+        face_detector.close()
 
         cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-
     main()
