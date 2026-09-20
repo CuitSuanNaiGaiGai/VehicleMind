@@ -317,7 +317,7 @@ class VehicleStatus:
     navigation_state: NavigationState = (
         NavigationState.IDLE
     )
-
+    navigation_destination_id: str | None = None
     navigation_destination: str | None = None
 
     # --------------------------------------------------------
@@ -549,6 +549,12 @@ class VehicleContext:
                     self.vehicle
                     .navigation_state
                 ),
+
+                "navigation_destination_id": (
+                    self.vehicle
+                    .navigation_destination_id
+                ),
+
                 "navigation_destination": (
                     self.vehicle
                     .navigation_destination

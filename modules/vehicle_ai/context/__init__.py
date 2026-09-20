@@ -16,6 +16,12 @@ from modules.vehicle_ai.context.context_manager import (
     ContextManager,
 )
 
+from modules.vehicle_ai.context.context_selector import (
+    ContextSelection,
+    ContextSelector,
+    ContextTopic,
+)
+
 
 __all__ = [
     "DriverContext",
@@ -30,4 +36,7 @@ __all__ = [
     "ContextChange",
     "ContextDomain",
     "ContextManager",
+    "ContextSelection",
+    "ContextSelector",
+    "ContextTopic",
 ]

@@ -171,10 +171,10 @@ def main():
 
     if rest_result.success:
 
-        destination = (
+        poi_id = (
             rest_result
             .data[
-                "name"
+                "poi_id"
             ]
         )
 
@@ -182,8 +182,8 @@ def main():
             registry,
             "start_navigation",
             {
-                "destination":
-                    destination,
+                "poi_id":
+                    poi_id,
             },
         )
 

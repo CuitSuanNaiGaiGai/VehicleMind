@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import json
 
+from modules.vehicle_ai.agent.action_state import (
+    PendingAction,
+    PendingActionStore,
+)
+
+from modules.vehicle_ai.agent.prompts import (
+    SYSTEM_PROMPT,
+)
+
 from modules.vehicle_ai.context import (
     ContextManager,
+    ContextSelector,
 )
 
 from modules.vehicle_ai.llm import (
@@ -14,39 +24,30 @@ from modules.vehicle_ai.tools import (
     ToolRegistry,
 )
 
-from modules.vehicle_ai.agent.prompts import (
-    SYSTEM_PROMPT,
-)
-
 
 class VehicleAgent:
     """
     Context-aware VehicleMind Agent.
 
-    Flow:
+    Core flow:
 
         User
           ↓
-        Current VehicleContext
+        Vehicle Context
+          +
+        Pending Action
           ↓
         LLM
           ↓
-        tool_calls?
-          │
-       ┌──┴──┐
-       NO    YES
-       │      │
-       ▼      ▼
-    answer   ToolRegistry
-              │
-              ▼
-           ToolResult
-              │
-              ▼
-             LLM
-              │
-              ▼
-         final answer
+        Function Call
+          ↓
+        ToolRegistry
+          ↓
+        Tool Result
+          ↓
+        Action State Update
+          ↓
+        LLM Final Response
     """
 
     def __init__(
@@ -70,30 +71,165 @@ class VehicleAgent:
             max_tool_rounds
         )
 
-        # Natural-language conversation only.
-        #
-        # Dynamic vehicle state is intentionally
-        # re-injected from ContextManager every turn.
+        # ----------------------------------------------------
+        # Natural language history
+        # ----------------------------------------------------
+
         self.history: list[
             dict
         ] = []
 
+        # ----------------------------------------------------
+        # Grounded action state
+        # ----------------------------------------------------
+
+        self.pending_actions = (
+            PendingActionStore()
+        )
+        self.context_selector = (
+            ContextSelector()
+        )
+
     # ========================================================
-    # Context
+    # Vehicle Context
     # ========================================================
 
     def _context_message(
         self,
+        user_text: str,
+        debug: bool = False,
     ) -> dict:
 
-        context = (
+        # --------------------------------------------------------
+        # Obtain latest complete runtime context.
+        # --------------------------------------------------------
+
+        full_context = (
             self.context_manager
-            .get_agent_context()
+            .get_context()
         )
+
+        # --------------------------------------------------------
+        # Select only information relevant to this turn.
+        # --------------------------------------------------------
+
+        selection = (
+            self.context_selector
+            .select(
+                user_text=(
+                    user_text
+                ),
+                vehicle_context=(
+                    full_context
+                ),
+            )
+        )
+
+        selected_context = (
+            selection.context
+        )
+
+        if debug:
+
+            print()
+            print(
+                "[Context Selector]"
+            )
+
+            print(
+                "  topics:",
+                [
+                    topic.value
+                    for topic
+                    in selection.topics
+                ],
+            )
+
+            print(
+                "  matched:",
+                selection
+                .matched_keywords,
+            )
+
+            print(
+                "  context:"
+            )
+
+            print(
+                json.dumps(
+                    selected_context,
+                    ensure_ascii=False,
+                    indent=2,
+                    default=str,
+                )
+            )
+
+        # --------------------------------------------------------
+        # Nothing relevant.
+        # --------------------------------------------------------
+
+        if not selected_context:
+
+            return {
+                "role":
+                    "system",
+
+                "content": (
+                    "CURRENT RELEVANT "
+                    "VEHICLE CONTEXT:\n"
+                    "No vehicle context is "
+                    "required for this request."
+                ),
+            }
 
         context_json = (
             json.dumps(
-                context,
+                selected_context,
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            )
+        )
+
+        return {
+            "role":
+                "system",
+
+            "content": (
+                "CURRENT RELEVANT "
+                "VEHICLE CONTEXT:\n"
+                f"{context_json}\n\n"
+                "Only use this context when "
+                "it is relevant to the "
+                "current user request."
+            ),
+        }
+    # ========================================================
+    # Pending Action Context
+    # ========================================================
+
+    def _pending_action_message(
+        self,
+    ) -> dict:
+
+        pending = (
+            self.pending_actions
+            .to_agent_context()
+        )
+
+        if pending is None:
+
+            return {
+                "role": "system",
+                "content": (
+                    "PENDING ACTION:\n"
+                    "None"
+                ),
+            }
+
+        pending_json = (
+            json.dumps(
+                pending,
                 ensure_ascii=False,
                 indent=2,
                 default=str,
@@ -103,13 +239,17 @@ class VehicleAgent:
         return {
             "role": "system",
             "content": (
-                "CURRENT VEHICLE CONTEXT:\n"
-                f"{context_json}"
+                "PENDING ACTION:\n"
+                f"{pending_json}\n\n"
+                "If the user confirms this "
+                "action, execute the exact "
+                "tool_name with the exact "
+                "stored arguments."
             ),
         }
 
     # ========================================================
-    # Tool assistant message
+    # Tool-call assistant message
     # ========================================================
 
     def _assistant_tool_message(
@@ -146,6 +286,214 @@ class VehicleAgent:
         }
 
     # ========================================================
+    # Tool argument grounding
+    # ========================================================
+
+    def _ground_tool_arguments(
+        self,
+        tool_name: str,
+        arguments: dict,
+    ) -> dict:
+        """
+        Apply deterministic grounding before tool execution.
+
+        For start_navigation:
+
+        if a valid pending navigation action exists, the
+        canonical poi_id from the pending action is authoritative.
+
+        This prevents entity drift caused by LLM paraphrasing.
+        """
+
+        grounded = dict(
+            arguments
+        )
+
+        if (
+            tool_name
+            == "start_navigation"
+        ):
+
+            pending = (
+                self.pending_actions
+                .get()
+            )
+
+            if (
+                pending is not None
+                and
+                pending.tool_name
+                == "start_navigation"
+            ):
+
+                pending_poi_id = (
+                    pending
+                    .arguments
+                    .get(
+                        "poi_id"
+                    )
+                )
+
+                if pending_poi_id:
+
+                    grounded[
+                        "poi_id"
+                    ] = (
+                        pending_poi_id
+                    )
+
+        return grounded
+
+    # ========================================================
+    # Tool result -> Action State
+    # ========================================================
+
+    def _update_action_state(
+        self,
+        tool_name: str,
+        tool_result,
+    ) -> None:
+        """
+        Convert selected tool results into grounded pending
+        actions.
+
+        Search results are observations.
+
+        Actions derived from those observations are stored
+        separately until confirmed by the driver.
+        """
+
+        if not tool_result.success:
+
+            return
+
+        # ----------------------------------------------------
+        # Rest-area search
+        # ----------------------------------------------------
+
+        if (
+            tool_name
+            == "search_nearby_rest_area"
+        ):
+
+            poi_id = (
+                tool_result
+                .data
+                .get(
+                    "poi_id"
+                )
+            )
+
+            name = (
+                tool_result
+                .data
+                .get(
+                    "name"
+                )
+            )
+
+            if (
+                poi_id
+                and
+                name
+            ):
+
+                self.pending_actions.set(
+                    PendingAction(
+                        tool_name=(
+                            "start_navigation"
+                        ),
+                        arguments={
+                            "poi_id":
+                                poi_id,
+                        },
+                        display_text=(
+                            f"Navigate to {name}"
+                        ),
+                        metadata={
+                            "poi_id":
+                                poi_id,
+
+                            "name":
+                                name,
+
+                            "distance_km":
+                                tool_result
+                                .data
+                                .get(
+                                    "distance_km"
+                                ),
+
+                            "eta_minutes":
+                                tool_result
+                                .data
+                                .get(
+                                    "eta_minutes"
+                                ),
+                        },
+                        expires_after_seconds=(
+                            120.0
+                        ),
+                    )
+                )
+
+        # ----------------------------------------------------
+        # Navigation started
+        # ----------------------------------------------------
+
+        elif (
+            tool_name
+            == "start_navigation"
+        ):
+
+            self.pending_actions.clear()
+
+        # ----------------------------------------------------
+        # Navigation cancelled
+        # ----------------------------------------------------
+
+        elif (
+            tool_name
+            == "cancel_navigation"
+        ):
+
+            self.pending_actions.clear()
+
+    # ========================================================
+    # Debug
+    # ========================================================
+
+    def _print_pending_action(
+        self,
+    ) -> None:
+
+        pending = (
+            self.pending_actions
+            .get()
+        )
+
+        if pending is None:
+
+            print(
+                "[Pending Action] None"
+            )
+
+            return
+
+        print(
+            "[Pending Action]"
+        )
+
+        print(
+            json.dumps(
+                pending.to_dict(),
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            )
+        )
+
+    # ========================================================
     # Chat
     # ========================================================
 
@@ -164,23 +512,33 @@ class VehicleAgent:
             return ""
 
         # ----------------------------------------------------
-        # Rebuild dynamic context every user turn.
+        # Rebuild dynamic system state every user turn.
         # ----------------------------------------------------
 
         messages = [
             {
-                "role": "system",
+                "role":
+                    "system",
+
                 "content":
                     SYSTEM_PROMPT,
             },
 
-            self._context_message(),
+            self._context_message(
+                user_text=user_text,
+                debug=debug,
+            ),
+
+            self._pending_action_message(),
 
             *self.history,
 
             {
-                "role": "user",
-                "content": user_text,
+                "role":
+                    "user",
+
+                "content":
+                    user_text,
             },
         ]
 
@@ -190,10 +548,10 @@ class VehicleAgent:
         )
 
         # ====================================================
-        # Agent loop
+        # Agent Loop
         # ====================================================
 
-        for round_index in range(
+        for _ in range(
             self.max_tool_rounds
         ):
 
@@ -204,9 +562,9 @@ class VehicleAgent:
                 )
             )
 
-            # ------------------------------------------------
-            # No tool call -> final response
-            # ------------------------------------------------
+            # =================================================
+            # Final natural-language response
+            # =================================================
 
             if not response.tool_calls:
 
@@ -219,6 +577,7 @@ class VehicleAgent:
                     {
                         "role":
                             "user",
+
                         "content":
                             user_text,
                     }
@@ -228,21 +587,23 @@ class VehicleAgent:
                     {
                         "role":
                             "assistant",
+
                         "content":
                             final_text,
                     }
                 )
 
-                # Keep a small conversational window.
                 self.history = (
-                    self.history[-12:]
+                    self.history[
+                        -12:
+                    ]
                 )
 
                 return final_text
 
-            # ------------------------------------------------
-            # Tool calls
-            # ------------------------------------------------
+            # =================================================
+            # Tool Calls
+            # =================================================
 
             messages.append(
                 self._assistant_tool_message(
@@ -253,6 +614,22 @@ class VehicleAgent:
             for call in (
                 response.tool_calls
             ):
+
+                # --------------------------------------------
+                # Deterministic grounding
+                # --------------------------------------------
+
+                grounded_arguments = (
+                    self
+                    ._ground_tool_arguments(
+                        tool_name=(
+                            call.name
+                        ),
+                        arguments=(
+                            call.arguments
+                        ),
+                    )
+                )
 
                 if debug:
 
@@ -273,6 +650,27 @@ class VehicleAgent:
                         )
                     )
 
+                    if (
+                        grounded_arguments
+                        != call.arguments
+                    ):
+
+                        print(
+                            "[Grounded Arguments]"
+                        )
+
+                        print(
+                            json.dumps(
+                                grounded_arguments,
+                                ensure_ascii=False,
+                                indent=2,
+                            )
+                        )
+
+                # --------------------------------------------
+                # Execute
+                # --------------------------------------------
+
                 tool_result = (
                     self.tool_registry
                     .execute(
@@ -280,18 +678,22 @@ class VehicleAgent:
                             call.name
                         ),
                         arguments=(
-                            call.arguments
+                            grounded_arguments
                         ),
                     )
                 )
 
-                result_json = (
-                    json.dumps(
+                # --------------------------------------------
+                # Update deterministic action state
+                # --------------------------------------------
+
+                self._update_action_state(
+                    tool_name=(
+                        call.name
+                    ),
+                    tool_result=(
                         tool_result
-                        .to_dict(),
-                        ensure_ascii=False,
-                        default=str,
-                    )
+                    ),
                 )
 
                 if debug:
@@ -310,14 +712,19 @@ class VehicleAgent:
                         )
                     )
 
+                    self._print_pending_action()
+
+                result_json = (
+                    json.dumps(
+                        tool_result
+                        .to_dict(),
+                        ensure_ascii=False,
+                        default=str,
+                    )
+                )
+
                 # --------------------------------------------
-                # Function Calling protocol:
-                #
-                # assistant(tool_calls)
-                #        ↓
-                # tool(tool_call_id)
-                #        ↓
-                # assistant(final answer)
+                # Tool response
                 # --------------------------------------------
 
                 messages.append(
@@ -347,3 +754,5 @@ class VehicleAgent:
     ) -> None:
 
         self.history.clear()
+
+        self.pending_actions.clear()
