@@ -126,7 +126,7 @@ class DriverContext:
 
     perclos: float | None = None
 
-    eye_closed: bool = False
+    eye_closed: bool | None = None
 
     eye_closure_seconds: float = 0.0
 
