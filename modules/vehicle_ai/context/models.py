@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
 
+from modules.vehicle_ai.context.contract import CONTEXT_SCHEMA_VERSION
 from modules.vehicle_ai.context.enums import (
     DriverPresence,
     DriverState,
@@ -294,6 +295,8 @@ class VehicleContext:
     The LLM should primarily consume this layer instead of
     directly accessing individual perception modules.
     """
+
+    schema_version: int = field(default=CONTEXT_SCHEMA_VERSION, init=False)
 
     driver: DriverContext = field(default_factory=DriverContext)
 

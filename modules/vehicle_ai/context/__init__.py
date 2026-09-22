@@ -21,6 +21,10 @@ from modules.vehicle_ai.context.context_selector import (
     ContextSelector,
     ContextTopic,
 )
+from modules.vehicle_ai.context.contract import (
+    CONTEXT_FIELD_CONTRACTS,
+    CONTEXT_SCHEMA_VERSION,
+)
 
 
 __all__ = [
@@ -39,4 +43,6 @@ __all__ = [
     "ContextSelection",
     "ContextSelector",
     "ContextTopic",
+    "CONTEXT_FIELD_CONTRACTS",
+    "CONTEXT_SCHEMA_VERSION",
 ]
