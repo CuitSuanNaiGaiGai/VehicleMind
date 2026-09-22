@@ -54,7 +54,7 @@ Existing safety responsibilities remain separate:
 - Consumes: approved design `docs/superpowers/specs/2026-09-22-demo-first-scope-reset-design.md`
 - Produces: an executable master checklist whose first unfinished product gate is the offline replay Demo
 
-- [ ] **Step 1: Write the failing scope-contract test**
+- [x] **Step 1: Write the failing scope-contract test**
 
 Create `tests/test_todolist_scope.py` with assertions that the active checklist:
 
@@ -85,7 +85,7 @@ def test_todolist_matches_demo_first_scope() -> None:
     assert all(item not in text for item in forbidden)
 ```
 
-- [ ] **Step 2: Run the test and verify the old plan fails**
+- [x] **Step 2: Run the test and verify the old plan fails**
 
 Run:
 
@@ -95,7 +95,7 @@ uv run --group dev python -m pytest tests/test_todolist_scope.py -q
 
 Expected: failure because the existing task list still requires GRU, TCN, perception ablations, and CARLA-first evaluation.
 
-- [ ] **Step 3: Rewrite `todolist.md` around evidence gates**
+- [x] **Step 3: Rewrite `todolist.md` around evidence gates**
 
 Keep completed repository-baseline items intact. Replace the remaining roadmap with these ordered sections and exact limits:
 
@@ -108,7 +108,7 @@ Keep completed repository-baseline items intact. Replace the remaining roadmap w
 
 Remove large-public-benchmark completion gates, self-trained GRU/TCN comparisons, all ablation tasks, and mandatory CARLA work. Preserve the rule that no unsupported accuracy or reliability claim may enter the README or resume.
 
-- [ ] **Step 4: Verify the new checklist**
+- [x] **Step 4: Verify the new checklist**
 
 Run:
 
@@ -119,7 +119,7 @@ git diff --check
 
 Expected: both test files pass and the diff check is clean.
 
-- [ ] **Step 5: Commit and review the task list**
+- [x] **Step 5: Commit and review the task list**
 
 ```bash
 git add todolist.md tests/test_todolist_scope.py
