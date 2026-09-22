@@ -27,6 +27,14 @@ def test_unknown_is_not_the_same_as_missing() -> None:
     assert manager.field_quality("driver", "state", now=received_at) == "UNKNOWN"
 
 
+def test_partial_update_does_not_mark_untouched_defaults_as_observed() -> None:
+    manager = ContextManager()
+    manager.update_road(vehicle_count=1)
+
+    assert manager.field_quality("road", "vehicle_count") == "KNOWN"
+    assert manager.field_quality("road", "lane_detected") == "MISSING"
+
+
 def test_stale_uses_receipt_clock_and_domain_ttl() -> None:
     manager = ContextManager()
     manager.update_road(lane_detected=True)
@@ -80,9 +88,7 @@ def test_valid_perception_metadata_is_available_in_quality_report() -> None:
         valid=True,
         processing_ms=3.0,
     )
-    manager.update_road(lane_detected=False)
-
-    manager.mark_valid_observation("road", metadata)
+    manager.update_road(observation=metadata, lane_detected=False)
 
     report = manager.observation_quality("road")
     assert report["metadata"] == metadata

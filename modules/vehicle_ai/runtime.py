@@ -119,9 +119,7 @@ class VehicleMindRuntime:
         if metadata is not None and not metadata.valid:
             self.context_manager.mark_invalid_observation("driver", metadata)
             return []
-        changes = self.cabin.update(**kwargs)
-        if metadata is not None:
-            self.context_manager.mark_valid_observation("driver", metadata)
+        changes = self.cabin.update(observation=metadata, **kwargs)
 
         return self._process_changes(changes)
 
@@ -137,9 +135,7 @@ class VehicleMindRuntime:
         if metadata is not None and not metadata.valid:
             self.context_manager.mark_invalid_observation("road", metadata)
             return []
-        changes = self.driving.update(**kwargs)
-        if metadata is not None:
-            self.context_manager.mark_valid_observation("road", metadata)
+        changes = self.driving.update(observation=metadata, **kwargs)
 
         return self._process_changes(changes)
 

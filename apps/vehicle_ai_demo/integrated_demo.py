@@ -7,6 +7,7 @@ import time
 from dotenv import load_dotenv
 
 from apps.vehicle_ai_demo.integrated_workers import cabin_worker, driving_worker
+from apps.vehicle_ai_demo.quality_display import format_age
 
 from modules.vehicle_ai.context import (
     GearState,
@@ -178,8 +179,7 @@ def main():
                 for domain, info in freshness.items():
                     print(
                         f"{domain:<8} "
-                        f"age="
-                        f"{info['age_seconds']:.3f}s "
+                        f"age={format_age(info['age_seconds'])} "
                         f"fresh="
                         f"{info['fresh']}"
                     )

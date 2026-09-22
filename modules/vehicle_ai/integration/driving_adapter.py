@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from modules.observation import ObservationMetadata
 from modules.vehicle_ai.context import (
     ContextManager,
 )
@@ -45,6 +46,7 @@ class DrivingContextAdapter:
     def update(
         self,
         *,
+        observation: ObservationMetadata | None = None,
         vehicle_count: int = 0,
         pedestrian_count: int = 0,
         rider_count: int = 0,
@@ -68,6 +70,7 @@ class DrivingContextAdapter:
         )
 
         return self.context_manager.update_road(
+            observation=observation,
             vehicle_count=(vehicle_count),
             pedestrian_count=int(pedestrian_count),
             rider_count=int(rider_count),

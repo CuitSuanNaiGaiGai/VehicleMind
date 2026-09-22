@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from modules.observation import ObservationMetadata
 from modules.vehicle_ai.context import (
     ContextManager,
     DriverPresence,
@@ -113,6 +114,7 @@ class CabinContextAdapter:
     def update(
         self,
         *,
+        observation: ObservationMetadata | None = None,
         presence: Any,
         driver_state: Any,
         risk: Any,
@@ -128,6 +130,7 @@ class CabinContextAdapter:
         """
 
         return self.context_manager.update_driver(
+            observation=observation,
             presence=(self._presence(presence)),
             state=(self._driver_state(driver_state)),
             risk=(self._risk_level(risk)),

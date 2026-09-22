@@ -31,6 +31,7 @@ class ObservationQualityTracker:
 
     def __init__(self) -> None:
         self._receipts: dict[str, Receipt] = {}
+        self._field_receipts: dict[tuple[str, str], Receipt] = {}
 
     def record(
         self,
@@ -38,10 +39,15 @@ class ObservationQualityTracker:
         *,
         valid: bool,
         metadata: ObservationMetadata | None = None,
+        fields: tuple[str, ...] = (),
     ) -> None:
         if domain not in self._MAX_AGE:
             raise ValueError(f"unknown context domain: {domain}")
-        self._receipts[domain] = Receipt(time.monotonic(), valid, metadata)
+        receipt = Receipt(time.monotonic(), valid, metadata)
+        self._receipts[domain] = receipt
+        if valid:
+            for field in fields:
+                self._field_receipts[(domain, field)] = receipt
 
     def report(self, domain: str, *, now: float | None = None) -> dict[str, Any]:
         if domain not in self._MAX_AGE:
@@ -69,10 +75,18 @@ class ObservationQualityTracker:
             "metadata": receipt.metadata,
         }
 
-
-def field_quality(domain_status: QualityStatus, value: object) -> QualityStatus:
-    if domain_status is not QualityStatus.KNOWN:
-        return domain_status
-    if value is None or value == "UNKNOWN":
-        return QualityStatus.UNKNOWN
-    return QualityStatus.KNOWN
+    def field_status(
+        self, domain: str, field: str, value: object, *, now: float | None = None
+    ) -> QualityStatus:
+        domain_report = self.report(domain, now=now)
+        if domain_report["status"] is QualityStatus.INVALID:
+            return QualityStatus.INVALID
+        receipt = self._field_receipts.get((domain, field))
+        if receipt is None:
+            return QualityStatus.MISSING
+        current = time.monotonic() if now is None else now
+        if current - receipt.received_at > self._MAX_AGE[domain]:
+            return QualityStatus.STALE
+        if value is None or value == "UNKNOWN":
+            return QualityStatus.UNKNOWN
+        return QualityStatus.KNOWN

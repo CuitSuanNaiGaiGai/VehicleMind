@@ -25,7 +25,6 @@ from modules.vehicle_ai.context.models import (
 from modules.vehicle_ai.context.quality import (
     ObservationQualityTracker,
     QualityStatus,
-    field_quality,
 )
 
 
@@ -180,6 +179,7 @@ class ContextManager:
         self,
         domain: ContextDomain,
         updates: dict[str, Any],
+        observation: ObservationMetadata | None = None,
     ) -> list[ContextChange]:
         """
         Apply partial updates to one context domain.
@@ -189,6 +189,8 @@ class ContextManager:
         """
 
         with self._lock:
+            if observation is not None and not observation.valid:
+                raise ValueError("semantic update requires a valid observation")
             validate_domain_updates(domain.value, updates)
             target = getattr(self._context, domain.value)
             replacement = deepcopy(target)
@@ -212,7 +214,12 @@ class ContextManager:
                 replacement.updated_at = now
                 setattr(self._context, domain.value, replacement)
                 self._changes.extend(changes)
-                self._quality.record(domain.value, valid=True)
+                self._quality.record(
+                    domain.value,
+                    valid=True,
+                    metadata=observation,
+                    fields=tuple(updates),
+                )
             return changes
 
     def mark_invalid_observation(
@@ -222,14 +229,6 @@ class ContextManager:
             raise ValueError("invalid observation marker requires valid=False")
         with self._lock:
             self._quality.record(domain, valid=False, metadata=metadata)
-
-    def mark_valid_observation(
-        self, domain: str, metadata: ObservationMetadata
-    ) -> None:
-        if not metadata.valid:
-            raise ValueError("valid observation marker requires valid=True")
-        with self._lock:
-            self._quality.record(domain, valid=True, metadata=metadata)
 
     def observation_quality(
         self, domain: str, *, now: float | None = None
@@ -245,9 +244,8 @@ class ContextManager:
         if field not in CONTEXT_FIELD_CONTRACTS[domain]:
             raise ValueError(f"unknown context field: {domain}.{field}")
         with self._lock:
-            status = self._quality.report(domain, now=now)["status"]
             value = getattr(getattr(self._context, domain), field)
-            return field_quality(status, value)
+            return self._quality.field_status(domain, field, value, now=now)
 
     # ========================================================
     # Driver update
@@ -255,6 +253,7 @@ class ContextManager:
 
     def update_driver(
         self,
+        observation: ObservationMetadata | None = None,
         **updates: Any,
     ) -> list[ContextChange]:
         """
@@ -271,6 +270,7 @@ class ContextManager:
         return self._update_domain(
             ContextDomain.DRIVER,
             updates,
+            observation,
         )
 
     # ========================================================
@@ -279,6 +279,7 @@ class ContextManager:
 
     def update_road(
         self,
+        observation: ObservationMetadata | None = None,
         **updates: Any,
     ) -> list[ContextChange]:
         """
@@ -288,6 +289,7 @@ class ContextManager:
         return self._update_domain(
             ContextDomain.ROAD,
             updates,
+            observation,
         )
 
     # ========================================================

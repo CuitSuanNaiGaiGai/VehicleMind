@@ -1,5 +1,6 @@
 import time
 
+from apps.vehicle_ai_demo.quality_display import format_age
 from modules.vehicle_ai.context import (
     ContextManager,
     DriverPresence,
@@ -187,7 +188,9 @@ def main():
     freshness = manager.freshness()
 
     for domain, info in freshness.items():
-        print(f"{domain:<8} age={info['age_seconds']:.3f}s fresh={info['fresh']}")
+        print(
+            f"{domain:<8} age={format_age(info['age_seconds'])} fresh={info['fresh']}"
+        )
 
     # ========================================================
     # Recent changes
