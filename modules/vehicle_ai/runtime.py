@@ -130,6 +130,14 @@ class VehicleMindRuntime:
 
         return self._process_changes(changes)
 
+    def update_vehicle(
+        self,
+        **kwargs,
+    ):
+        changes = self.context_manager.update_vehicle(**kwargs)
+
+        return self._process_changes(changes)
+
     # ========================================================
     # Agent
     # ========================================================

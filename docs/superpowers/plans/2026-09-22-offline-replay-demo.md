@@ -442,7 +442,7 @@ Review checkpoint: report the demonstrated pre-fix vulnerability, post-fix evide
 - Produces: `ReplayResult(context_schema_version, scenario_id, passed, trace, semantic_sha256, assertions, final_context, metrics)`
 - Produces: `ReplayRunner.run(scenario: ReplayScenario) -> ReplayResult`
 
-- [ ] **Step 1: Write failing end-to-end replay tests**
+- [x] **Step 1: Write failing end-to-end replay tests**
 
 Tests must assert that the committed scenario:
 
@@ -458,7 +458,7 @@ Tests must assert that the committed scenario:
 
 Also add a negative scenario where expected state differs and assert `result.passed is False` with a named assertion failure rather than an exception.
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_replay_runner.py -q
@@ -466,7 +466,7 @@ uv run --group dev python -m pytest tests/vehicle_ai/replay/test_replay_runner.p
 
 Expected: import failure for runner and trace contracts.
 
-- [ ] **Step 3: Implement normalized tracing**
+- [x] **Step 3: Implement normalized tracing**
 
 Set `context_schema_version` to integer `1`. Trace records use scenario `at_ms` and monotonically increasing sequence numbers. Every `context_update` record contains domain, source, confidence, validity, and normalized values from `ReplayObservation`. Do not place wall-clock timestamps, UUID event IDs, absolute paths, prompts containing secrets, or hidden reasoning in the semantic digest. Normalize enums to their string values and sort mapping keys before hashing canonical JSON.
 
@@ -485,13 +485,13 @@ TRACE_KINDS = {
 }
 ```
 
-- [ ] **Step 4: Implement `ReplayRunner` orchestration**
+- [x] **Step 4: Implement `ReplayRunner` orchestration**
 
 Construct one `VehicleMindRuntime` using `ScriptedLLMClient`. For each step, record the observation envelope and apply its `values` through existing public adapters only when `valid` is true; an invalid observation records evidence but does not silently overwrite the current domain with normal values. Record returned events; call `runtime.chat` for user text; and call `runtime.agent.confirm_pending` for confirmation steps using the current pending action ID. Record stage durations with `time.perf_counter`, but exclude those measurements from the semantic digest.
 
 Compare final evidence with `ExpectedOutcome` and return named assertions such as `event:HIGH_RISK_DETECTED`, `tool:start_navigation`, `vehicle.navigation_state`, and `unauthorized_sensitive_executions`.
 
-- [ ] **Step 5: Verify, size-check, and commit**
+- [x] **Step 5: Verify, size-check, and commit**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_replay_runner.py tests/vehicle_ai/test_tool_confirmation.py -q
