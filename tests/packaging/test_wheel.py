@@ -15,7 +15,15 @@ def test_built_wheel_contains_loadable_default_cabin_config(
 ) -> None:
     wheel_dir = tmp_path / "wheel"
     subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(wheel_dir)],
+        [
+            "uv",
+            "build",
+            "--offline",
+            "--no-build-isolation",
+            "--wheel",
+            "--out-dir",
+            str(wheel_dir),
+        ],
         cwd=REPOSITORY_ROOT,
         check=True,
         capture_output=True,
