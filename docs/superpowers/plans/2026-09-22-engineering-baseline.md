@@ -36,7 +36,7 @@
 - Consumes: Python 3.13 and the existing `apps`, `modules`, and `tests` packages.
 - Produces: `pytest` collection restricted to `tests/`, dependency groups, and unambiguous demo filenames.
 
-- [ ] **Step 1: Add a failing repository-layout test**
+- [x] **Step 1: Add a failing repository-layout test**
 
 ```python
 from pathlib import Path
@@ -53,29 +53,29 @@ def test_demo_modules_are_not_named_like_tests():
     assert offenders == []
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `python -m pytest tests/test_repository_layout.py -q -p no:cacheprovider`
 
 Expected: FAIL listing `phone_test.py` and `real_perception_test.py`.
 
-- [ ] **Step 3: Rename the demo modules and add project metadata**
+- [x] **Step 3: Rename the demo modules and add project metadata**
 
 `pyproject.toml` must set `requires-python = ">=3.13,<3.14"`, configure pytest with `testpaths = ["tests"]`, and configure Ruff for Python 3.13. Dependency files must separate lightweight runtime, perception, and development packages; `requirements.txt` remains the full-install compatibility entry point.
 
-- [ ] **Step 4: Generate and validate the lock**
+- [x] **Step 4: Generate and validate the lock**
 
 Run: `uv lock`
 
 Expected: `uv.lock` resolves successfully for Python 3.13.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run: `uv run --group dev python -m pytest tests/test_repository_layout.py -q -p no:cacheprovider`
 
 Expected: `1 passed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pyproject.toml uv.lock requirements.txt requirements apps tests/test_repository_layout.py

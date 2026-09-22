@@ -1,0 +1,7 @@
+-r core.txt
+
+mypy>=1.17,<2
+pytest>=8.4,<9
+pytest-cov>=6,<8
+ruff>=0.12,<1
+
