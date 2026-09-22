@@ -560,7 +560,7 @@ git add README.md CONTRIBUTING.md todolist.md \
 git commit -m "docs: explain reproducible result artifacts"
 ```
 
-- [ ] **Step 5: Push and verify protected remote CI**
+- [x] **Step 5: Push and verify protected remote CI**
 
 Run:
 
