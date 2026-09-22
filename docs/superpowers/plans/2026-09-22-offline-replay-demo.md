@@ -327,7 +327,7 @@ Review checkpoint: report deterministic behavior and identify execution-layer co
 - Produces: `ToolRegistry.execution_history() -> tuple[ToolExecutionRecord, ...]`
 - Produces: `VehicleAgent.confirm_pending(action_id: str) -> ToolResult`
 
-- [ ] **Step 1: Write failing safety tests**
+- [x] **Step 1: Write failing safety tests**
 
 Required tests:
 
@@ -354,7 +354,7 @@ def test_confirmation_executes_only_original_action_once(runtime):
 
 Also cover wrong IDs, expired actions, tool-name mismatch, argument mismatch, unknown tools, and confirmation objects used with nonmatching calls.
 
-- [ ] **Step 2: Run safety tests and verify existing behavior fails**
+- [x] **Step 2: Run safety tests and verify existing behavior fails**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/test_tool_confirmation.py -q
@@ -362,7 +362,7 @@ uv run --group dev python -m pytest tests/vehicle_ai/test_tool_confirmation.py -
 
 Expected: the first test demonstrates that `start_navigation` currently executes despite `requires_confirmation=True`.
 
-- [ ] **Step 3: Implement confirmation consumption**
+- [x] **Step 3: Implement confirmation consumption**
 
 Add to `action_state.py`:
 
@@ -388,7 +388,7 @@ def consume(self, action_id: str) -> ConfirmedAction | None:
 
 The returned arguments must be defensive copies. An expired or mismatched action must not execute and must not be transformable into a different action.
 
-- [ ] **Step 4: Enforce confirmation inside `ToolRegistry.execute`**
+- [x] **Step 4: Enforce confirmation inside `ToolRegistry.execute`**
 
 After lookup and before required-field validation:
 
@@ -404,11 +404,11 @@ if tool.requires_confirmation:
 
 Mark a matching confirmation ID used before invoking the handler so a failing handler cannot replay it. Append one `ToolExecutionRecord` for every attempt, including blocked, invalid, failed, and successful executions. Return defensive history copies. The execution layer, not prompts or UI code, owns these invariants.
 
-- [ ] **Step 5: Add explicit Agent confirmation**
+- [x] **Step 5: Add explicit Agent confirmation**
 
 `VehicleAgent.confirm_pending` consumes the pending action, calls the registry with the exact stored tool name and arguments, updates action state after success, and returns stable `INVALID_CONFIRMATION` when no matching live action exists. Sensitive tool calls proposed during ordinary `chat` remain blocked unless this method supplies the consumed confirmation.
 
-- [ ] **Step 6: Run safety and regression tests**
+- [x] **Step 6: Run safety and regression tests**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/test_tool_confirmation.py tests/smoke/test_core_demos.py -q
@@ -419,7 +419,7 @@ uv run --group dev python scripts/check_source_size.py
 
 Expected: all tests pass, all unauthorized sensitive calls are blocked, and source limits remain satisfied.
 
-- [ ] **Step 7: Commit and review**
+- [x] **Step 7: Commit and review**
 
 ```bash
 git add modules/vehicle_ai/agent modules/vehicle_ai/tools tests/vehicle_ai/test_tool_confirmation.py

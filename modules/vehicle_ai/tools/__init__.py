@@ -4,6 +4,7 @@ from modules.vehicle_ai.context import (
 
 from modules.vehicle_ai.tools.base import (
     ToolDefinition,
+    ToolExecutionRecord,
     ToolResult,
 )
 
@@ -54,6 +55,7 @@ def build_default_tool_registry(
 
 __all__ = [
     "ToolDefinition",
+    "ToolExecutionRecord",
     "ToolResult",
     "ToolRegistry",
     "build_default_tool_registry",

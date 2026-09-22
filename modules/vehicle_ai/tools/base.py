@@ -40,6 +40,18 @@ class ToolResult:
         }
 
 
+@dataclass(frozen=True)
+class ToolExecutionRecord:
+    """Auditable outcome for one attempted tool execution."""
+
+    name: str
+    arguments: dict[str, Any]
+    requires_confirmation: bool
+    confirmed: bool
+    success: bool
+    error: str | None
+
+
 # ============================================================
 # Tool Definition
 # ============================================================

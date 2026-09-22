@@ -1,11 +1,26 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from typing import Protocol
 from typing import Any
+from collections.abc import Mapping
 
 from modules.vehicle_ai.tools.base import (
     ToolDefinition,
+    ToolExecutionRecord,
     ToolResult,
 )
+
+
+class Confirmation(Protocol):
+    @property
+    def action_id(self) -> str: ...
+
+    @property
+    def tool_name(self) -> str: ...
+
+    @property
+    def arguments(self) -> Mapping[str, Any]: ...
 
 
 # ============================================================
@@ -43,6 +58,8 @@ class ToolRegistry:
             str,
             ToolDefinition,
         ] = {}
+        self._execution_history: list[ToolExecutionRecord] = []
+        self._used_confirmation_ids: set[str] = set()
 
     # ========================================================
     # Register
@@ -92,6 +109,30 @@ class ToolRegistry:
 
         return [tool.llm_schema() for tool in self._tools.values()]
 
+    def execution_history(self) -> tuple[ToolExecutionRecord, ...]:
+        return tuple(deepcopy(self._execution_history))
+
+    def _record(
+        self,
+        *,
+        name: str,
+        arguments: Mapping[str, Any],
+        requires_confirmation: bool,
+        confirmed: bool,
+        result: ToolResult,
+    ) -> ToolResult:
+        self._execution_history.append(
+            ToolExecutionRecord(
+                name=name,
+                arguments=deepcopy(dict(arguments)),
+                requires_confirmation=requires_confirmation,
+                confirmed=confirmed,
+                success=result.success,
+                error=result.error,
+            )
+        )
+        return result
+
     # ========================================================
     # Execute
     # ========================================================
@@ -100,19 +141,71 @@ class ToolRegistry:
         self,
         name: str,
         arguments: dict[str, Any] | None = None,
+        *,
+        confirmation: Confirmation | None = None,
     ) -> ToolResult:
 
         if arguments is None:
             arguments = {}
 
         if name not in self._tools:
-            return ToolResult(
-                success=False,
-                message=(f"Tool '{name}' is not available."),
-                error="UNKNOWN_TOOL",
+            return self._record(
+                name=name,
+                arguments=arguments,
+                requires_confirmation=False,
+                confirmed=False,
+                result=ToolResult(
+                    success=False,
+                    message=(f"Tool '{name}' is not available."),
+                    error="UNKNOWN_TOOL",
+                ),
             )
 
         tool = self._tools[name]
+        confirmed = False
+
+        if tool.requires_confirmation:
+            if confirmation is None:
+                return self._record(
+                    name=name,
+                    arguments=arguments,
+                    requires_confirmation=True,
+                    confirmed=False,
+                    result=ToolResult(
+                        success=False,
+                        message="Explicit confirmation is required.",
+                        error="CONFIRMATION_REQUIRED",
+                    ),
+                )
+            if (
+                confirmation.tool_name != name
+                or dict(confirmation.arguments) != arguments
+            ):
+                return self._record(
+                    name=name,
+                    arguments=arguments,
+                    requires_confirmation=True,
+                    confirmed=False,
+                    result=ToolResult(
+                        success=False,
+                        message="Confirmation does not match the pending action.",
+                        error="CONFIRMATION_MISMATCH",
+                    ),
+                )
+            if confirmation.action_id in self._used_confirmation_ids:
+                return self._record(
+                    name=name,
+                    arguments=arguments,
+                    requires_confirmation=True,
+                    confirmed=False,
+                    result=ToolResult(
+                        success=False,
+                        message="Confirmation was already used.",
+                        error="CONFIRMATION_REPLAY",
+                    ),
+                )
+            self._used_confirmation_ids.add(confirmation.action_id)
+            confirmed = True
 
         # ----------------------------------------------------
         # Basic required-field validation
@@ -126,13 +219,19 @@ class ToolRegistry:
         missing = [field_name for field_name in required if field_name not in arguments]
 
         if missing:
-            return ToolResult(
-                success=False,
-                message=(f"Missing required arguments: {missing}"),
-                error=("MISSING_ARGUMENTS"),
-                data={
-                    "missing": missing,
-                },
+            return self._record(
+                name=name,
+                arguments=arguments,
+                requires_confirmation=tool.requires_confirmation,
+                confirmed=confirmed,
+                result=ToolResult(
+                    success=False,
+                    message=(f"Missing required arguments: {missing}"),
+                    error=("MISSING_ARGUMENTS"),
+                    data={
+                        "missing": missing,
+                    },
+                ),
             )
 
         # ----------------------------------------------------
@@ -147,13 +246,19 @@ class ToolRegistry:
         unknown = [key for key in arguments if key not in known_properties]
 
         if unknown:
-            return ToolResult(
-                success=False,
-                message=(f"Unknown arguments: {unknown}"),
-                error=("UNKNOWN_ARGUMENTS"),
-                data={
-                    "unknown": unknown,
-                },
+            return self._record(
+                name=name,
+                arguments=arguments,
+                requires_confirmation=tool.requires_confirmation,
+                confirmed=confirmed,
+                result=ToolResult(
+                    success=False,
+                    message=(f"Unknown arguments: {unknown}"),
+                    error=("UNKNOWN_ARGUMENTS"),
+                    data={
+                        "unknown": unknown,
+                    },
+                ),
             )
 
         # ----------------------------------------------------
@@ -164,13 +269,19 @@ class ToolRegistry:
             result = tool.handler(**arguments)
 
         except Exception as exc:
-            return ToolResult(
-                success=False,
-                message=(f"Tool '{name}' execution failed."),
-                error=(type(exc).__name__),
-                data={
-                    "detail": str(exc),
-                },
+            return self._record(
+                name=name,
+                arguments=arguments,
+                requires_confirmation=tool.requires_confirmation,
+                confirmed=confirmed,
+                result=ToolResult(
+                    success=False,
+                    message=(f"Tool '{name}' execution failed."),
+                    error=(type(exc).__name__),
+                    data={
+                        "detail": str(exc),
+                    },
+                ),
             )
 
         if not isinstance(
@@ -179,4 +290,10 @@ class ToolRegistry:
         ):
             raise TypeError(f"Tool '{name}' must return ToolResult.")
 
-        return result
+        return self._record(
+            name=name,
+            arguments=arguments,
+            requires_confirmation=tool.requires_confirmation,
+            confirmed=confirmed,
+            result=result,
+        )

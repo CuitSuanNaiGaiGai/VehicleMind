@@ -3,9 +3,30 @@ from __future__ import annotations
 import time
 import uuid
 
+from copy import deepcopy
 from dataclasses import dataclass
 from dataclasses import field
+from types import MappingProxyType
+from collections.abc import Mapping
 from typing import Any
+
+
+def _freeze_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType(
+            {str(key): _freeze_value(item) for key, item in value.items()}
+        )
+    if isinstance(value, list | tuple):
+        return tuple(_freeze_value(item) for item in value)
+    return deepcopy(value)
+
+
+def _plain_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _plain_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_plain_value(item) for item in value]
+    return deepcopy(value)
 
 
 # ============================================================
@@ -13,7 +34,7 @@ from typing import Any
 # ============================================================
 
 
-@dataclass
+@dataclass(frozen=True)
 class PendingAction:
     """
     A grounded action waiting for user confirmation.
@@ -37,17 +58,21 @@ class PendingAction:
 
     tool_name: str
 
-    arguments: dict[str, Any]
+    arguments: Mapping[str, Any]
 
     display_text: str
 
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     created_at: float = field(default_factory=time.time)
 
     expires_after_seconds: float = 120.0
 
     action_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "arguments", _freeze_value(self.arguments))
+        object.__setattr__(self, "metadata", _freeze_value(self.metadata))
 
     # ========================================================
     # Lifetime
@@ -84,12 +109,21 @@ class PendingAction:
         return {
             "action_id": self.action_id,
             "tool_name": self.tool_name,
-            "arguments": self.arguments,
+            "arguments": _plain_value(self.arguments),
             "display_text": self.display_text,
-            "metadata": self.metadata,
+            "metadata": _plain_value(self.metadata),
             "created_at": self.created_at,
             "expires_after_seconds": self.expires_after_seconds,
         }
+
+
+@dataclass(frozen=True)
+class ConfirmedAction:
+    """One immutable, one-time grant derived from a live pending action."""
+
+    action_id: str
+    tool_name: str
+    arguments: Mapping[str, Any]
 
 
 # ============================================================
@@ -152,6 +186,22 @@ class PendingActionStore:
 
         self._pending = None
 
+    def consume(
+        self,
+        action_id: str,
+    ) -> ConfirmedAction | None:
+        """Consume one matching live action and return its exact execution grant."""
+
+        action = self.get()
+        if action is None or action.action_id != action_id:
+            return None
+        self.clear()
+        return ConfirmedAction(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            arguments=_freeze_value(action.arguments),
+        )
+
     # ========================================================
     # Agent representation
     # ========================================================
@@ -168,7 +218,7 @@ class PendingActionStore:
         return {
             "action_id": action.action_id,
             "tool_name": action.tool_name,
-            "arguments": action.arguments,
+            "arguments": _plain_value(action.arguments),
             "display_text": action.display_text,
-            "metadata": action.metadata,
+            "metadata": _plain_value(action.metadata),
         }

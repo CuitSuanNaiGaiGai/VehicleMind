@@ -1,4 +1,5 @@
 from modules.vehicle_ai.agent.action_state import (
+    ConfirmedAction,
     PendingAction,
     PendingActionStore,
 )
@@ -9,6 +10,7 @@ from modules.vehicle_ai.agent.vehicle_agent import (
 
 
 __all__ = [
+    "ConfirmedAction",
     "PendingAction",
     "PendingActionStore",
     "VehicleAgent",

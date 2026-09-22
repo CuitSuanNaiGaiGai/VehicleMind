@@ -6,6 +6,7 @@ from modules.vehicle_ai.agent.action_state import (
     PendingAction,
     PendingActionStore,
 )
+from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
 
 from modules.vehicle_ai.agent.prompts import (
     SYSTEM_PROMPT,
@@ -27,6 +28,7 @@ from modules.vehicle_ai.llm import (
 
 from modules.vehicle_ai.tools import (
     ToolRegistry,
+    ToolResult,
 )
 
 
@@ -81,6 +83,10 @@ class VehicleAgent:
         # ----------------------------------------------------
 
         self.pending_actions = PendingActionStore()
+        self.confirmations = ActionConfirmationController(
+            self.pending_actions,
+            self.tool_registry,
+        )
         self.context_selector = ContextSelector()
 
     # ========================================================
@@ -284,6 +290,9 @@ class VehicleAgent:
         elif tool_name == "cancel_navigation":
             self.pending_actions.clear()
 
+    def confirm_pending(self, action_id: str) -> ToolResult:
+        return self.confirmations.confirm(action_id)
+
     # ========================================================
     # Debug
     # ========================================================
@@ -381,6 +390,7 @@ class VehicleAgent:
                     tool_name=(call.name),
                     arguments=(call.arguments),
                 )
+                self.confirmations.stage(call.name, grounded_arguments)
 
                 if debug:
                     print()

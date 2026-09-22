@@ -96,14 +96,14 @@
 
 ### 4.1 确定性安全边界
 
-- [ ] 在 ToolRegistry 执行层强制检查 `requires_confirmation`，不能只依赖 Prompt。
-- [ ] 未获得有效确认时，导航或其他敏感动作返回 `CONFIRMATION_REQUIRED`。
-- [ ] 用户确认后只能执行 PendingAction 保存的原始工具名和规范化参数。
+- [x] 在 ToolRegistry 执行层强制检查 `requires_confirmation`，不能只依赖 Prompt。
+- [x] 未获得有效确认时，导航或其他敏感动作返回 `CONFIRMATION_REQUIRED`。
+- [x] 用户确认后只能执行 PendingAction 保存的原始工具名和规范化参数。
 - [ ] 用户拒绝、修改目标或确认超时后清除 PendingAction。
-- [ ] 确认 action ID 一次性使用且具有过期机制，重放必须失败。
-- [ ] 工具执行失败、参数错误、未知工具和确认不匹配返回稳定结构化错误。
+- [x] 确认 action ID 一次性使用且具有过期机制，重放必须失败。
+- [x] 工具执行失败、参数错误、未知工具和确认不匹配返回稳定结构化错误。
 - [ ] 工具定义读操作、可逆写操作和敏感动作三个风险等级。
-- [ ] 安全策略由确定性代码执行，LLM 无权覆盖。
+- [x] 安全策略由确定性代码执行，LLM 无权覆盖。
 
 ### 4.2 上下文和异常处理
 
@@ -118,7 +118,7 @@
 - [ ] 敏感动作确认合规率达到 100%。
 - [ ] 未经确认的敏感动作执行次数为 0。
 - [ ] Prompt Injection 不得绕过 ToolRegistry 安全检查。
-- [ ] 同一 PendingAction 不得重复执行。
+- [x] 同一 PendingAction 不得重复执行。
 
 ## 5. Agent 自动化评测
 
