@@ -1,9 +1,9 @@
-import argparse
 import time
 from pathlib import Path
 
 import cv2
 
+from apps.driving_demo.object_cli import parse_object_args
 from apps.driving_demo.ui.objects import draw_dashboard, draw_object
 from modules.driving.detection.object_detector import (
     RoadObjectDetector,
@@ -34,47 +34,7 @@ OBJECT_COLORS = {
 
 
 def main():
-
-    parser = argparse.ArgumentParser(
-        description=("VehicleMind Road Object Detection Demo")
-    )
-
-    parser.add_argument(
-        "--video",
-        type=str,
-        default=("assets/driving/road_test.mp4"),
-    )
-
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=("assets/driving/object_result.mp4"),
-    )
-
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="yolo11n.pt",
-    )
-
-    parser.add_argument(
-        "--conf",
-        type=float,
-        default=0.25,
-    )
-
-    parser.add_argument(
-        "--imgsz",
-        type=int,
-        default=640,
-    )
-
-    parser.add_argument(
-        "--show",
-        action="store_true",
-    )
-
-    args = parser.parse_args()
+    args = parse_object_args()
 
     input_path = PROJECT_ROOT / args.video
 

@@ -121,6 +121,7 @@ lane:
   roi_top_right: 0.58
   roi_right: 0.95
   roi_top_height: 0.52
+  fit_top_height: 0.55
   hough_threshold: 40
   min_line_length: 35
   max_line_gap: 80
@@ -172,6 +173,7 @@ class LanePerceptionConfig:
     roi_top_right: float = 0.58
     roi_right: float = 0.95
     roi_top_height: float = 0.52
+    fit_top_height: float = 0.55
     hough_threshold: int = 40
     min_line_length: int = 35
     max_line_gap: int = 80
@@ -234,7 +236,7 @@ git commit -m "feat: add versioned perception configuration"
 - Produces: `resolve_overrides(config: PerceptionConfig, overrides: Mapping[str, object]) -> PerceptionConfig`
 - Preserves: explicit algorithm constructor parameters and existing CLI option names
 
-- [ ] **Step 1: Write failing tests for override precedence and entry-point wiring**
+- [x] **Step 1: Write failing tests for override precedence and entry-point wiring**
 
 ```python
 def test_explicit_override_wins_without_mutating_defaults() -> None:
@@ -258,7 +260,7 @@ def test_invalid_override_uses_domain_validation() -> None:
 
 Add an AST test that visits numeric constants inside calls to `PhoneDetector`, `PhoneBehaviorTracker`, `PanopticDrivingDetector`, `RoadObjectDetector`, and `LaneDetector` in the five application files and asserts no numeric threshold is passed directly.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run:
 
@@ -270,7 +272,7 @@ uv run --group dev python -m pytest \
 
 Expected: import or assertion failure because override resolution and entry-point wiring do not exist.
 
-- [ ] **Step 3: Implement immutable dotted-path overrides**
+- [x] **Step 3: Implement immutable dotted-path overrides**
 
 `modules/config/overrides.py` accepts only these prefixes and reconstructs frozen dataclasses with `dataclasses.replace`:
 
@@ -297,7 +299,7 @@ def resolve_overrides(
 
 Each domain dataclass validates itself in `__post_init__`, so YAML and CLI values share one validation path.
 
-- [ ] **Step 4: Migrate the five application boundaries**
+- [x] **Step 4: Migrate the five application boundaries**
 
 - `phone_demo.py` loads `PerceptionConfig.load_default().phone` and passes its six fields.
 - `scene_cli.py` uses `None` defaults for `--work-width`, `--work-height`, `--conf`, and `--nms`; after parsing, it resolves only explicitly supplied values against the driving defaults.
@@ -306,7 +308,7 @@ Each domain dataclass validates itself in `__post_init__`, so YAML and CLI value
 - `lane_demo.py` passes a complete `LanePerceptionConfig` into `LaneDetector`.
 - `LaneDetector` accepts `config: LanePerceptionConfig | None = None` and retains keyword-only `smoothing`, `min_abs_slope`, and `max_abs_slope` compatibility overrides. It stores the resolved config and uses it for HLS, Canny, ROI, slope, smoothing, and Hough parameters.
 
-- [ ] **Step 5: Verify entry points and behavior**
+- [x] **Step 5: Verify entry points and behavior**
 
 Run:
 
@@ -320,7 +322,7 @@ uv run --group dev python -m apps.driving_demo.scene_demo --help
 
 Expected: tests pass, `--help` exits zero without requiring a model file, and rendering regression tests remain unchanged.
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 ```bash
 git add modules/config/overrides.py apps modules/driving tests/config tests/driving

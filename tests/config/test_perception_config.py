@@ -15,6 +15,7 @@ def test_repository_perception_config_loads() -> None:
     assert config.driving.nms_threshold == pytest.approx(0.45)
     assert config.lane.canny_low == 60
     assert config.lane.white_hls_lower == (0, 160, 0)
+    assert config.lane.fit_top_height == pytest.approx(0.55)
 
 
 def test_partial_config_overrides_defaults(tmp_path: Path) -> None:

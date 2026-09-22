@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 
 from apps.driving_demo.ui.lane import draw_dashboard, draw_lane_result
+from modules.config import PerceptionConfig
 from modules.driving.lane.lane_detector import (
     LaneDetector,
 )
@@ -52,9 +53,7 @@ def main():
     # Detector
     # ========================================================
 
-    detector = LaneDetector(
-        smoothing=0.75,
-    )
+    detector = LaneDetector(config=PerceptionConfig.load_default().lane)
 
     # ========================================================
     # Video

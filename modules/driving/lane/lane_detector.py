@@ -1,8 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional, Tuple
 
 import cv2
 import numpy as np
+
+from modules.config import LanePerceptionConfig
 
 
 Line = Tuple[int, int, int, int]
@@ -57,15 +59,29 @@ class LaneDetector:
 
     def __init__(
         self,
-        smoothing: float = 0.75,
-        min_abs_slope: float = 0.35,
-        max_abs_slope: float = 3.0,
+        config: LanePerceptionConfig | None = None,
+        *,
+        smoothing: float | None = None,
+        min_abs_slope: float | None = None,
+        max_abs_slope: float | None = None,
     ):
-        self.smoothing = smoothing
+        resolved = config or LanePerceptionConfig()
+        compatibility_overrides = {
+            name: value
+            for name, value in (
+                ("smoothing", smoothing),
+                ("min_abs_slope", min_abs_slope),
+                ("max_abs_slope", max_abs_slope),
+            )
+            if value is not None
+        }
+        if compatibility_overrides:
+            resolved = replace(resolved, **compatibility_overrides)
 
-        self.min_abs_slope = min_abs_slope
-
-        self.max_abs_slope = max_abs_slope
+        self.config = resolved
+        self.smoothing = resolved.smoothing
+        self.min_abs_slope = resolved.min_abs_slope
+        self.max_abs_slope = resolved.max_abs_slope
 
         self._left_line = None
         self._right_line = None
@@ -74,8 +90,8 @@ class LaneDetector:
     # Color mask
     # ========================================================
 
-    @staticmethod
     def _lane_color_mask(
+        self,
         frame: np.ndarray,
     ) -> np.ndarray:
         """
@@ -91,15 +107,9 @@ class LaneDetector:
         # White lane
         # ----------------------------------------------------
 
-        white_lower = np.array(
-            [0, 160, 0],
-            dtype=np.uint8,
-        )
+        white_lower = np.array(self.config.white_hls_lower, dtype=np.uint8)
 
-        white_upper = np.array(
-            [180, 255, 255],
-            dtype=np.uint8,
-        )
+        white_upper = np.array(self.config.white_hls_upper, dtype=np.uint8)
 
         white_mask = cv2.inRange(
             hls,
@@ -111,15 +121,9 @@ class LaneDetector:
         # Yellow lane
         # ----------------------------------------------------
 
-        yellow_lower = np.array(
-            [10, 80, 80],
-            dtype=np.uint8,
-        )
+        yellow_lower = np.array(self.config.yellow_hls_lower, dtype=np.uint8)
 
-        yellow_upper = np.array(
-            [40, 255, 255],
-            dtype=np.uint8,
-        )
+        yellow_upper = np.array(self.config.yellow_hls_upper, dtype=np.uint8)
 
         yellow_mask = cv2.inRange(
             hls,
@@ -154,16 +158,16 @@ class LaneDetector:
 
         edges = cv2.Canny(
             blurred,
-            60,
-            150,
+            self.config.canny_low,
+            self.config.canny_high,
         )
 
         color_mask = self._lane_color_mask(frame)
 
         color_edges = cv2.Canny(
             color_mask,
-            50,
-            120,
+            self.config.color_canny_low,
+            self.config.color_canny_high,
         )
 
         return cv2.bitwise_or(
@@ -175,8 +179,8 @@ class LaneDetector:
     # Road ROI
     # ========================================================
 
-    @staticmethod
     def _road_roi(
+        self,
         edges: np.ndarray,
     ) -> np.ndarray:
 
@@ -189,19 +193,19 @@ class LaneDetector:
             [
                 [
                     (
-                        int(width * 0.05),
+                        int(width * self.config.roi_left),
                         height,
                     ),
                     (
-                        int(width * 0.42),
-                        int(height * 0.52),
+                        int(width * self.config.roi_top_left),
+                        int(height * self.config.roi_top_height),
                     ),
                     (
-                        int(width * 0.58),
-                        int(height * 0.52),
+                        int(width * self.config.roi_top_right),
+                        int(height * self.config.roi_top_height),
                     ),
                     (
-                        int(width * 0.95),
+                        int(width * self.config.roi_right),
                         height,
                     ),
                 ]
@@ -330,7 +334,7 @@ class LaneDetector:
 
         y_bottom = height - 1
 
-        y_top = int(height * 0.55)
+        y_top = int(height * self.config.fit_top_height)
 
         x_bottom = int(a * y_bottom + b)
 
@@ -409,9 +413,9 @@ class LaneDetector:
             roi,
             rho=1,
             theta=np.pi / 180.0,
-            threshold=40,
-            minLineLength=35,
-            maxLineGap=80,
+            threshold=self.config.hough_threshold,
+            minLineLength=self.config.min_line_length,
+            maxLineGap=self.config.max_line_gap,
         )
 
         segments = []

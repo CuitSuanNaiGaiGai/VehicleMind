@@ -4,6 +4,7 @@ from pathlib import Path
 import cv2
 
 from apps.cabin_demo.ui.phone import draw_interaction_zone, open_camera
+from modules.config import PerceptionConfig
 from modules.cabin.face.landmarks import (
     FaceLandmarkDetector,
 )
@@ -24,20 +25,21 @@ MODEL_PATH = PROJECT_ROOT / "models" / "mediapipe" / "face_landmarker.task"
 
 
 def main():
+    config = PerceptionConfig.load_default().phone
     face_detector = FaceLandmarkDetector(
         model_path=MODEL_PATH,
     )
 
     phone_detector = PhoneDetector(
-        model_name="yolo26n.pt",
-        confidence_threshold=0.35,
-        image_size=640,
+        model_name=config.model_name,
+        confidence_threshold=config.confidence_threshold,
+        image_size=config.image_size,
     )
 
     behavior_tracker = PhoneBehaviorTracker(
-        near_duration_seconds=0.5,
-        use_duration_seconds=1.5,
-        missing_tolerance_seconds=0.25,
+        near_duration_seconds=config.near_duration_seconds,
+        use_duration_seconds=config.use_duration_seconds,
+        missing_tolerance_seconds=config.missing_tolerance_seconds,
     )
 
     cap = open_camera()

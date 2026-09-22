@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+
+from argparse import Namespace
 from pathlib import Path
 
 import cv2
@@ -31,8 +33,8 @@ def _open_writer(path: Path, fps: float, size: tuple[int, int]):
     return writer
 
 
-def run_scene_demo() -> None:
-    args = parse_scene_args()
+def run_scene_demo(args: Namespace | None = None) -> None:
+    args = args or parse_scene_args()
     input_path = PROJECT_ROOT / args.video
     output_path = PROJECT_ROOT / args.output
     model_path = PROJECT_ROOT / args.panoptic_model
@@ -46,8 +48,8 @@ def run_scene_demo() -> None:
         model_path=model_path,
         score_threshold=args.conf,
         nms_threshold=args.nms,
-        prefer_coreml=True,
-        warmup_runs=2,
+        prefer_coreml=args.prefer_coreml,
+        warmup_runs=args.warmup_runs,
     )
     capture = cv2.VideoCapture(str(input_path))
     if not capture.isOpened():

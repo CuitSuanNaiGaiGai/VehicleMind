@@ -125,6 +125,7 @@ class LanePerceptionConfig:
     roi_top_right: float = 0.58
     roi_right: float = 0.95
     roi_top_height: float = 0.52
+    fit_top_height: float = 0.55
     hough_threshold: int = 40
     min_line_length: int = 35
     max_line_gap: int = 80
@@ -176,6 +177,7 @@ class LanePerceptionConfig:
                 "and lane.roi_right must be strictly increasing"
             )
         _unit_interval("lane.roi_top_height", self.roi_top_height)
+        _unit_interval("lane.fit_top_height", self.fit_top_height)
         _positive_int("lane.hough_threshold", self.hough_threshold)
         _positive_int("lane.min_line_length", self.min_line_length)
         _positive_int("lane.max_line_gap", self.max_line_gap)
