@@ -15,7 +15,9 @@ def print_performance_summary(
     detector_ms: float,
     pipeline_ms: float,
 ) -> None:
-    divisor = max(frame_count, 1)
+    if frame_count <= 0:
+        raise ValueError("No video frames were processed; performance is unavailable")
+    divisor = frame_count
     averages = {
         "Preprocess": preprocess_ms / divisor,
         "Inference": inference_ms / divisor,
