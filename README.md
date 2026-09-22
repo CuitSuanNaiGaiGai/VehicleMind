@@ -4,6 +4,42 @@
 
 VehicleMind 旨在构建一个 **可运行、可展示、可扩展** 的智能车辆算法系统。
 
+## 可复现工程基线
+
+当前锁定 Python `3.13`。完整感知链路已在 macOS `26.6.2`、Apple Silicon、Python `3.13.9` 上验证；macOS 14+ Apple Silicon 是目标平台，其他 macOS 版本属于 best-effort。ONNX Runtime 优先使用 CoreML，并保留 `CPUExecutionProvider` fallback。无需摄像头、模型权重和在线 API 即可运行核心测试。
+
+推荐使用 [uv](https://docs.astral.sh/uv/)：
+
+```bash
+# Agent/上下文核心与开发工具
+uv sync --group dev
+
+# 需要摄像头、视频或模型推理时
+uv sync --extra perception --group dev
+
+# 离线质量门禁
+uv run --group dev python -m pytest -q
+uv run --group dev ruff check apps modules scripts tests
+uv run --group dev python scripts/check_source_size.py
+```
+
+模型权重不进入 Git。将权重放到 `assets/model_manifest.yaml` 指定的位置后验证：
+
+```bash
+uv run --group dev python scripts/verify_assets.py
+```
+
+在线 Agent 仅在需要时复制 `.env.example` 为 `.env` 并填写一个提供商的密钥。离线测试不会读取密钥。有效入口包括：
+
+```bash
+python -m apps.cabin_demo.main
+python -m apps.cabin_demo.demo_video --help
+python -m apps.driving_demo.scene_demo --help
+python -m apps.vehicle_ai_demo.cabin_adapter_demo
+```
+
+第三方模型来源与许可证风险见 `THIRD_PARTY_NOTICES.md`。项目自身 `LICENSE` 尚待仓库所有者选择，在此之前不要推断本仓库代码已获得某种开源许可。
+
 当前项目已经完成两个核心感知模块：
 
 ```text

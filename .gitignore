@@ -4,6 +4,9 @@ __pycache__/
 *.so
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
 
 # Virtual environment
 .venv/
@@ -39,3 +42,8 @@ logs/
 
 # Environment
 .env
+.env.*
+!.env.example
+
+# Model compiler caches
+.coreml_cache/

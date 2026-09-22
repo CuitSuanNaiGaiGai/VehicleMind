@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path
 
 
 from dotenv import load_dotenv
@@ -20,23 +19,6 @@ from modules.vehicle_ai.llm import (
 from modules.vehicle_ai.runtime import (
     VehicleMindRuntime,
 )
-
-
-# ============================================================
-# Project
-# ============================================================
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-
-CABIN_MODEL = PROJECT_ROOT / "models" / "mediapipe" / "face_landmarker.task"
-
-
-DRIVING_MODEL = PROJECT_ROOT / "models" / "driving" / "YOLOPv2_512.onnx"
-
-
-ROAD_VIDEO = PROJECT_ROOT / "assets" / "driving" / "road_test.mp4"
 
 
 def main():

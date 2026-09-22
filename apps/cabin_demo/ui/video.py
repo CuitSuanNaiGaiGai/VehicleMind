@@ -1,22 +1,6 @@
-from pathlib import Path
-
 import cv2
 
 from modules.cabin.fatigue.eye_state import EyeStateAnalyzer
-
-
-# ============================================================
-# Project paths
-# ============================================================
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-MODEL_PATH = PROJECT_ROOT / "models" / "mediapipe" / "face_landmarker.task"
-
-
-# ============================================================
-# Arguments
-# ============================================================
 
 
 def draw_eye_landmarks(

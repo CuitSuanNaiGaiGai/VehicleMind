@@ -1,0 +1,70 @@
+version: 1
+assets:
+  - id: mediapipe_face_landmarker_float16_v1
+    filename: face_landmarker.task
+    expected_path: models/mediapipe/face_landmarker.task
+    required: true
+    size_bytes: 3758596
+    sha256: 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
+    source_url: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+    upstream_project: https://github.com/google-ai-edge/mediapipe
+    license:
+      name: Apache-2.0 repository; artifact-specific redistribution terms not located
+      url: https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE
+      status: review-required-for-redistribution
+
+  - id: yolopv2_dynamic_onnx
+    filename: YOLOPv2.onnx
+    expected_path: models/driving/YOLOPv2.onnx
+    required: true
+    size_bytes: 155893668
+    sha256: 661188db51398d305916b55c991c5327be9b7aa56ac90113fd47d2876c0805d9
+    source_url: https://github.com/CAIC-AD/YOLOPv2/releases/tag/V0.0.1
+    upstream_project: https://github.com/CAIC-AD/YOLOPv2
+    provenance: legacy local ONNX conversion; exact conversion command is not yet reconstructed
+    license:
+      name: MIT
+      url: https://github.com/CAIC-AD/YOLOPv2/blob/main/LICENSE
+      status: upstream-verified-exact-onnx-provenance-pending
+
+  - id: yolopv2_static_512_onnx
+    filename: YOLOPv2_512.onnx
+    expected_path: models/driving/YOLOPv2_512.onnx
+    required: true
+    size_bytes: 155893629
+    sha256: 9d81ce2616f84f2c370cb39d4ac825aaf566c488935b52822ef7540d4f0c6e7d
+    source_url: https://github.com/CAIC-AD/YOLOPv2/releases/tag/V0.0.1
+    upstream_project: https://github.com/CAIC-AD/YOLOPv2
+    provenance: derived locally from yolopv2_dynamic_onnx with a fixed 1x3x512x512 input
+    license:
+      name: MIT
+      url: https://github.com/CAIC-AD/YOLOPv2/blob/main/LICENSE
+      status: upstream-verified-local-derivative
+
+  - id: yolopv2_static_640_onnx
+    filename: YOLOPv2_640.onnx
+    expected_path: models/driving/YOLOPv2_640.onnx
+    required: true
+    size_bytes: 155893629
+    sha256: 82ece0d6a550d7450d03baf3785ecb8de1e724f34fbc418fe846349850735e58
+    source_url: https://github.com/CAIC-AD/YOLOPv2/releases/tag/V0.0.1
+    upstream_project: https://github.com/CAIC-AD/YOLOPv2
+    provenance: derived locally from yolopv2_dynamic_onnx with a fixed 1x3x640x640 input
+    license:
+      name: MIT
+      url: https://github.com/CAIC-AD/YOLOPv2/blob/main/LICENSE
+      status: upstream-verified-local-derivative
+
+  - id: ultralytics_yolo26n_phone_detector
+    filename: yolo26n.pt
+    expected_path: yolo26n.pt
+    required: false
+    size_bytes: null
+    sha256: null
+    source_url: https://github.com/ultralytics/assets/releases/tag/v8.4.0
+    upstream_project: https://github.com/ultralytics/ultralytics
+    provenance: optional auto-download used only by phone_demo; pinning is still required
+    license:
+      name: AGPL-3.0 or Ultralytics Enterprise
+      url: https://www.ultralytics.com/license
+      status: review-required-before-resume-grade-release

@@ -1,19 +1,4 @@
 import argparse
-from pathlib import Path
-
-
-# ============================================================
-# Project paths
-# ============================================================
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-MODEL_PATH = PROJECT_ROOT / "models" / "mediapipe" / "face_landmarker.task"
-
-
-# ============================================================
-# Arguments
-# ============================================================
 
 
 def parse_args():

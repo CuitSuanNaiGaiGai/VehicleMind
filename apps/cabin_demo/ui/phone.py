@@ -1,11 +1,4 @@
-from pathlib import Path
-
 import cv2
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-MODEL_PATH = PROJECT_ROOT / "models" / "mediapipe" / "face_landmarker.task"
 
 
 def open_camera(

@@ -282,7 +282,7 @@ git commit -m "refactor: split oversized perception and demo modules"
 - Produces: `verify_assets(manifest_path: Path, root: Path) -> list[str]`, returning deterministic validation errors.
 - Requires: owner-selected project license before creating `LICENSE`; third-party provenance must be evidence-backed.
 
-- [ ] **Step 1: Write failing manifest tests**
+- [x] **Step 1: Write failing manifest tests**
 
 ```python
 from pathlib import Path
@@ -296,17 +296,17 @@ def test_missing_assets_have_actionable_errors(tmp_path):
     assert all("expected path" in error for error in errors)
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `uv run --group dev python -m pytest tests/test_asset_manifest.py -q`
 
 Expected: FAIL because the verifier does not exist.
 
-- [ ] **Step 3: Add manifest and verification implementation**
+- [x] **Step 3: Add manifest and verification implementation**
 
 The manifest records the existing MediaPipe and YOLOPv2 filenames, SHA-256 values, canonical upstream URL, license URL, and local expected path. `.env.example` contains key names only. README documents supported platforms, CPU fallback, installation groups, asset verification, and valid demo commands.
 
-- [ ] **Step 4: Verify documentation and manifest**
+- [x] **Step 4: Verify documentation and manifest**
 
 Run: `uv run --group dev python -m pytest tests/test_asset_manifest.py -q`
 
@@ -316,7 +316,7 @@ Run: `uv run --group dev python scripts/verify_assets.py --manifest assets/model
 
 Expected: either success for locally present assets or actionable missing-asset messages without a traceback.
 
-- [ ] **Step 5: Commit non-license documentation**
+- [x] **Step 5: Commit non-license documentation**
 
 ```bash
 git add .env.example .gitignore assets/model_manifest.yaml scripts/verify_assets.py THIRD_PARTY_NOTICES.md CONTRIBUTING.md README.md tests/test_asset_manifest.py
