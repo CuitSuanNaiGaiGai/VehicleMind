@@ -17,6 +17,7 @@
 - Snapshot generation is deterministic and works without cameras, models, or online APIs.
 - Existing explicit constructor injection remains supported for tests and ablations.
 - Work proceeds test-first and each task ends in a focused commit.
+- After every task, review this checklist and report completed work, verification evidence, remaining risks, and the exact next task before implementation continues.
 
 ---
 
@@ -345,7 +346,7 @@ git commit -m "refactor: resolve perception thresholds from config"
 - Produces: `write_run_artifacts(output_dir: Path, snapshot: Mapping[str, object]) -> RunArtifactPaths`
 - Produces: `resolved_config.yaml` for machines and `run_card.md` for human-facing result presentation
 
-- [ ] **Step 1: Write failing deterministic-artifact tests**
+- [x] **Step 1: Write failing deterministic-artifact tests**
 
 ```python
 def test_snapshot_digest_is_deterministic() -> None:
@@ -397,7 +398,7 @@ def test_writer_creates_machine_and_human_artifacts(tmp_path: Path) -> None:
 
 Also test refusal to overwrite an existing run, dirty-worktree rejection in formal mode, missing asset IDs, and absence of secret values.
 
-- [ ] **Step 2: Run snapshot tests and verify RED**
+- [x] **Step 2: Run snapshot tests and verify RED**
 
 Run:
 
@@ -408,7 +409,7 @@ uv run --group dev python -m pytest \
 
 Expected: collection fails because `modules.config.snapshot` does not exist.
 
-- [ ] **Step 3: Implement canonical snapshot construction**
+- [x] **Step 3: Implement canonical snapshot construction**
 
 Use these public types:
 
@@ -429,7 +430,7 @@ class RunArtifactPaths:
 
 Convert frozen dataclasses with `dataclasses.asdict`. Compute `config_sha256` from `yaml.safe_dump(resolved_sections, sort_keys=True).encode("utf-8")`. The digest covers resolved cabin/perception values and explicit overrides, not timestamps or paths.
 
-- [ ] **Step 4: Implement atomic artifact writing and readable result card**
+- [x] **Step 4: Implement atomic artifact writing and readable result card**
 
 Write both artifacts to temporary siblings and replace their final targets only after both serialize successfully. Refuse an output directory that already contains either final artifact.
 
@@ -459,7 +460,7 @@ The Markdown card contains this exact structure:
 
 This card displays traceability only. Metric tables and qualitative examples will be added by later benchmark tasks when real results exist.
 
-- [ ] **Step 5: Add the offline CLI**
+- [x] **Step 5: Add the offline CLI**
 
 `scripts/snapshot_experiment_config.py` supports:
 
@@ -473,7 +474,7 @@ This card displays traceability only. Metric tables and qualitative examples wil
 
 It loads repository defaults, resolves overrides, reads selected model metadata from the existing asset manifest, obtains `git rev-parse HEAD` and `git status --porcelain`, rejects dirty formal runs unless `--allow-dirty` is supplied, and prints both created paths.
 
-- [ ] **Step 6: Verify artifacts in a temporary directory**
+- [x] **Step 6: Verify artifacts in a temporary directory**
 
 Run:
 
@@ -487,7 +488,7 @@ uv run --group dev python scripts/snapshot_experiment_config.py \
 
 Expected: tests pass; the command creates `/tmp/vehiclemind-runs/engineering-baseline/resolved_config.yaml` and `run_card.md` without cameras, models, or network access.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```bash
 git add modules/config/snapshot.py scripts/snapshot_experiment_config.py tests/config/test_snapshot.py .gitignore
