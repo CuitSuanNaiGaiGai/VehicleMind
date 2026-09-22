@@ -673,7 +673,7 @@ Expected: every command exits zero. Report the actual test count and coverage wi
 
 Review the full plan range for schema strictness, path traversal, secret leakage, deterministic evidence, confirmation bypass, replay attacks, partial result publication, HTML injection, misleading perception claims, package resources, and source-size compliance.
 
-- [ ] **Step 8: Commit, push, and verify remote CI**
+- [x] **Step 8: Commit, push, and verify remote CI**
 
 ```bash
 git add apps/vehicle_ai_demo/replay_demo.py README.md todolist.md \
