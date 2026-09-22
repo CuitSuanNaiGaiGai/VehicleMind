@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from modules.config import CabinPerceptionConfig, PerceptionConfig
+from modules.config.overrides import resolve_overrides
 from modules.config.snapshot import (
     RunProvenance,
     build_run_snapshot,
@@ -29,10 +30,11 @@ def _provenance(*, dirty: bool = False) -> RunProvenance:
 
 
 def _snapshot(*, dirty: bool = False, allow_dirty: bool = False):
+    overrides = {"driving.score_threshold": 0.42}
     return build_run_snapshot(
         cabin=CabinPerceptionConfig.load_default(),
-        perception=PerceptionConfig.load_default(),
-        overrides={"driving.score_threshold": 0.42},
+        perception=resolve_overrides(PerceptionConfig.load_default(), overrides),
+        overrides=overrides,
         assets=[],
         provenance=_provenance(dirty=dirty),
         allow_dirty=allow_dirty,
@@ -58,6 +60,20 @@ def test_dirty_debug_run_is_recorded_when_explicitly_allowed() -> None:
     assert snapshot["provenance"]["dirty"] is True
 
 
+@pytest.mark.parametrize(
+    "run_id",
+    ["../escape", "nested/run", "nested\\run", ".", "..", "line\nbreak"],
+)
+def test_run_id_must_be_a_safe_directory_name(run_id: str) -> None:
+    with pytest.raises(ValueError, match="run_id"):
+        RunProvenance(
+            run_id=run_id,
+            created_at_utc="2026-09-22T00:00:00Z",
+            git_commit="a" * 40,
+            dirty=False,
+        )
+
+
 def test_writer_creates_machine_and_human_artifacts(tmp_path: Path) -> None:
     paths = write_run_artifacts(tmp_path / "demo-001", _snapshot())
 
@@ -68,12 +84,23 @@ def test_writer_creates_machine_and_human_artifacts(tmp_path: Path) -> None:
     assert document["provenance"]["git_commit"] == "a" * 40
     assert "# VehicleMind Run Card" in run_card
     assert "Git commit" in run_card
+    assert "2026-09-22T00:00:00Z" in run_card
+    assert "Driving score threshold" in run_card
+    assert "0.42" in run_card
     assert "No benchmark metrics are recorded" in run_card
 
 
 def test_writer_refuses_to_overwrite_run_artifacts(tmp_path: Path) -> None:
     output_dir = tmp_path / "demo-001"
     write_run_artifacts(output_dir, _snapshot())
+
+    with pytest.raises(FileExistsError, match="already exists"):
+        write_run_artifacts(output_dir, _snapshot())
+
+
+def test_writer_refuses_any_preexisting_run_directory(tmp_path: Path) -> None:
+    output_dir = tmp_path / "demo-001"
+    output_dir.mkdir()
 
     with pytest.raises(FileExistsError, match="already exists"):
         write_run_artifacts(output_dir, _snapshot())

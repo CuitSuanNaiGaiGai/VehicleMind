@@ -39,6 +39,16 @@ def _positive_int(name: str, value: Any) -> int:
     return value
 
 
+def _model_identifier(name: str, value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty string")
+    if value != value.strip() or any(character in value for character in ("/", "\\")):
+        raise ValueError(f"{name} must be a model identifier, not a local path")
+    if any(ord(character) < 32 for character in value):
+        raise ValueError(f"{name} must not contain control characters")
+    return value
+
+
 def _non_negative_int(name: str, value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError(f"{name} must be a non-negative integer")
@@ -66,8 +76,7 @@ class PhonePerceptionConfig:
     missing_tolerance_seconds: float = 0.25
 
     def __post_init__(self) -> None:
-        if not isinstance(self.model_name, str) or not self.model_name.strip():
-            raise ValueError("phone.model_name must be a non-empty string")
+        _model_identifier("phone.model_name", self.model_name)
         _unit_interval("phone.confidence_threshold", self.confidence_threshold)
         _positive_int("phone.image_size", self.image_size)
         _positive("phone.near_duration_seconds", self.near_duration_seconds)
@@ -95,11 +104,7 @@ class DrivingPerceptionConfig:
         if not isinstance(self.prefer_coreml, bool):
             raise ValueError("driving.prefer_coreml must be a boolean")
         _non_negative_int("driving.warmup_runs", self.warmup_runs)
-        if (
-            not isinstance(self.object_model_name, str)
-            or not self.object_model_name.strip()
-        ):
-            raise ValueError("driving.object_model_name must be a non-empty string")
+        _model_identifier("driving.object_model_name", self.object_model_name)
         _unit_interval(
             "driving.object_confidence_threshold",
             self.object_confidence_threshold,
@@ -146,6 +151,17 @@ class LanePerceptionConfig:
             object.__setattr__(
                 self, name, _hls_triplet(f"lane.{name}", getattr(self, name))
             )
+        for color in ("white", "yellow"):
+            lower = getattr(self, f"{color}_hls_lower")
+            upper = getattr(self, f"{color}_hls_upper")
+            if any(
+                lower_value > upper_value
+                for lower_value, upper_value in zip(lower, upper)
+            ):
+                raise ValueError(
+                    f"lane.{color}_hls_lower must not exceed "
+                    f"lane.{color}_hls_upper component-wise"
+                )
 
         canny_low = _positive_int("lane.canny_low", self.canny_low)
         canny_high = _positive_int("lane.canny_high", self.canny_high)

@@ -66,6 +66,38 @@ def test_invalid_hls_triplet_is_rejected(tmp_path: Path) -> None:
         PerceptionConfig.load(path)
 
 
+def test_inverted_hls_bounds_are_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "perception.yaml"
+    path.write_text(
+        "lane:\n  white_hls_lower: [180, 255, 255]\n  white_hls_upper: [0, 0, 0]\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="lane.white_hls_lower"):
+        PerceptionConfig.load(path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("phone.model_name", "/Users/example/private.pt"),
+        ("phone.model_name", "../private.pt"),
+        ("driving.object_model_name", r"C:\\private\\model.pt"),
+    ],
+)
+def test_model_identifiers_cannot_contain_local_paths(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    section, name = field.split(".")
+    path = tmp_path / "perception.yaml"
+    path.write_text(f"{section}:\n  {name}: '{value}'\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=field):
+        PerceptionConfig.load(path)
+
+
 def test_unknown_perception_key_is_rejected(tmp_path: Path) -> None:
     path = tmp_path / "perception.yaml"
     path.write_text("phone:\n  magic_threshold: 0.2\n", encoding="utf-8")

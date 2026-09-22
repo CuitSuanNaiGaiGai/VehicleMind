@@ -103,6 +103,14 @@ def test_lane_detector_uses_injected_configuration() -> None:
     assert detector.smoothing == pytest.approx(0.6)
 
 
+def test_lane_detector_retains_legacy_positional_overrides() -> None:
+    detector = LaneDetector(0.6, 0.2, 2.0)
+
+    assert detector.smoothing == pytest.approx(0.6)
+    assert detector.min_abs_slope == pytest.approx(0.2)
+    assert detector.max_abs_slope == pytest.approx(2.0)
+
+
 def test_entry_points_do_not_pass_numeric_threshold_literals() -> None:
     offenders: list[str] = []
     for relative_path in ENTRY_POINTS:

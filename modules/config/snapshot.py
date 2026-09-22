@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import re
+import shutil
+import tempfile
 
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -21,14 +24,28 @@ class RunProvenance:
     dirty: bool
 
     def __post_init__(self) -> None:
-        if not self.run_id.strip():
-            raise ValueError("run_id must be a non-empty string")
-        if not self.created_at_utc.strip():
+        if (
+            not isinstance(self.run_id, str)
+            or self.run_id in {".", ".."}
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", self.run_id) is None
+        ):
+            raise ValueError(
+                "run_id must be a safe 1-64 character directory name containing "
+                "only letters, numbers, dot, underscore, or hyphen"
+            )
+        if not isinstance(self.created_at_utc, str) or not self.created_at_utc.strip():
             raise ValueError("created_at_utc must be a non-empty string")
-        if len(self.git_commit) != 40 or any(
-            character not in "0123456789abcdef" for character in self.git_commit.lower()
+        if (
+            not isinstance(self.git_commit, str)
+            or len(self.git_commit) != 40
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.git_commit.lower()
+            )
         ):
             raise ValueError("git_commit must be a 40-character hexadecimal commit")
+        if not isinstance(self.dirty, bool):
+            raise ValueError("dirty must be a boolean")
 
 
 @dataclass(frozen=True)
@@ -47,6 +64,12 @@ def _plain(value: Any) -> Any:
 
 def _canonical_yaml(value: Mapping[str, object]) -> str:
     return yaml.safe_dump(_plain(value), sort_keys=True, allow_unicode=True)
+
+
+def _require_mapping(value: object, name: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"snapshot {name} must be a mapping")
+    return value
 
 
 def build_run_snapshot(
@@ -115,12 +138,17 @@ def select_asset_records(
 
 
 def _render_run_card(snapshot: Mapping[str, object]) -> str:
-    provenance = snapshot["provenance"]
-    if not isinstance(provenance, Mapping):
-        raise ValueError("snapshot provenance must be a mapping")
+    provenance = _require_mapping(snapshot["provenance"], "provenance")
     assets = snapshot.get("model_assets", [])
     if not isinstance(assets, list):
         raise ValueError("snapshot model_assets must be a list")
+    resolved = _require_mapping(snapshot.get("resolved_config"), "resolved_config")
+    perception = _require_mapping(
+        resolved.get("perception"), "perception configuration"
+    )
+    phone = _require_mapping(perception.get("phone"), "phone configuration")
+    driving = _require_mapping(perception.get("driving"), "driving configuration")
+    lane = _require_mapping(perception.get("lane"), "lane configuration")
 
     lines = [
         "# VehicleMind Run Card",
@@ -128,9 +156,21 @@ def _render_run_card(snapshot: Mapping[str, object]) -> str:
         "| Field | Value |",
         "|---|---|",
         f"| Run ID | {provenance['run_id']} |",
+        f"| Created at (UTC) | {provenance['created_at_utc']} |",
         f"| Git commit | {provenance['git_commit']} |",
         f"| Dirty worktree | {'yes' if provenance['dirty'] else 'no'} |",
         f"| Config SHA-256 | {snapshot['config_sha256']} |",
+        "",
+        "## Key resolved parameters",
+        "",
+        "| Parameter | Value |",
+        "|---|---|",
+        f"| Phone confidence threshold | {phone['confidence_threshold']} |",
+        f"| Driving score threshold | {driving['score_threshold']} |",
+        f"| Driving NMS threshold | {driving['nms_threshold']} |",
+        f"| Driving work size | {driving['work_width']} × {driving['work_height']} |",
+        f"| Lane smoothing | {lane['smoothing']} |",
+        f"| Lane Canny thresholds | {lane['canny_low']} / {lane['canny_high']} |",
         "",
         "## Selected model assets",
         "",
@@ -177,9 +217,8 @@ def write_run_artifacts(
 ) -> RunArtifactPaths:
     manifest = output_dir / "resolved_config.yaml"
     run_card = output_dir / "run_card.md"
-    for path in (manifest, run_card):
-        if path.exists():
-            raise FileExistsError(f"run artifact already exists: {path}")
+    if output_dir.exists():
+        raise FileExistsError(f"run artifact directory already exists: {output_dir}")
 
     manifest_text = yaml.safe_dump(
         _plain(snapshot),
@@ -187,16 +226,19 @@ def write_run_artifacts(
         allow_unicode=True,
     )
     run_card_text = _render_run_card(snapshot)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    manifest_temp = output_dir / ".resolved_config.yaml.tmp"
-    run_card_temp = output_dir / ".run_card.md.tmp"
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_dir.name}.tmp-",
+            dir=output_dir.parent,
+        )
+    )
     try:
-        manifest_temp.write_text(manifest_text, encoding="utf-8")
-        run_card_temp.write_text(run_card_text, encoding="utf-8")
-        manifest_temp.replace(manifest)
-        run_card_temp.replace(run_card)
+        (staging_dir / manifest.name).write_text(manifest_text, encoding="utf-8")
+        (staging_dir / run_card.name).write_text(run_card_text, encoding="utf-8")
+        staging_dir.rename(output_dir)
     finally:
-        manifest_temp.unlink(missing_ok=True)
-        run_card_temp.unlink(missing_ok=True)
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
 
     return RunArtifactPaths(manifest=manifest, run_card=run_card)

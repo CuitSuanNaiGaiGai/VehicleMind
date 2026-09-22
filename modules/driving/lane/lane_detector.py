@@ -59,24 +59,23 @@ class LaneDetector:
 
     def __init__(
         self,
-        config: LanePerceptionConfig | None = None,
-        *,
         smoothing: float | None = None,
         min_abs_slope: float | None = None,
         max_abs_slope: float | None = None,
+        *,
+        config: LanePerceptionConfig | None = None,
     ):
         resolved = config or LanePerceptionConfig()
-        compatibility_overrides = {
-            name: value
-            for name, value in (
-                ("smoothing", smoothing),
-                ("min_abs_slope", min_abs_slope),
-                ("max_abs_slope", max_abs_slope),
-            )
-            if value is not None
-        }
-        if compatibility_overrides:
-            resolved = replace(resolved, **compatibility_overrides)
+        resolved = replace(
+            resolved,
+            smoothing=resolved.smoothing if smoothing is None else smoothing,
+            min_abs_slope=(
+                resolved.min_abs_slope if min_abs_slope is None else min_abs_slope
+            ),
+            max_abs_slope=(
+                resolved.max_abs_slope if max_abs_slope is None else max_abs_slope
+            ),
+        )
 
         self.config = resolved
         self.smoothing = resolved.smoothing
