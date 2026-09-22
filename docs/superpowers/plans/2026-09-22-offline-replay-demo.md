@@ -269,7 +269,7 @@ Review checkpoint: report the exact scenario contract, validation coverage, and 
 - Produces: `ScriptedLLMClient(BaseLLMClient)` with `chat(...) -> LLMResponse`
 - Produces: read-only `requests` evidence containing copied messages and tool schemas
 
-- [ ] **Step 1: Write failing deterministic-adapter tests**
+- [x] **Step 1: Write failing deterministic-adapter tests**
 
 Cover ordered response consumption, preservation of tool IDs/names/arguments, defensive copies of incoming messages, exhaustion failure, and rejection of an empty response sequence.
 
@@ -284,7 +284,7 @@ with pytest.raises(RuntimeError, match="exhausted"):
     client.chat(messages=[])
 ```
 
-- [ ] **Step 2: Run the tests and verify they fail**
+- [x] **Step 2: Run the tests and verify they fail**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_scripted_llm.py -q
@@ -292,11 +292,11 @@ uv run --group dev python -m pytest tests/vehicle_ai/replay/test_scripted_llm.py
 
 Expected: import failure for `ScriptedLLMClient`.
 
-- [ ] **Step 3: Implement the adapter**
+- [x] **Step 3: Implement the adapter**
 
 Use a `deque` internally. Convert each `ScriptedResponse` to a fresh `LLMResponse`; never return mutable objects owned by the scenario. Record request evidence without API keys or environment variables. Return the scripted content and tool calls exactly; do not add heuristic intent logic.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_scripted_llm.py -q

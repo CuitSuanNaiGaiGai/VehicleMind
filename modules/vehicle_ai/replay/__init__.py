@@ -6,6 +6,7 @@ from modules.vehicle_ai.replay.models import (
     ReplayStep,
     ScriptedResponse,
 )
+from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
 
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "ReplayScenario",
     "ReplayStep",
     "ScriptedResponse",
+    "ScriptedLLMClient",
     "load_replay_scenario",
 ]
