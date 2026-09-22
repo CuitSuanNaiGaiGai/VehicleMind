@@ -29,6 +29,21 @@ uv run --group dev python scripts/check_source_size.py
 uv run --group dev python scripts/verify_assets.py
 ```
 
+舱内、手机分心、道路目标、YOLOPv2 和传统车道检测的算法阈值分别保存在 `modules/config/cabin.yaml` 与 `modules/config/perception.yaml`。正式评测或回放前，应从干净的 Git 工作树生成运行制品：
+
+```bash
+uv run --group dev python scripts/snapshot_experiment_config.py \
+  --run-id engineering-baseline \
+  --output-root runs
+```
+
+每个运行目录包含：
+
+- `resolved_config.yaml`：机器可读的最终配置、CLI 覆盖、Git commit、配置哈希和模型资产哈希；
+- `run_card.md`：面向项目展示和结果包的可读摘要。
+
+调试未提交代码时可显式增加 `--allow-dirty`，但此类运行不能作为最终简历或 Benchmark 证据。当前 Run Card 只证明配置与来源可追溯；精度、延迟和案例图必须由后续正式评测生成，不能手工填写或推断。
+
 在线 Agent 仅在需要时复制 `.env.example` 为 `.env` 并填写一个提供商的密钥。离线测试不会读取密钥。有效入口包括：
 
 ```bash

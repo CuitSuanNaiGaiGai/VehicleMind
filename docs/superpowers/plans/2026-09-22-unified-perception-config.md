@@ -509,7 +509,7 @@ git commit -m "feat: record reproducible run artifacts"
 - Produces: commands a reviewer can copy to inspect configuration and create a run card
 - Produces: checked progress state only after local and remote evidence exists
 
-- [ ] **Step 1: Document configuration and result artifacts**
+- [x] **Step 1: Document configuration and result artifacts**
 
 Add concise README commands:
 
@@ -521,7 +521,7 @@ uv run --group dev python scripts/snapshot_experiment_config.py \
 
 Explain that `resolved_config.yaml` is the machine-readable provenance record and `run_card.md` is the human-facing artifact intended for result packages. State explicitly that it contains no accuracy or latency claim until evaluation tasks populate those results.
 
-- [ ] **Step 2: Run the complete local quality gate**
+- [x] **Step 2: Run the complete local quality gate**
 
 Run:
 
@@ -546,11 +546,11 @@ git diff --check
 
 Expected: every command exits zero, all tests pass, and coverage is reported without claiming the final 80% goal.
 
-- [ ] **Step 3: Request independent review and fix all Critical/Important findings**
+- [x] **Step 3: Request independent review and fix all Critical/Important findings**
 
 Review range: the commit before Task 1 through the current Task 3 head. Review configuration validation, CLI override compatibility, wheel resources, snapshot determinism, secret leakage, source sizes, and whether the run card could be mistaken for benchmark evidence.
 
-- [ ] **Step 4: Commit documentation and evidence-backed progress update**
+- [x] **Step 4: Commit documentation and evidence-backed progress update**
 
 Only after Step 2 and Step 3 succeed, mark “将硬编码阈值迁移至可版本化配置文件，并保存每次实验使用的配置” complete.
 

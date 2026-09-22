@@ -8,6 +8,7 @@ VehicleMind uses short-lived feature branches and pull requests. Do not develop 
 uv sync --group dev
 uv run --group dev python -m pytest -q
 uv run --group dev ruff check apps modules scripts tests
+uv run --group dev ruff format --check apps modules scripts tests
 uv run --group dev python scripts/check_source_size.py
 ```
 
@@ -26,6 +27,17 @@ Python 3.13 is required. The current full perception path is validated on macOS 
 3. Keep public contracts backward-compatible or document the migration.
 4. Run the commands above and include reproducible evidence in the PR description.
 5. Do not mark a `todolist.md` item complete until its acceptance condition is verifiably met.
+
+Formal evaluations and reproducible replays must create a clean-worktree run record before processing data:
+
+```bash
+uv run --group dev python scripts/snapshot_experiment_config.py \
+  --run-id <descriptive-run-id> \
+  --output-root runs \
+  --asset-id <manifest-asset-id>
+```
+
+Keep both `resolved_config.yaml` and `run_card.md` with the result package. The run card is provenance evidence, not a substitute for measured accuracy, latency, robustness, or qualitative examples.
 
 Production modules are limited to 500 physical lines. Executable `*_demo.py` files are limited to 300 lines. Extract code by responsibility rather than bypassing the check.
 
