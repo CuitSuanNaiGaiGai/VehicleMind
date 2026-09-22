@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import time
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from modules.config import CabinPerceptionConfig
+from modules.observation import ObservationSequencer
+from modules.cabin.snapshot import CabinPerceptionSnapshot
 
 
 from modules.cabin.face.landmarks import (
@@ -40,64 +40,8 @@ from modules.cabin.presence.driver_presence import (
 
 from modules.cabin.state.driver_state import (
     DriverStateEstimator,
+    DriverStateResult,
 )
-
-
-# ============================================================
-# Result
-# ============================================================
-
-
-@dataclass
-class CabinPerceptionSnapshot:
-    """
-    Semantic output of one Cabin Intelligence frame.
-
-    This is the boundary between perception and Vehicle AI.
-    """
-
-    timestamp_ms: int
-
-    face_visible: bool
-
-    presence: Any
-
-    driver_state: Any
-
-    risk: Any
-
-    perclos: float | None
-
-    perclos_ready: bool
-
-    eye_closed: bool | None
-
-    eye_closure_seconds: float
-
-    recent_yawns: int
-
-    blink_count: int
-
-    current_yawn: bool
-
-    # ========================================================
-    # VehicleMind adapter
-    # ========================================================
-
-    def to_context_kwargs(
-        self,
-    ) -> dict:
-
-        return {
-            "presence": self.presence,
-            "driver_state": self.driver_state,
-            "risk": self.risk,
-            "perclos": self.perclos,
-            "eye_closed": self.eye_closed,
-            "eye_closure_seconds": self.eye_closure_seconds,
-            "recent_yawns": self.recent_yawns,
-            "blink_count": self.blink_count,
-        }
 
 
 # ============================================================
@@ -185,8 +129,9 @@ class CabinPerceptionService:
         # ====================================================
 
         self.start_time = time.perf_counter()
+        self._observations = ObservationSequencer("cabin_perception")
 
-        self.last_driver_state_result = None
+        self.last_driver_state_result: DriverStateResult | None = None
 
         self.last_yawn_count = 0
 
@@ -211,6 +156,7 @@ class CabinPerceptionService:
         frame,
         timestamp_ms: int | None = None,
     ) -> CabinPerceptionSnapshot:
+        processing_started = time.perf_counter()
 
         if timestamp_ms is None:
             timestamp_ms = self.current_timestamp_ms()
@@ -242,6 +188,7 @@ class CabinPerceptionService:
         perclos_value = None
 
         perclos_ready = False
+        driver_state_result: DriverStateResult | None
 
         # ====================================================
         # Valid face observation
@@ -387,7 +334,10 @@ class CabinPerceptionService:
             recent_yawns = int(driver_state_result.recent_yawns)
 
         return CabinPerceptionSnapshot(
-            timestamp_ms=timestamp_ms,
+            metadata=self._observations.next(
+                timestamp_ms=timestamp_ms,
+                processing_ms=(time.perf_counter() - processing_started) * 1000,
+            ),
             face_visible=face_visible,
             presence=(presence_result.state),
             driver_state=driver_state,
