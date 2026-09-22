@@ -144,7 +144,7 @@ Review checkpoint: report that the old research-heavy requirements were removed,
 - Produces: `load_replay_scenario(path: str | Path, repository_root: Path) -> ReplayScenario`
 - Consumes later: Task 3 scripted LLM and Task 5 replay runner
 
-- [ ] **Step 1: Write failing loader tests**
+- [x] **Step 1: Write failing loader tests**
 
 Tests must prove that the loader accepts the committed scenario and rejects unknown keys, duplicate/non-monotonic step times, negative times, blank IDs, absolute media paths, `..` media traversal, missing repository media, empty response queues, and a confirmation step before any pending action can exist.
 
@@ -163,7 +163,7 @@ assert scenario.media["road"] == ROOT / "assets/demo/driving_perception.gif"
 assert scenario.expected.unauthorized_sensitive_executions == 0
 ```
 
-- [ ] **Step 2: Run the loader tests and verify they fail**
+- [x] **Step 2: Run the loader tests and verify they fail**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_scenario_loader.py -q
@@ -171,7 +171,7 @@ uv run --group dev python -m pytest tests/vehicle_ai/replay/test_scenario_loader
 
 Expected: import failure because the replay package does not exist.
 
-- [ ] **Step 3: Implement immutable scenario contracts**
+- [x] **Step 3: Implement immutable scenario contracts**
 
 Define focused frozen dataclasses in `models.py`:
 
@@ -222,11 +222,11 @@ class ReplayScenario:
 
 Copy input mappings into immutable mapping proxies or fresh dictionaries that are never mutated by the loader.
 
-- [ ] **Step 4: Implement strict YAML loading**
+- [x] **Step 4: Implement strict YAML loading**
 
 `loader.py` must use `yaml.safe_load`, reject every undocumented key at root and nested levels, normalize tool-call arguments to dictionaries, resolve media only beneath `repository_root`, and never infer missing required values. Every cabin, road, or vehicle block must contain `source`, `confidence`, `valid`, and `values`; confidence is `null` or finite in `[0, 1]`. Validation errors must include the YAML field path, such as `steps[2].cabin.confidence`.
 
-- [ ] **Step 5: Add the committed showcase scenario**
+- [x] **Step 5: Add the committed showcase scenario**
 
 `drowsy_rest_stop.yaml` must include:
 
@@ -241,7 +241,7 @@ Copy input mappings into immutable mapping proxies or fresh dictionaries that ar
 
 All semantic observation blocks must name their recorded source and validity. The initial cabin and road observations use finite confidence values; the scenario must also contain one valid `UNKNOWN` eye observation with `confidence: null` to demonstrate that missing evidence is not converted to a normal value.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_scenario_loader.py -q
