@@ -26,4 +26,4 @@
 - [x] Implement immutable metadata, per-service sequencers, and snapshot fields.
 - [x] Run focused tests, full offline tests, Ruff, mypy, and source-size checks.
 - [x] Update the evidence-backed checkbox in section 3 of `todolist.md`.
-- [ ] Commit, push a feature branch, open a PR, and verify CI.
+- [x] Commit, push a feature branch, open a PR, and verify CI.

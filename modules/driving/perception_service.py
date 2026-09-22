@@ -115,8 +115,11 @@ class DrivingPerceptionService:
     def process_frame(
         self,
         frame: np.ndarray,
+        timestamp_ms: int | None = None,
     ) -> DrivingPerceptionSnapshot:
         processing_started = time.perf_counter()
+        if timestamp_ms is None:
+            timestamp_ms = max(0, int((processing_started - self._started_at) * 1000))
 
         # ----------------------------------------------------
         # Resize once, consistent with current scene_demo.py
@@ -257,9 +260,7 @@ class DrivingPerceptionService:
 
         return DrivingPerceptionSnapshot(
             metadata=self._observations.next(
-                timestamp_ms=max(
-                    0, int((processing_started - self._started_at) * 1000)
-                ),
+                timestamp_ms=timestamp_ms,
                 processing_ms=(time.perf_counter() - processing_started) * 1000,
             ),
             scene_result=(scene_result),

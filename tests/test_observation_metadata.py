@@ -31,9 +31,11 @@ def test_metadata_keeps_unknown_confidence_distinct_from_validity() -> None:
         ({"source": ""}, ValueError),
         ({"confidence": 1.1}, ValueError),
         ({"confidence": float("nan")}, ValueError),
+        ({"confidence": 10**400}, ValueError),
         ({"valid": 1}, TypeError),
         ({"processing_ms": -0.1}, ValueError),
         ({"processing_ms": float("inf")}, ValueError),
+        ({"processing_ms": 10**400}, ValueError),
     ],
 )
 def test_metadata_rejects_invalid_fields(

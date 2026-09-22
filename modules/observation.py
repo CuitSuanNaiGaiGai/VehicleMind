@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import sys
 
 from dataclasses import dataclass
 from threading import Lock
@@ -33,13 +34,26 @@ class ObservationMetadata:
                 self.confidence, int | float
             ):
                 raise TypeError("confidence must be numeric or null")
-            if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
+            if not 0 <= self.confidence <= 1 or (
+                isinstance(self.confidence, float)
+                and not math.isfinite(self.confidence)
+            ):
                 raise ValueError("confidence must be finite and within [0, 1]")
         if isinstance(self.processing_ms, bool) or not isinstance(
             self.processing_ms, int | float
         ):
             raise TypeError("processing_ms must be numeric")
-        if not math.isfinite(self.processing_ms) or self.processing_ms < 0:
+        if (
+            self.processing_ms < 0
+            or (
+                isinstance(self.processing_ms, int)
+                and self.processing_ms > sys.float_info.max
+            )
+            or (
+                isinstance(self.processing_ms, float)
+                and not math.isfinite(self.processing_ms)
+            )
+        ):
             raise ValueError("processing_ms must be finite and nonnegative")
 
 

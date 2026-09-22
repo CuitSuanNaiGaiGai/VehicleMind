@@ -43,6 +43,20 @@ def test_road_service_attaches_metadata_to_each_successful_frame() -> None:
     assert first.metadata.processing_ms >= 0
 
 
+def test_road_service_preserves_supplied_frame_timeline() -> None:
+    service = DrivingPerceptionService.__new__(DrivingPerceptionService)
+    service.work_width = 8
+    service.work_height = 8
+    service.detector = _Detector()
+    service._observations = ObservationSequencer("driving_perception")
+    service._started_at = 0.0
+    frame = np.zeros((8, 8, 3), dtype=np.uint8)
+
+    snapshot = service.process_frame(frame, timestamp_ms=1234)
+
+    assert snapshot.metadata.timestamp_ms == 1234
+
+
 def test_cabin_snapshot_retains_source_timestamp_and_metadata() -> None:
     metadata = ObservationMetadata(
         timestamp_ms=250,
