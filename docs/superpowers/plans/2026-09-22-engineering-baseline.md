@@ -397,7 +397,7 @@ git commit -m "ci: add deterministic core quality gates"
 **Interfaces:**
 - Produces: checked TODO items only where evidence exists, a remote feature branch, and a reviewable PR.
 
-- [ ] **Step 1: Run the complete verification suite**
+- [x] **Step 1: Run the complete verification suite**
 
 Run: `uv sync --group dev`
 
@@ -409,7 +409,7 @@ Run: `uv run --group dev python scripts/check_source_size.py`
 
 Expected: all commands exit 0; core coverage is reported and no source-size violations remain.
 
-- [ ] **Step 2: Update `todolist.md` conservatively**
+- [x] **Step 2: Update `todolist.md` conservatively**
 
 Mark only requirements proven by the verification output. Leave `LICENSE` unchecked until the repository owner selects a license, and leave branch protection unchecked until the GitHub rule is confirmed by API readback.
 

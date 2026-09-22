@@ -22,23 +22,23 @@
 
 - [ ] 建立功能分支与 Pull Request 工作流，禁止继续把未验证功能直接堆叠到 `main`。
 - [ ] 为 `main` 启用分支保护，要求 CI 通过后才能合并。
-- [ ] 补全 Python 依赖声明，并生成可锁定版本的环境文件。
-- [ ] 明确支持的 Python、macOS、Apple Silicon 和 CPU fallback 版本范围。
-- [ ] 配置 pytest 只收集 `tests/`，避免把 Demo 文件误识别为测试。
-- [ ] 修复 `face_present`/`presence` 等已经失效的 Demo 接口。
-- [ ] 将 `eye_closed` 统一为 `bool | None`，明确 `None` 表示当前没有可靠眼睛观测。
-- [ ] 删除、实现或解释仓库中的空模块、空测试和空配置文件。
+- [x] 补全 Python 依赖声明，并生成可锁定版本的环境文件。
+- [x] 明确支持的 Python、macOS、Apple Silicon 和 CPU fallback 版本范围。
+- [x] 配置 pytest 只收集 `tests/`，避免把 Demo 文件误识别为测试。
+- [x] 修复 `face_present`/`presence` 等已经失效的 Demo 接口。
+- [x] 将 `eye_closed` 统一为 `bool | None`，明确 `None` 表示当前没有可靠眼睛观测。
+- [x] 删除、实现或解释仓库中的空模块、空测试和空配置文件。
 - [ ] 将硬编码阈值迁移至可版本化配置文件，并保存每次实验使用的配置。
-- [ ] 增加 `.env.example`，确保密钥和本地路径不进入 Git。
-- [ ] 增加模型资产清单，记录文件名、来源、版本、SHA-256、许可证和预期路径。
+- [x] 增加 `.env.example`，确保密钥和本地路径不进入 Git。
+- [x] 增加模型资产清单，记录文件名、来源、版本、SHA-256、许可证和预期路径。
 - [ ] 增加 `LICENSE`、`THIRD_PARTY_NOTICES.md` 和贡献说明。
-- [ ] 建立 GitHub Actions，执行格式检查、静态检查、单元测试和核心离线 smoke test。
+- [x] 建立 GitHub Actions，执行格式检查、静态检查、单元测试和核心离线 smoke test。
 
 ### 达到程度
 
 - [ ] 全新 clone 后不依赖开发者本机隐式环境即可安装。
-- [ ] `pytest` 能正常完成收集并全部通过。
-- [ ] 不连接摄像头、不下载大模型、不调用在线 API 时，核心逻辑测试仍可运行。
+- [x] `pytest` 能正常完成收集并全部通过。
+- [x] 不连接摄像头、不下载大模型、不调用在线 API 时，核心逻辑测试仍可运行。
 - [ ] CI 在每个 Pull Request 上自动执行，失败时不能合并。
 - [ ] README 中的命令与真实入口一致，不存在已失效示例。
 
