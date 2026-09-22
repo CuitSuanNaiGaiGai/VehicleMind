@@ -10,6 +10,7 @@ from enum import StrEnum
 from threading import RLock
 from typing import Any
 
+from modules.observation import ObservationMetadata
 from modules.vehicle_ai.context.contract import (
     CONTEXT_SCHEMA_VERSION,
     CONTEXT_FIELD_CONTRACTS,
@@ -20,6 +21,11 @@ from modules.vehicle_ai.context.models import (
     RoadContext,
     VehicleContext,
     VehicleStatus,
+)
+from modules.vehicle_ai.context.quality import (
+    ObservationQualityTracker,
+    QualityStatus,
+    field_quality,
 )
 
 
@@ -136,6 +142,7 @@ class ContextManager:
             self._context = deepcopy(initial_context)
 
         self._changes: deque[ContextChange] = deque(maxlen=max_change_history)
+        self._quality = ObservationQualityTracker()
 
     # ========================================================
     # Snapshot
@@ -205,7 +212,42 @@ class ContextManager:
                 replacement.updated_at = now
                 setattr(self._context, domain.value, replacement)
                 self._changes.extend(changes)
+                self._quality.record(domain.value, valid=True)
             return changes
+
+    def mark_invalid_observation(
+        self, domain: str, metadata: ObservationMetadata
+    ) -> None:
+        if metadata.valid:
+            raise ValueError("invalid observation marker requires valid=False")
+        with self._lock:
+            self._quality.record(domain, valid=False, metadata=metadata)
+
+    def mark_valid_observation(
+        self, domain: str, metadata: ObservationMetadata
+    ) -> None:
+        if not metadata.valid:
+            raise ValueError("valid observation marker requires valid=True")
+        with self._lock:
+            self._quality.record(domain, valid=True, metadata=metadata)
+
+    def observation_quality(
+        self, domain: str, *, now: float | None = None
+    ) -> dict[str, Any]:
+        with self._lock:
+            return self._quality.report(domain, now=now)
+
+    def field_quality(
+        self, domain: str, field: str, *, now: float | None = None
+    ) -> QualityStatus:
+        if domain not in CONTEXT_FIELD_CONTRACTS:
+            raise ValueError(f"unknown context domain: {domain}")
+        if field not in CONTEXT_FIELD_CONTRACTS[domain]:
+            raise ValueError(f"unknown context field: {domain}.{field}")
+        with self._lock:
+            status = self._quality.report(domain, now=now)["status"]
+            value = getattr(getattr(self._context, domain), field)
+            return field_quality(status, value)
 
     # ========================================================
     # Driver update
@@ -374,28 +416,16 @@ class ContextManager:
         """
 
         with self._lock:
-            now = time.time()
-
-            driver_age = self._context.driver.age_seconds(now)
-
-            road_age = self._context.road.age_seconds(now)
-
-            vehicle_age = self._context.vehicle.age_seconds(now)
-
-            return {
-                "driver": {
-                    "age_seconds": driver_age,
-                    "fresh": self._context.driver.is_fresh(now=now),
-                },
-                "road": {
-                    "age_seconds": road_age,
-                    "fresh": self._context.road.is_fresh(now=now),
-                },
-                "vehicle": {
-                    "age_seconds": vehicle_age,
-                    "fresh": self._context.vehicle.is_fresh(now=now),
-                },
-            }
+            now = time.monotonic()
+            result = {}
+            for domain in ("driver", "road", "vehicle"):
+                quality = self._quality.report(domain, now=now)
+                result[domain] = {
+                    "age_seconds": quality["age_seconds"],
+                    "fresh": quality["status"] is QualityStatus.KNOWN,
+                    "status": quality["status"],
+                }
+            return result
 
     # ========================================================
     # Convenience
