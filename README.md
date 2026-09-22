@@ -53,7 +53,7 @@ python -m apps.driving_demo.scene_demo --help
 python -m apps.vehicle_ai_demo.cabin_adapter_demo
 ```
 
-第三方模型来源与许可证风险见 `THIRD_PARTY_NOTICES.md`。项目自身 `LICENSE` 尚待仓库所有者选择，在此之前不要推断本仓库代码已获得某种开源许可。
+VehicleMind 的原创代码采用 Apache License 2.0，完整条款见 `LICENSE`。第三方模型、依赖和代码不因项目许可证而重新授权，其来源与许可证风险见 `THIRD_PARTY_NOTICES.md`；尤其是可选 Ultralytics 路径仍需遵守 AGPL-3.0 或单独的商业许可。
 
 当前项目已经完成两个核心感知模块：
 

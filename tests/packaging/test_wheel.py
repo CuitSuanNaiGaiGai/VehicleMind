@@ -32,8 +32,22 @@ def test_built_wheel_contains_loadable_default_cabin_config(
     wheel_path = next(wheel_dir.glob("vehiclemind-*.whl"))
     extracted = tmp_path / "installed"
     with zipfile.ZipFile(wheel_path) as wheel:
-        assert "modules/config/cabin.yaml" in wheel.namelist()
-        assert "modules/config/perception.yaml" in wheel.namelist()
+        names = wheel.namelist()
+        assert "modules/config/cabin.yaml" in names
+        assert "modules/config/perception.yaml" in names
+        license_paths = [
+            name for name in names if name.endswith(".dist-info/licenses/LICENSE")
+        ]
+        assert len(license_paths) == 1
+        metadata_path = next(
+            name for name in names if name.endswith(".dist-info/METADATA")
+        )
+        assert (
+            wheel.read(license_paths[0]) == (REPOSITORY_ROOT / "LICENSE").read_bytes()
+        )
+        assert "License-Expression: Apache-2.0" in wheel.read(metadata_path).decode(
+            "utf-8"
+        )
         wheel.extractall(extracted)
 
     environment = os.environ.copy()

@@ -7,6 +7,8 @@ name = "vehiclemind"
 version = "0.1.0"
 description = "Perception-to-action vehicle AI research and engineering system"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "openai>=1,<3",

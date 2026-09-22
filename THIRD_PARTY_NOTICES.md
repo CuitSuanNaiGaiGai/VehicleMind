@@ -1,6 +1,6 @@
 # Third-party notices
 
-VehicleMind does not commit the model files listed below. Users obtain them separately and remain responsible for the upstream terms. The future VehicleMind project license will not replace third-party licenses.
+VehicleMind's original code is licensed under Apache License 2.0. The project does not commit the model files listed below; users obtain them separately and remain responsible for the upstream terms. The VehicleMind license does not replace or relicense third-party software, models, datasets, or media.
 
 ## MediaPipe Face Landmarker
 

@@ -31,7 +31,7 @@
 - [x] 将硬编码阈值迁移至可版本化配置文件，并保存每次实验使用的配置。
 - [x] 增加 `.env.example`，确保密钥和本地路径不进入 Git。
 - [x] 增加模型资产清单，记录文件名、来源、版本、SHA-256、许可证和预期路径。
-- [ ] 增加 `LICENSE`、`THIRD_PARTY_NOTICES.md` 和贡献说明。
+- [x] 增加 `LICENSE`、`THIRD_PARTY_NOTICES.md` 和贡献说明。
 - [x] 建立 GitHub Actions，执行格式检查、静态检查、单元测试和核心离线 smoke test。
 
 ### 达到程度
