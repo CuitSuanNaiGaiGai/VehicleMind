@@ -10,6 +10,7 @@ from enum import StrEnum
 from threading import RLock
 from typing import Any
 
+from modules.vehicle_ai.context.contract import validate_domain_updates
 from modules.vehicle_ai.context.models import (
     DriverContext,
     RoadContext,
@@ -103,11 +104,8 @@ class ContextManager:
     Those belong to later layers.
     """
 
-    # Fields that should not generate semantic events.
-    _IGNORED_FIELDS = {
-        "updated_at",
-        "source",
-    }
+    # Fields managed by the runtime rather than partial-update callers.
+    _IGNORED_FIELDS = {"updated_at", "source"}
 
     def __init__(
         self,
@@ -169,76 +167,29 @@ class ContextManager:
         """
 
         with self._lock:
-            target = getattr(
-                self._context,
-                domain.value,
-            )
-
+            validate_domain_updates(domain.value, updates)
+            target = getattr(self._context, domain.value)
+            replacement = deepcopy(target)
             changes: list[ContextChange] = []
-
             now = time.time()
-
             for field_name, new_value in updates.items():
-                # ------------------------------------------------
-                # Protect internal metadata.
-                # ------------------------------------------------
-
-                if field_name in (self._IGNORED_FIELDS):
-                    raise ValueError(f"Field cannot be updated directly: {field_name}")
-
-                # ------------------------------------------------
-                # Validate field.
-                # ------------------------------------------------
-
-                if not hasattr(
-                    target,
-                    field_name,
-                ):
-                    raise AttributeError(
-                        f"{domain.value} context has no field '{field_name}'"
-                    )
-
-                old_value = getattr(
-                    target,
-                    field_name,
-                )
-
-                # ------------------------------------------------
-                # Ignore identical values.
-                # ------------------------------------------------
-
+                old_value = getattr(target, field_name)
                 if old_value == new_value:
                     continue
-
-                # ------------------------------------------------
-                # Apply update.
-                # ------------------------------------------------
-
-                setattr(
-                    target,
-                    field_name,
-                    new_value,
+                setattr(replacement, field_name, new_value)
+                changes.append(
+                    ContextChange(
+                        domain=domain,
+                        field=field_name,
+                        old_value=old_value,
+                        new_value=new_value,
+                        timestamp=now,
+                    )
                 )
-
-                change = ContextChange(
-                    domain=domain,
-                    field=field_name,
-                    old_value=old_value,
-                    new_value=new_value,
-                    timestamp=now,
-                )
-
-                changes.append(change)
-
-                self._changes.append(change)
-
-            # ----------------------------------------------------
-            # Refresh timestamp only if actual state changed.
-            # ----------------------------------------------------
-
             if updates:
-                target.touch()
-
+                replacement.updated_at = now
+                setattr(self._context, domain.value, replacement)
+                self._changes.extend(changes)
             return changes
 
     # ========================================================

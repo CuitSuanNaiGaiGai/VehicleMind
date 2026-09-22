@@ -9,10 +9,10 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any
 
+from modules.vehicle_ai.context.contract import CONTEXT_SCHEMA_VERSION
 from modules.vehicle_ai.replay.models import freeze_mapping
 
 
-CONTEXT_SCHEMA_VERSION = 1
 TRACE_KINDS = {
     "context_update",
     "event",
