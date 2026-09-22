@@ -26,6 +26,7 @@ from modules.vehicle_ai.tools import (
     ToolRegistry,
     build_default_tool_registry,
 )
+from modules.observation import ObservationMetadata
 
 
 class VehicleMindRuntime:
@@ -112,9 +113,13 @@ class VehicleMindRuntime:
 
     def update_cabin(
         self,
+        metadata: ObservationMetadata | None = None,
         **kwargs,
     ):
-        changes = self.cabin.update(**kwargs)
+        if metadata is not None and not metadata.valid:
+            self.context_manager.mark_invalid_observation("driver", metadata)
+            return []
+        changes = self.cabin.update(observation=metadata, **kwargs)
 
         return self._process_changes(changes)
 
@@ -124,9 +129,13 @@ class VehicleMindRuntime:
 
     def update_driving(
         self,
+        metadata: ObservationMetadata | None = None,
         **kwargs,
     ):
-        changes = self.driving.update(**kwargs)
+        if metadata is not None and not metadata.valid:
+            self.context_manager.mark_invalid_observation("road", metadata)
+            return []
+        changes = self.driving.update(observation=metadata, **kwargs)
 
         return self._process_changes(changes)
 

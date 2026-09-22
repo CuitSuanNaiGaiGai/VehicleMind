@@ -132,7 +132,9 @@ def cabin_worker(
             # SAME shared VehicleMind runtime
             # --------------------------------------------
 
-            runtime.update_cabin(**snapshot.to_context_kwargs())
+            runtime.update_cabin(
+                metadata=snapshot.metadata, **snapshot.to_context_kwargs()
+            )
 
             # --------------------------------------------
             # Lightweight status logging.
@@ -246,7 +248,9 @@ def driving_worker(
             # SAME shared VehicleMind runtime
             # --------------------------------------------
 
-            runtime.update_driving(**snapshot.to_context_kwargs())
+            runtime.update_driving(
+                metadata=snapshot.metadata, **snapshot.to_context_kwargs()
+            )
 
             # --------------------------------------------
             # Periodic logging
