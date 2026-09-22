@@ -57,7 +57,7 @@ def main():
     # ========================================================
 
     runtime.update_cabin(
-        face_present=True,
+        presence="PRESENT",
         driver_state="DROWSY",
         risk="HIGH",
         perclos=0.31,

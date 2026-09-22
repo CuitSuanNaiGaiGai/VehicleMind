@@ -20,7 +20,7 @@ def main():
     # ========================================================
 
     changes = adapter.update(
-        face_present=True,
+        presence="PRESENT",
         driver_state="NORMAL",
         risk="LOW",
         perclos=0.12,
@@ -46,7 +46,7 @@ def main():
     # ========================================================
 
     changes = adapter.update(
-        face_present=True,
+        presence="PRESENT",
         driver_state="DROWSY",
         risk="HIGH",
         perclos=0.32,

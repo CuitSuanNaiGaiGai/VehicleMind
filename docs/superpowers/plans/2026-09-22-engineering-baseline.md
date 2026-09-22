@@ -89,14 +89,13 @@ git commit -m "build: establish reproducible Python baseline"
 - Modify: `apps/vehicle_ai_demo/runtime_demo.py`
 - Modify: `modules/cabin/perception_service.py`
 - Modify: `modules/vehicle_ai/context/models.py`
-- Test: `tests/vehicle_ai/test_cabin_adapter.py`
-- Test: `tests/cabin/test_perception_contract.py`
+- Test: `tests/vehicle_ai/test_cabin_contracts.py`
 
 **Interfaces:**
 - Consumes: `CabinContextAdapter.update(*, presence, driver_state, risk, ...)`.
 - Produces: one tri-state observation contract: `eye_closed: bool | None`; demo callers use semantic `presence` rather than frame-level `face_present`.
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 ```python
 from modules.vehicle_ai.context import ContextManager, DriverPresence
@@ -122,19 +121,19 @@ def test_missing_eye_observation_remains_unknown():
     assert manager.get_context().driver.eye_closed is None
 ```
 
-- [ ] **Step 2: Verify the stale demos fail before the fix**
+- [x] **Step 2: Verify the stale demos fail before the fix**
 
 Run: `uv run --group dev python -m apps.vehicle_ai_demo.cabin_adapter_demo`
 
 Expected: FAIL with `unexpected keyword argument 'face_present'`.
 
-- [ ] **Step 3: Apply the minimal contract repair**
+- [x] **Step 3: Apply the minimal contract repair**
 
 Replace the two stale demo arguments with `presence="PRESENT"`; change `CabinPerceptionSnapshot.eye_closed` to `bool | None`; keep `DriverContext.eye_closed` at `bool | None = None`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
-Run: `uv run --group dev python -m pytest tests/vehicle_ai/test_cabin_adapter.py tests/cabin/test_perception_contract.py -q`
+Run: `uv run --group dev python -m pytest tests/vehicle_ai/test_cabin_contracts.py -q -p no:cacheprovider`
 
 Expected: all tests pass.
 
@@ -142,7 +141,7 @@ Run: `uv run --group dev python -m apps.vehicle_ai_demo.cabin_adapter_demo`
 
 Expected: exits successfully and prints NORMAL and DROWSY context transitions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/vehicle_ai_demo modules/cabin/perception_service.py modules/vehicle_ai/context/models.py tests

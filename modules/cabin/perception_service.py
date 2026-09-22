@@ -68,7 +68,7 @@ class CabinPerceptionSnapshot:
 
     perclos_ready: bool
 
-    eye_closed: bool
+    eye_closed: bool | None
 
     eye_closure_seconds: float
 
