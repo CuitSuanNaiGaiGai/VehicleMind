@@ -1,0 +1,39 @@
+phone:
+  model_name: yolo26n.pt
+  confidence_threshold: 0.35
+  image_size: 640
+  near_duration_seconds: 0.5
+  use_duration_seconds: 1.5
+  missing_tolerance_seconds: 0.25
+
+driving:
+  work_width: 1280
+  work_height: 720
+  score_threshold: 0.30
+  nms_threshold: 0.45
+  prefer_coreml: true
+  warmup_runs: 2
+  object_model_name: yolo11n.pt
+  object_confidence_threshold: 0.25
+  object_image_size: 640
+
+lane:
+  smoothing: 0.75
+  min_abs_slope: 0.35
+  max_abs_slope: 3.0
+  white_hls_lower: [0, 160, 0]
+  white_hls_upper: [180, 255, 255]
+  yellow_hls_lower: [10, 80, 80]
+  yellow_hls_upper: [40, 255, 255]
+  canny_low: 60
+  canny_high: 150
+  color_canny_low: 50
+  color_canny_high: 120
+  roi_left: 0.05
+  roi_top_left: 0.42
+  roi_top_right: 0.58
+  roi_right: 0.95
+  roi_top_height: 0.52
+  hough_threshold: 40
+  min_line_length: 35
+  max_line_gap: 80

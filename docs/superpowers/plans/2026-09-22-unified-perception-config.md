@@ -36,7 +36,7 @@
 - Produces: frozen `PhonePerceptionConfig`, `DrivingPerceptionConfig`, and `LanePerceptionConfig`
 - Consumes: packaged YAML resources under `modules/config/`
 
-- [ ] **Step 1: Write failing tests for defaults, immutability, packaging, and validation**
+- [x] **Step 1: Write failing tests for defaults, immutability, packaging, and validation**
 
 ```python
 def test_repository_perception_config_loads() -> None:
@@ -68,7 +68,7 @@ Extend the wheel test with:
 assert "modules/config/perception.yaml" in wheel.namelist()
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run:
 
@@ -80,7 +80,7 @@ uv run --group dev python -m pytest \
 
 Expected: collection fails because `PerceptionConfig` and `perception.yaml` do not exist.
 
-- [ ] **Step 3: Add the versioned YAML values**
+- [x] **Step 3: Add the versioned YAML values**
 
 Create `modules/config/perception.yaml` with these complete defaults:
 
@@ -126,7 +126,7 @@ lane:
   max_line_gap: 80
 ```
 
-- [ ] **Step 4: Implement focused frozen dataclasses and YAML parsing**
+- [x] **Step 4: Implement focused frozen dataclasses and YAML parsing**
 
 `modules/config/perception.py` exposes the following public shape:
 
@@ -194,7 +194,7 @@ class PerceptionConfig:
 
 Validate non-empty model names, thresholds in `[0, 1]`, positive image dimensions and durations, ordered slope/Canny/ROI bounds, three-element HLS values in `[0, 255]`, and unknown sections/fields. Normalize YAML HLS lists to tuples before dataclass construction. Partial YAML files inherit dataclass defaults.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run:
 
@@ -207,7 +207,7 @@ uv run --group dev python -m pytest \
 
 Expected: all focused tests pass and the built wheel contains both YAML files.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```bash
 git add modules/config tests/config tests/packaging/test_wheel.py

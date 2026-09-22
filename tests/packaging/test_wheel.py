@@ -33,6 +33,7 @@ def test_built_wheel_contains_loadable_default_cabin_config(
     extracted = tmp_path / "installed"
     with zipfile.ZipFile(wheel_path) as wheel:
         assert "modules/config/cabin.yaml" in wheel.namelist()
+        assert "modules/config/perception.yaml" in wheel.namelist()
         wheel.extractall(extracted)
 
     environment = os.environ.copy()
@@ -44,9 +45,11 @@ def test_built_wheel_contains_loadable_default_cabin_config(
             (
                 "from pathlib import Path; "
                 "from modules.config import CabinPerceptionConfig; "
+                "from modules.config import PerceptionConfig; "
                 "import modules.config.cabin as cabin; "
                 "assert Path(cabin.__file__).is_relative_to(Path.cwd()); "
-                "assert CabinPerceptionConfig.load_default().eye.ear_threshold == 0.21"
+                "assert CabinPerceptionConfig.load_default().eye.ear_threshold == 0.21; "
+                "assert PerceptionConfig.load_default().driving.nms_threshold == 0.45"
             ),
         ],
         cwd=extracted,
