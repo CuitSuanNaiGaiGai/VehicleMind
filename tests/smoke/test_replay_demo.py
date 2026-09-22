@@ -1,0 +1,147 @@
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+
+from pathlib import Path
+
+import pytest
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+SCENARIO = Path("assets/scenarios/drowsy_rest_stop.yaml")
+
+
+def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "apps.vehicle_ai_demo.replay_demo",
+            *arguments,
+        ],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_replay_demo_creates_a_complete_passing_result(tmp_path: Path) -> None:
+    output_root = tmp_path / "runs"
+
+    result = _run_cli(
+        "--scenario",
+        str(SCENARIO),
+        "--output-root",
+        str(output_root),
+        "--allow-dirty",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "PASS" in result.stdout
+    result_dir = output_root / "drowsy-rest-stop"
+    for name in (
+        "summary.json",
+        "trace.json",
+        "report.html",
+        "resolved_config.yaml",
+        "run_card.md",
+    ):
+        assert (result_dir / name).is_file()
+
+    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["passed"] is True
+    assert summary["unauthorized_sensitive_executions"] == 0
+    assert re.fullmatch(r"[0-9a-f]{64}", summary["semantic_sha256"])
+
+
+def test_replay_demo_reports_invalid_scenario_without_traceback(
+    tmp_path: Path,
+) -> None:
+    scenario = tmp_path / "invalid.yaml"
+    scenario.write_text("unknown: field\n", encoding="utf-8")
+
+    result = _run_cli(
+        "--scenario",
+        str(scenario),
+        "--output-root",
+        str(tmp_path / "runs"),
+        "--allow-dirty",
+    )
+
+    assert result.returncode != 0
+    assert "ERROR:" in result.stderr
+    assert "Traceback (most recent call last)" not in result.stderr
+
+
+def test_replay_demo_publishes_complete_failed_assertion_result(
+    tmp_path: Path,
+) -> None:
+    scenario = tmp_path / "expected-failure.yaml"
+    source = (REPOSITORY_ROOT / SCENARIO).read_text(encoding="utf-8")
+    scenario.write_text(
+        source.replace(
+            "unauthorized_sensitive_executions: 0",
+            "unauthorized_sensitive_executions: 1",
+        ),
+        encoding="utf-8",
+    )
+    output_root = tmp_path / "runs"
+
+    result = _run_cli(
+        "--scenario",
+        str(scenario),
+        "--output-root",
+        str(output_root),
+        "--allow-dirty",
+    )
+
+    assert result.returncode == 1
+    assert "FAIL" in result.stdout
+    result_dir = output_root / "drowsy-rest-stop"
+    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["passed"] is False
+    assert any(assertion["passed"] is False for assertion in summary["assertions"])
+    assert (result_dir / "trace.json").is_file()
+    assert (result_dir / "report.html").is_file()
+
+
+def test_replay_demo_debug_mode_preserves_traceback(tmp_path: Path) -> None:
+    scenario = tmp_path / "invalid.yaml"
+    scenario.write_text("unknown: field\n", encoding="utf-8")
+
+    result = _run_cli(
+        "--scenario",
+        str(scenario),
+        "--output-root",
+        str(tmp_path / "runs"),
+        "--allow-dirty",
+        "--debug",
+    )
+
+    assert result.returncode != 0
+    assert "Traceback (most recent call last)" in result.stderr
+
+
+@pytest.mark.parametrize("run_id", ["../../escaped", "/tmp/escaped"])
+def test_replay_demo_rejects_run_id_path_escape(
+    tmp_path: Path,
+    run_id: str,
+) -> None:
+    output_root = tmp_path / "runs"
+
+    result = _run_cli(
+        "--scenario",
+        str(SCENARIO),
+        "--output-root",
+        str(output_root),
+        "--run-id",
+        run_id,
+        "--allow-dirty",
+    )
+
+    assert result.returncode == 2
+    assert "run_id must be a safe" in result.stderr
+    assert not (tmp_path / "escaped").exists()

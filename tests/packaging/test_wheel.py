@@ -35,6 +35,16 @@ def test_built_wheel_contains_loadable_default_cabin_config(
         names = wheel.namelist()
         assert "modules/config/cabin.yaml" in names
         assert "modules/config/perception.yaml" in names
+        for packaged_path in (
+            "apps/vehicle_ai_demo/replay_demo.py",
+            "apps/vehicle_ai_demo/replay_ui/report.html",
+            "apps/vehicle_ai_demo/replay_ui/report.css",
+            "apps/vehicle_ai_demo/replay_ui/report.js",
+            "modules/vehicle_ai/replay/loader.py",
+            "modules/vehicle_ai/replay/report.py",
+            "modules/vehicle_ai/replay/runner.py",
+        ):
+            assert packaged_path in names
         license_paths = [
             name for name in names if name.endswith(".dist-info/licenses/LICENSE")
         ]
@@ -61,9 +71,13 @@ def test_built_wheel_contains_loadable_default_cabin_config(
                 "from modules.config import CabinPerceptionConfig; "
                 "from modules.config import PerceptionConfig; "
                 "import modules.config.cabin as cabin; "
+                "import modules.vehicle_ai.replay.report as report; "
                 "assert Path(cabin.__file__).is_relative_to(Path.cwd()); "
                 "assert CabinPerceptionConfig.load_default().eye.ear_threshold == 0.21; "
-                "assert PerceptionConfig.load_default().driving.nms_threshold == 0.45"
+                "assert PerceptionConfig.load_default().driving.nms_threshold == 0.45; "
+                "assert (report.UI_ROOT / 'report.html').is_file(); "
+                "assert (report.UI_ROOT / 'report.css').is_file(); "
+                "assert (report.UI_ROOT / 'report.js').is_file()"
             ),
         ],
         cwd=extracted,

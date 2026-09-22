@@ -23,6 +23,26 @@ uv run --group dev ruff check apps modules scripts tests
 uv run --group dev python scripts/check_source_size.py
 ```
 
+## 一条命令运行舱内外协同 Demo
+
+从干净的仓库工作树执行：
+
+```bash
+uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
+  --scenario assets/scenarios/drowsy_rest_stop.yaml \
+  --output-root runs
+```
+
+命令会离线回放“疲劳驾驶 → 建议休息 → 搜索休息区 → 用户确认 → 启动模拟导航”，并生成 `runs/drowsy-rest-stop/report.html`。结果包同时包含可复核的配置、运行卡、摘要和完整语义 trace。开发过程中若有未提交改动，可加 `--allow-dirty`；这类结果会标记为 dirty，不应作为正式项目证据。
+
+项目提供三种用途不同的运行模式：
+
+- **Replay 模式**：使用已录制的语义观测，确定性验证上下文、事件、Agent 编排、确认门禁和工具执行；不需要摄像头、模型权重、API Key 或网络。
+- **Perception 模式**：单独运行舱内或舱外模型，验证真实视频输入与感知输出，需要相应依赖和模型资产。
+- **Live 模式**：面向后续车机联调，将实时感知接入统一上下文和 Agent；当前不作为离线 Demo 的完成条件。
+
+回放页面中的驾驶员与道路状态来自录制观测，不是本次运行重新执行感知模型的结果，因此该页面只证明系统集成和 Agent 安全编排，不构成感知精度证据。感知效果将通过舱内、舱外各不超过 50 条的小样本验证单独报告。
+
 模型权重不进入 Git。将权重放到 `assets/model_manifest.yaml` 指定的位置后验证：
 
 ```bash

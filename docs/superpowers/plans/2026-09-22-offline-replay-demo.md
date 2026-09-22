@@ -610,7 +610,7 @@ uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
   --output-root runs
 ```
 
-- [ ] **Step 1: Write the failing CLI smoke test**
+- [x] **Step 1: Write the failing CLI smoke test**
 
 Run the module in a subprocess with a temporary output root. Assert exit code zero, a printed `PASS`, and these files:
 
@@ -624,7 +624,7 @@ Run the module in a subprocess with a temporary output root. Assert exit code ze
 
 Load `summary.json` and assert `passed is True`, `unauthorized_sensitive_executions == 0`, and `semantic_sha256` contains 64 lowercase hexadecimal characters. Add a malformed-scenario test that exits nonzero without a Python traceback unless `--debug` is present.
 
-- [ ] **Step 2: Run the smoke test and verify it fails**
+- [x] **Step 2: Run the smoke test and verify it fails**
 
 ```bash
 uv run --group dev python -m pytest tests/smoke/test_replay_demo.py -q
@@ -632,21 +632,21 @@ uv run --group dev python -m pytest tests/smoke/test_replay_demo.py -q
 
 Expected: module-not-found failure for `replay_demo`.
 
-- [ ] **Step 3: Implement the thin CLI**
+- [x] **Step 3: Implement the thin CLI**
 
 `replay_demo.py` only parses paths, `--run-id`, `--allow-dirty`, and `--debug`; loads the scenario; collects `RunProvenance` from Git; builds a snapshot from the resolved cabin/perception configs with the scenario path recorded as a non-secret override; runs the replay; writes the report; prints the result and artifact paths; and returns `0` for a passing replay or `1` for a failed replay. It must not contain scenario logic, HTML, tool policy, or Agent policy. Dirty worktrees are refused unless `--allow-dirty` is explicit.
 
-- [ ] **Step 4: Package replay resources**
+- [x] **Step 4: Package replay resources**
 
 Extend the wheel test to assert that replay Python modules and `apps/vehicle_ai_demo/replay_ui/{report.html,report.css,report.js}` are present. The showcase YAML remains a repository example rather than package runtime data; README resolves it from a clone.
 
-- [ ] **Step 5: Document the Demo and update evidence-backed progress**
+- [x] **Step 5: Document the Demo and update evidence-backed progress**
 
 README must show the exact command, explain replay/perception/live modes, link the generated report, and state that the showcase uses recorded semantic observations rather than rerunning perception models. It must not describe the replay as perception accuracy evidence.
 
 Only after the smoke test and report inspection succeed, check the `todolist.md` items for versioned scenario format, offline end-to-end replay, deterministic safety confirmation, trace generation, and initial dashboard. Leave small-sample perception and the 120-task Agent evaluation unchecked.
 
-- [ ] **Step 6: Run the complete local quality gate**
+- [x] **Step 6: Run the complete local quality gate**
 
 ```bash
 uv sync --frozen --group dev
@@ -669,7 +669,7 @@ git diff --check
 
 Expected: every command exits zero. Report the actual test count and coverage without claiming the final 80% goal.
 
-- [ ] **Step 7: Request independent review and fix all Critical/Important findings**
+- [x] **Step 7: Request independent review and fix all Critical/Important findings**
 
 Review the full plan range for schema strictness, path traversal, secret leakage, deterministic evidence, confirmation bypass, replay attacks, partial result publication, HTML injection, misleading perception claims, package resources, and source-size compliance.
 

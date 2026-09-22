@@ -9,6 +9,7 @@ from modules.vehicle_ai.tools.base import (
 )
 
 from modules.vehicle_ai.tools.registry import (
+    ConfirmationIssuer,
     ToolRegistry,
 )
 
@@ -57,6 +58,7 @@ __all__ = [
     "ToolDefinition",
     "ToolExecutionRecord",
     "ToolResult",
+    "ConfirmationIssuer",
     "ToolRegistry",
     "build_default_tool_registry",
 ]

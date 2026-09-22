@@ -86,6 +86,7 @@ class VehicleAgent:
         self.confirmations = ActionConfirmationController(
             self.pending_actions,
             self.tool_registry,
+            self.tool_registry.take_confirmation_issuer(),
         )
         self.context_selector = ContextSelector()
 

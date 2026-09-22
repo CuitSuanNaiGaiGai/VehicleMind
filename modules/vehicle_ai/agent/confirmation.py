@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from modules.vehicle_ai.agent.action_state import PendingAction, PendingActionStore
-from modules.vehicle_ai.tools import ToolRegistry, ToolResult
+from modules.vehicle_ai.tools import ConfirmationIssuer, ToolRegistry, ToolResult
 
 
 class ActionConfirmationController:
@@ -13,9 +13,11 @@ class ActionConfirmationController:
         self,
         pending_actions: PendingActionStore,
         tool_registry: ToolRegistry,
+        confirmation_issuer: ConfirmationIssuer,
     ) -> None:
         self.pending_actions = pending_actions
         self.tool_registry = tool_registry
+        self.__confirmation_issuer = confirmation_issuer
 
     def stage(self, tool_name: str, arguments: dict[str, Any]) -> None:
         try:
@@ -48,8 +50,13 @@ class ActionConfirmationController:
                 message="No matching live pending action was found.",
                 error="INVALID_CONFIRMATION",
             )
+        grant = self.__confirmation_issuer.issue(
+            confirmation.action_id,
+            confirmation.tool_name,
+            confirmation.arguments,
+        )
         return self.tool_registry.execute(
             confirmation.tool_name,
             dict(confirmation.arguments),
-            confirmation=confirmation,
+            confirmation=grant,
         )

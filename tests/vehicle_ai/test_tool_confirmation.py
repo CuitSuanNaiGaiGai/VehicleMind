@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import time
 
+from types import SimpleNamespace
+
 import pytest
 
 from modules.vehicle_ai.agent.action_state import PendingAction
-from modules.vehicle_ai.context import NavigationState
+from modules.vehicle_ai.context import ContextManager, NavigationState
 from modules.vehicle_ai.llm.base import LLMToolCall
 from modules.vehicle_ai.replay.models import ScriptedResponse
 from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
 from modules.vehicle_ai.runtime import VehicleMindRuntime
+from modules.vehicle_ai.tools import build_default_tool_registry
 
 
 @pytest.fixture
@@ -108,34 +111,70 @@ def test_expired_pending_action_cannot_execute(runtime: VehicleMindRuntime) -> N
     assert runtime.agent.pending_actions.get() is None
 
 
-def test_confirmation_must_match_and_cannot_be_replayed(
-    runtime: VehicleMindRuntime,
-) -> None:
-    runtime.agent.pending_actions.set(_pending_navigation())
-    pending = runtime.agent.pending_actions.get()
-    assert pending is not None
-    confirmation = runtime.agent.pending_actions.consume(pending.action_id)
-    assert confirmation is not None
+def test_confirmation_must_match_and_cannot_be_replayed() -> None:
+    context = ContextManager()
+    registry = build_default_tool_registry(context)
+    issuer = registry.take_confirmation_issuer()
+    grant = issuer.issue(
+        "issued-action",
+        "start_navigation",
+        {"poi_id": "rest_area_001"},
+    )
 
-    mismatch = runtime.tools.execute(
+    mismatch = registry.execute(
         "start_navigation",
         {"poi_id": "rest_area_002"},
-        confirmation=confirmation,
+        confirmation=grant,
     )
-    success = runtime.tools.execute(
+    success = registry.execute(
         "start_navigation",
         {"poi_id": "rest_area_001"},
-        confirmation=confirmation,
+        confirmation=grant,
     )
-    replay = runtime.tools.execute(
+    replay = registry.execute(
         "start_navigation",
         {"poi_id": "rest_area_001"},
-        confirmation=confirmation,
+        confirmation=grant,
     )
 
     assert mismatch.error == "CONFIRMATION_MISMATCH"
     assert success.success is True
     assert replay.error == "CONFIRMATION_REPLAY"
+
+
+def test_structurally_similar_confirmation_cannot_authorize_execution(
+    runtime: VehicleMindRuntime,
+) -> None:
+    forged = SimpleNamespace(
+        action_id="forged",
+        tool_name="set_driver_window",
+        arguments={"open": True},
+    )
+
+    result = runtime.tools.execute(
+        "set_driver_window",
+        {"open": True},
+        confirmation=forged,
+    )
+
+    assert result.success is False
+    assert result.error == "INVALID_CONFIRMATION"
+    assert runtime.context_manager.get_context().vehicle.driver_window_open is False
+    assert runtime.tools.execution_history()[-1].confirmed is False
+
+
+def test_runtime_registry_does_not_expose_another_issuer(
+    runtime: VehicleMindRuntime,
+) -> None:
+    with pytest.raises(RuntimeError, match="already been claimed"):
+        runtime.tools.take_confirmation_issuer()
+    with pytest.raises(PermissionError, match="invalid confirmation issuer"):
+        runtime.tools._issue_confirmation(
+            object(),
+            "attacker-minted",
+            "set_driver_window",
+            {"open": True},
+        )
 
 
 def test_tool_history_records_blocked_and_successful_attempts(
