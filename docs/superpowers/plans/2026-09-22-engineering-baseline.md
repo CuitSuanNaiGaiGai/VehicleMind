@@ -153,7 +153,7 @@ git commit -m "fix: align cabin demos with semantic context contract"
 **Files:**
 - Create: `modules/config/__init__.py`
 - Create: `modules/config/cabin.py`
-- Modify: `configs/cabin.yaml`
+- Modify: `modules/config/cabin.yaml`
 - Modify: `modules/cabin/perception_service.py`
 - Test: `tests/config/test_cabin_config.py`
 
@@ -172,7 +172,7 @@ from modules.config.cabin import CabinPerceptionConfig
 
 
 def test_repository_cabin_config_loads():
-    config = CabinPerceptionConfig.load(Path("configs/cabin.yaml"))
+    config = CabinPerceptionConfig.load_default()
     assert config.eye.ear_threshold == pytest.approx(0.21)
     assert config.perclos.window_seconds == pytest.approx(30.0)
 
@@ -203,7 +203,7 @@ Expected: all tests pass.
 - [x] **Step 5: Commit**
 
 ```bash
-git add configs/cabin.yaml modules/config modules/cabin/perception_service.py tests/config
+git add modules/config modules/cabin/perception_service.py tests/config
 git commit -m "refactor: centralize cabin perception configuration"
 ```
 

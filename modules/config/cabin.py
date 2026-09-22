@@ -178,7 +178,7 @@ class CabinPerceptionConfig:
 
     @classmethod
     def default_path(cls) -> Path:
-        return Path(__file__).resolve().parents[2] / "configs/cabin.yaml"
+        return Path(__file__).with_name("cabin.yaml")
 
     @classmethod
     def load_default(cls) -> CabinPerceptionConfig:

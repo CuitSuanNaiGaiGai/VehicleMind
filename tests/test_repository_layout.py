@@ -20,3 +20,9 @@ def test_implementation_modules_are_not_empty_placeholders():
     ]
 
     assert empty_modules == []
+
+
+def test_ci_checks_python_formatting() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert "ruff format --check apps modules scripts tests" in workflow

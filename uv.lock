@@ -1374,6 +1374,8 @@ perception = [
 [package.dev-dependencies]
 dev = [
     { name = "mypy" },
+    { name = "numpy" },
+    { name = "opencv-python" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -1398,6 +1400,8 @@ provides-extras = ["perception"]
 [package.metadata.requires-dev]
 dev = [
     { name = "mypy", specifier = ">=1.17,<2" },
+    { name = "numpy", specifier = ">=2.1,<3" },
+    { name = "opencv-python", specifier = ">=4.10,<5" },
     { name = "pytest", specifier = ">=8.4,<9" },
     { name = "pytest-cov", specifier = ">=6,<8" },
     { name = "ruff", specifier = ">=0.12,<1" },

@@ -13,7 +13,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_repository_cabin_config_loads() -> None:
-    config = CabinPerceptionConfig.load(REPOSITORY_ROOT / "configs/cabin.yaml")
+    config = CabinPerceptionConfig.load_default()
 
     assert config.eye.ear_threshold == pytest.approx(0.21)
     assert config.perclos.window_seconds == pytest.approx(30.0)

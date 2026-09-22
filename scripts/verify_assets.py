@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import sys
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 
@@ -19,6 +21,60 @@ REQUIRED_ASSET_FIELDS = {
     "license",
 }
 REQUIRED_LICENSE_FIELDS = {"name", "url", "status"}
+SHA256_PATTERN = re.compile(r"[0-9a-fA-F]{64}")
+
+
+def _is_http_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _validate_asset_values(
+    asset: dict[str, Any],
+    asset_id: str,
+) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(asset.get("id"), str) or not asset["id"].strip():
+        errors.append(f"{asset_id}: id must be a non-empty string")
+
+    expected_path = asset.get("expected_path")
+    if not isinstance(expected_path, str) or not expected_path:
+        errors.append(f"{asset_id}: expected path must be a non-empty string")
+    else:
+        relative_path = Path(expected_path)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            errors.append(f"{asset_id}: expected path must be repository-relative")
+
+    size_bytes = asset.get("size_bytes")
+    if (
+        isinstance(size_bytes, bool)
+        or not isinstance(size_bytes, int)
+        or size_bytes < 0
+    ):
+        errors.append(f"{asset_id}: size_bytes must be a non-negative integer")
+
+    sha256 = asset.get("sha256")
+    if not isinstance(sha256, str) or SHA256_PATTERN.fullmatch(sha256) is None:
+        errors.append(f"{asset_id}: sha256 must contain 64 hexadecimal characters")
+
+    if not _is_http_url(asset.get("source_url")):
+        errors.append(f"{asset_id}: source_url must be an absolute HTTP(S) URL")
+
+    required = asset.get("required", True)
+    if not isinstance(required, bool):
+        errors.append(f"{asset_id}: required must be a boolean")
+
+    license_data = asset.get("license")
+    if isinstance(license_data, dict):
+        for field in ("name", "status"):
+            value = license_data.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{asset_id}: license {field} must be a non-empty string")
+        if not _is_http_url(license_data.get("url")):
+            errors.append(f"{asset_id}: license url must be an absolute HTTP(S) URL")
+    return errors
 
 
 def _sha256(path: Path) -> str:
@@ -45,6 +101,8 @@ def _load_manifest(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
     errors: list[str] = []
     validated: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    seen_paths: set[str] = set()
     for index, asset in enumerate(assets):
         label = f"asset[{index}]"
         if not isinstance(asset, dict):
@@ -68,7 +126,20 @@ def _load_manifest(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
                 f"{', '.join(sorted(missing_license))}"
             )
             continue
-        validated.append(asset)
+        value_errors = _validate_asset_values(asset, asset_id)
+        errors.extend(value_errors)
+
+        if isinstance(asset.get("id"), str):
+            if asset["id"] in seen_ids:
+                errors.append(f"{asset_id}: duplicate asset id")
+            seen_ids.add(asset["id"])
+        if isinstance(asset.get("expected_path"), str):
+            if asset["expected_path"] in seen_paths:
+                errors.append(f"{asset_id}: duplicate expected path")
+            seen_paths.add(asset["expected_path"])
+
+        if not value_errors:
+            validated.append(asset)
     return validated, errors
 
 
@@ -77,10 +148,6 @@ def verify_assets(manifest_path: Path, root: Path) -> list[str]:
     for asset in assets:
         asset_id = str(asset["id"])
         relative_path = Path(str(asset["expected_path"]))
-        if relative_path.is_absolute() or ".." in relative_path.parts:
-            errors.append(f"{asset_id}: expected path must be repository-relative")
-            continue
-
         path = root / relative_path
         required = bool(asset.get("required", True))
         if not path.is_file():
@@ -90,20 +157,15 @@ def verify_assets(manifest_path: Path, root: Path) -> list[str]:
                 )
             continue
 
-        expected_size = asset.get("size_bytes")
-        if not isinstance(expected_size, int) or expected_size < 0:
-            errors.append(f"{asset_id}: size_bytes must be a non-negative integer")
-        elif path.stat().st_size != expected_size:
+        expected_size = int(asset["size_bytes"])
+        if path.stat().st_size != expected_size:
             errors.append(
                 f"{asset_id}: size mismatch at expected path "
                 f"{relative_path.as_posix()} (expected {expected_size}, "
                 f"got {path.stat().st_size})"
             )
 
-        expected_hash = asset.get("sha256")
-        if not isinstance(expected_hash, str) or len(expected_hash) != 64:
-            errors.append(f"{asset_id}: sha256 must contain 64 hexadecimal characters")
-            continue
+        expected_hash = str(asset["sha256"])
         actual_hash = _sha256(path)
         if actual_hash != expected_hash.lower():
             errors.append(
