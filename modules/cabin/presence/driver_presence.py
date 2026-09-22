@@ -72,17 +72,11 @@ class DriverPresenceTracker:
         absence_timeout_seconds: float = 1.5,
         startup_timeout_seconds: float = 1.0,
     ):
-        self.present_confirm_ms = int(
-            present_confirm_seconds * 1000
-        )
+        self.present_confirm_ms = int(present_confirm_seconds * 1000)
 
-        self.absence_timeout_ms = int(
-            absence_timeout_seconds * 1000
-        )
+        self.absence_timeout_ms = int(absence_timeout_seconds * 1000)
 
-        self.startup_timeout_ms = int(
-            startup_timeout_seconds * 1000
-        )
+        self.startup_timeout_ms = int(startup_timeout_seconds * 1000)
 
         self._state = DriverPresence.UNKNOWN
 
@@ -116,7 +110,6 @@ class DriverPresenceTracker:
         # =====================================================
 
         if face_detected:
-
             self._last_seen_timestamp_ms = timestamp_ms
 
             # Start candidate-present period.
@@ -125,34 +118,21 @@ class DriverPresenceTracker:
 
             # If already PRESENT, remain PRESENT immediately.
             if self._state == DriverPresence.PRESENT:
-
                 if self._visible_since_ms is None:
                     self._visible_since_ms = timestamp_ms
 
             else:
+                present_duration_ms = timestamp_ms - self._present_candidate_since_ms
 
-                present_duration_ms = (
-                    timestamp_ms
-                    - self._present_candidate_since_ms
-                )
-
-                if (
-                    present_duration_ms
-                    >= self.present_confirm_ms
-                ):
+                if present_duration_ms >= self.present_confirm_ms:
                     self._state = DriverPresence.PRESENT
 
-                    self._visible_since_ms = (
-                        self._present_candidate_since_ms
-                    )
+                    self._visible_since_ms = self._present_candidate_since_ms
 
             lost_duration = 0.0
 
             if self._visible_since_ms is not None:
-                visible_duration = (
-                    timestamp_ms
-                    - self._visible_since_ms
-                ) / 1000.0
+                visible_duration = (timestamp_ms - self._visible_since_ms) / 1000.0
             else:
                 visible_duration = 0.0
 
@@ -174,29 +154,19 @@ class DriverPresenceTracker:
         # -----------------------------------------------------
 
         if self._last_seen_timestamp_ms is not None:
+            lost_ms = timestamp_ms - self._last_seen_timestamp_ms
 
-            lost_ms = (
-                timestamp_ms
-                - self._last_seen_timestamp_ms
-            )
-
-            lost_duration = (
-                lost_ms / 1000.0
-            )
+            lost_duration = lost_ms / 1000.0
 
             # Short detector dropout:
             # retain PRESENT.
             if (
                 self._state == DriverPresence.PRESENT
-                and
-                lost_ms <= self.absence_timeout_ms
+                and lost_ms <= self.absence_timeout_ms
             ):
-
                 if self._visible_since_ms is not None:
-
                     visible_duration = (
-                        self._last_seen_timestamp_ms
-                        - self._visible_since_ms
+                        self._last_seen_timestamp_ms - self._visible_since_ms
                     ) / 1000.0
 
                 else:
@@ -211,7 +181,6 @@ class DriverPresenceTracker:
 
             # Missing for long enough -> ABSENT.
             if lost_ms > self.absence_timeout_ms:
-
                 self._state = DriverPresence.ABSENT
 
                 self._visible_since_ms = None
@@ -227,15 +196,9 @@ class DriverPresenceTracker:
         # Driver has never been detected since startup
         # -----------------------------------------------------
 
-        startup_elapsed_ms = (
-            timestamp_ms
-            - self._start_timestamp_ms
-        )
+        startup_elapsed_ms = timestamp_ms - self._start_timestamp_ms
 
-        if (
-            startup_elapsed_ms
-            >= self.startup_timeout_ms
-        ):
+        if startup_elapsed_ms >= self.startup_timeout_ms:
             self._state = DriverPresence.ABSENT
 
         return DriverPresenceResult(

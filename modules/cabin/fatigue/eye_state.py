@@ -77,9 +77,7 @@ class EyeStateAnalyzer:
         if horizontal < 1e-6:
             return 0.0
 
-        ear = (
-            vertical_1 + vertical_2
-        ) / (2.0 * horizontal)
+        ear = (vertical_1 + vertical_2) / (2.0 * horizontal)
 
         return float(ear)
 

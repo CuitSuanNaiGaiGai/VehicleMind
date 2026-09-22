@@ -3,6 +3,7 @@ from pathlib import Path
 
 import cv2
 
+from apps.cabin_demo.ui.phone import draw_interaction_zone, open_camera
 from modules.cabin.face.landmarks import (
     FaceLandmarkDetector,
 )
@@ -17,162 +18,45 @@ from modules.cabin.distraction.behavior_tracker import (
 )
 
 
-PROJECT_ROOT = Path(
-    __file__
-).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-MODEL_PATH = (
-    PROJECT_ROOT
-    / "models"
-    / "mediapipe"
-    / "face_landmarker.task"
-)
-
-
-def open_camera(
-    camera_id: int = 0,
-):
-
-    cap = cv2.VideoCapture(
-        camera_id,
-        cv2.CAP_AVFOUNDATION,
-    )
-
-    if not cap.isOpened():
-
-        cap = cv2.VideoCapture(
-            camera_id
-        )
-
-    if not cap.isOpened():
-
-        raise RuntimeError(
-            "Failed to open camera."
-        )
-
-    cap.set(
-        cv2.CAP_PROP_FRAME_WIDTH,
-        1280,
-    )
-
-    cap.set(
-        cv2.CAP_PROP_FRAME_HEIGHT,
-        720,
-    )
-
-    return cap
-
-
-def draw_interaction_zone(
-    frame,
-    zone,
-):
-
-    if zone is None:
-        return
-
-    cv2.rectangle(
-        frame,
-        (
-            zone.x1,
-            zone.y1,
-        ),
-        (
-            zone.x2,
-            zone.y2,
-        ),
-        (255, 180, 0),
-        2,
-    )
-
-    cv2.putText(
-        frame,
-        "DRIVER INTERACTION ZONE",
-        (
-            zone.x1,
-            max(
-                20,
-                zone.y1 - 10,
-            ),
-        ),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        (255, 180, 0),
-        1,
-        cv2.LINE_AA,
-    )
+MODEL_PATH = PROJECT_ROOT / "models" / "mediapipe" / "face_landmarker.task"
 
 
 def main():
-
-    # ========================================================
-    # Face
-    # ========================================================
-
-    face_detector = (
-        FaceLandmarkDetector(
-            model_path=MODEL_PATH,
-        )
+    face_detector = FaceLandmarkDetector(
+        model_path=MODEL_PATH,
     )
 
-    # ========================================================
-    # Phone detector
-    # ========================================================
-
-    phone_detector = (
-        PhoneDetector(
-            model_name="yolo26n.pt",
-            confidence_threshold=0.35,
-            image_size=640,
-        )
+    phone_detector = PhoneDetector(
+        model_name="yolo26n.pt",
+        confidence_threshold=0.35,
+        image_size=640,
     )
 
-    # ========================================================
-    # Behavior tracker
-    # ========================================================
-
-    behavior_tracker = (
-        PhoneBehaviorTracker(
-            near_duration_seconds=0.5,
-            use_duration_seconds=1.5,
-            missing_tolerance_seconds=0.25,
-        )
+    behavior_tracker = PhoneBehaviorTracker(
+        near_duration_seconds=0.5,
+        use_duration_seconds=1.5,
+        missing_tolerance_seconds=0.25,
     )
-
-    # ========================================================
-    # Camera
-    # ========================================================
 
     cap = open_camera()
 
-    start_time = (
-        time.perf_counter()
-    )
+    start_time = time.perf_counter()
 
     fps = 0.0
 
     fps_counter = 0
 
-    fps_start = (
-        time.perf_counter()
-    )
+    fps_start = time.perf_counter()
 
-    print(
-        "[VehicleMind] "
-        "Phone behavior monitoring started."
-    )
+    print("[VehicleMind] Phone behavior monitoring started.")
 
-    print(
-        "Press 'q' to quit."
-    )
+    print("Press 'q' to quit.")
 
     try:
-
         while True:
-
-            success, frame = (
-                cap.read()
-            )
+            success, frame = cap.read()
 
             if not success:
                 break
@@ -183,57 +67,37 @@ def main():
                 1,
             )
 
-            timestamp_ms = int(
-                (
-                    time.perf_counter()
-                    - start_time
-                )
-                * 1000
-            )
+            timestamp_ms = int((time.perf_counter() - start_time) * 1000)
 
-            height, width = (
-                frame.shape[:2]
-            )
+            height, width = frame.shape[:2]
 
             # =================================================
             # Face
             # =================================================
 
-            faces = (
-                face_detector.detect(
-                    frame,
-                    timestamp_ms,
-                )
+            faces = face_detector.detect(
+                frame,
+                timestamp_ms,
             )
 
-            face = (
-                faces[0]
-                if faces
-                else None
-            )
+            face = faces[0] if faces else None
 
             # =================================================
             # Phone Detection
             # =================================================
 
-            phone_result = (
-                phone_detector.detect(
-                    frame
-                )
-            )
+            phone_result = phone_detector.detect(frame)
 
             # =================================================
             # Behavior
             # =================================================
 
-            behavior_result = (
-                behavior_tracker.update(
-                    timestamp_ms=timestamp_ms,
-                    phone_result=phone_result,
-                    face=face,
-                    frame_width=width,
-                    frame_height=height,
-                )
+            behavior_result = behavior_tracker.update(
+                timestamp_ms=timestamp_ms,
+                phone_result=phone_result,
+                face=face,
+                frame_width=width,
+                frame_height=height,
             )
 
             # =================================================
@@ -249,17 +113,10 @@ def main():
             # Phone bounding boxes
             # =================================================
 
-            for detection in (
-                phone_result.detections
-            ):
-
-                is_associated = (
-                    behavior_result.associated_phone
-                    is detection
-                )
+            for detection in phone_result.detections:
+                is_associated = behavior_result.associated_phone is detection
 
                 if is_associated:
-
                     color = (
                         0,
                         0,
@@ -267,7 +124,6 @@ def main():
                     )
 
                 else:
-
                     color = (
                         0,
                         200,
@@ -288,10 +144,7 @@ def main():
                     2,
                 )
 
-                label = (
-                    "CELL PHONE "
-                    f"{detection.confidence:.2f}"
-                )
+                label = f"CELL PHONE {detection.confidence:.2f}"
 
                 cv2.putText(
                     frame,
@@ -314,37 +167,23 @@ def main():
             # Behavior State
             # =================================================
 
-            state = (
-                behavior_result.state
-            )
+            state = behavior_result.state
 
-            if (
-                state
-                == PhoneBehaviorState.NO_PHONE
-            ):
-
+            if state == PhoneBehaviorState.NO_PHONE:
                 state_color = (
                     0,
                     255,
                     0,
                 )
 
-            elif (
-                state
-                == PhoneBehaviorState.PHONE_PRESENT
-            ):
-
+            elif state == PhoneBehaviorState.PHONE_PRESENT:
                 state_color = (
                     0,
                     220,
                     255,
                 )
 
-            elif (
-                state
-                == PhoneBehaviorState.PHONE_NEAR_DRIVER
-            ):
-
+            elif state == PhoneBehaviorState.PHONE_NEAR_DRIVER:
                 state_color = (
                     0,
                     140,
@@ -352,7 +191,6 @@ def main():
                 )
 
             else:
-
                 state_color = (
                     0,
                     0,
@@ -375,10 +213,7 @@ def main():
 
             cv2.putText(
                 frame,
-                (
-                    "Associated Duration: "
-                    f"{behavior_result.associated_duration:.2f}s"
-                ),
+                (f"Associated Duration: {behavior_result.associated_duration:.2f}s"),
                 (
                     20,
                     80,
@@ -392,10 +227,7 @@ def main():
 
             cv2.putText(
                 frame,
-                (
-                    "Phone Confidence: "
-                    f"{behavior_result.confidence:.2f}"
-                ),
+                (f"Phone Confidence: {behavior_result.confidence:.2f}"),
                 (
                     20,
                     115,
@@ -413,23 +245,14 @@ def main():
 
             fps_counter += 1
 
-            elapsed = (
-                time.perf_counter()
-                - fps_start
-            )
+            elapsed = time.perf_counter() - fps_start
 
             if elapsed >= 1.0:
-
-                fps = (
-                    fps_counter
-                    / elapsed
-                )
+                fps = fps_counter / elapsed
 
                 fps_counter = 0
 
-                fps_start = (
-                    time.perf_counter()
-                )
+                fps_start = time.perf_counter()
 
             cv2.putText(
                 frame,
@@ -454,16 +277,12 @@ def main():
                 frame,
             )
 
-            key = (
-                cv2.waitKey(1)
-                & 0xFF
-            )
+            key = cv2.waitKey(1) & 0xFF
 
             if key == ord("q"):
                 break
 
     finally:
-
         cap.release()
 
         face_detector.close()
@@ -472,5 +291,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()

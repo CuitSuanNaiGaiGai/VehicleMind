@@ -20,31 +20,16 @@ from modules.vehicle_ai.tools.base import (
 
 MOCK_REST_AREAS = [
     {
-        "poi_id":
-            "rest_area_001",
-
-        "name":
-            "West Lake Rest Area",
-
-        "distance_km":
-            6.8,
-
-        "eta_minutes":
-            8,
+        "poi_id": "rest_area_001",
+        "name": "West Lake Rest Area",
+        "distance_km": 6.8,
+        "eta_minutes": 8,
     },
-
     {
-        "poi_id":
-            "rest_area_002",
-
-        "name":
-            "Riverside Service Area",
-
-        "distance_km":
-            12.4,
-
-        "eta_minutes":
-            15,
+        "poi_id": "rest_area_002",
+        "name": "Riverside Service Area",
+        "distance_km": 12.4,
+        "eta_minutes": 15,
     },
 ]
 
@@ -55,14 +40,11 @@ MOCK_REST_AREAS = [
 
 
 class NavigationTools:
-
     def __init__(
         self,
         context_manager: ContextManager,
     ):
-        self.context_manager = (
-            context_manager
-        )
+        self.context_manager = context_manager
 
     # ========================================================
     # POI lookup
@@ -74,15 +56,8 @@ class NavigationTools:
     ) -> dict | None:
 
         for poi in MOCK_REST_AREAS:
-
-            if (
-                poi["poi_id"]
-                == poi_id
-            ):
-
-                return deepcopy(
-                    poi
-                )
+            if poi["poi_id"] == poi_id:
+                return deepcopy(poi)
 
         return None
 
@@ -103,15 +78,11 @@ class NavigationTools:
         name is only a human-readable display label.
         """
 
-        result = deepcopy(
-            MOCK_REST_AREAS[0]
-        )
+        result = deepcopy(MOCK_REST_AREAS[0])
 
         return ToolResult(
             success=True,
-            message=(
-                "Nearby rest area found."
-            ),
+            message=("Nearby rest area found."),
             data=result,
         )
 
@@ -130,75 +101,42 @@ class NavigationTools:
         the LLM.
         """
 
-        poi_id = (
-            poi_id.strip()
-        )
+        poi_id = poi_id.strip()
 
         if not poi_id:
-
             return ToolResult(
                 success=False,
-                message=(
-                    "POI identifier "
-                    "cannot be empty."
-                ),
+                message=("POI identifier cannot be empty."),
                 error="EMPTY_POI_ID",
             )
 
-        poi = (
-            self._find_poi(
-                poi_id
-            )
-        )
+        poi = self._find_poi(poi_id)
 
         if poi is None:
-
             return ToolResult(
                 success=False,
-                message=(
-                    "The requested POI "
-                    "could not be resolved."
-                ),
+                message=("The requested POI could not be resolved."),
                 error="UNKNOWN_POI",
                 data={
-                    "poi_id":
-                        poi_id,
+                    "poi_id": poi_id,
                 },
             )
 
         self.context_manager.update_vehicle(
-            navigation_destination_id=(
-                poi["poi_id"]
-            ),
-            navigation_destination=(
-                poi["name"]
-            ),
-            navigation_state=(
-                NavigationState.ACTIVE
-            ),
+            navigation_destination_id=(poi["poi_id"]),
+            navigation_destination=(poi["name"]),
+            navigation_state=(NavigationState.ACTIVE),
         )
 
         return ToolResult(
             success=True,
-            message=(
-                "Navigation started to "
-                f"'{poi['name']}'."
-            ),
+            message=(f"Navigation started to '{poi['name']}'."),
             data={
-                "poi_id":
-                    poi["poi_id"],
-
-                "destination":
-                    poi["name"],
-
-                "distance_km":
-                    poi["distance_km"],
-
-                "eta_minutes":
-                    poi["eta_minutes"],
-
-                "navigation_state":
-                    NavigationState.ACTIVE,
+                "poi_id": poi["poi_id"],
+                "destination": poi["name"],
+                "distance_km": poi["distance_km"],
+                "eta_minutes": poi["eta_minutes"],
+                "navigation_state": NavigationState.ACTIVE,
             },
         )
 
@@ -213,19 +151,14 @@ class NavigationTools:
         self.context_manager.update_vehicle(
             navigation_destination_id=None,
             navigation_destination=None,
-            navigation_state=(
-                NavigationState.IDLE
-            ),
+            navigation_state=(NavigationState.IDLE),
         )
 
         return ToolResult(
             success=True,
-            message=(
-                "Navigation cancelled."
-            ),
+            message=("Navigation cancelled."),
             data={
-                "navigation_state":
-                    NavigationState.IDLE,
+                "navigation_state": NavigationState.IDLE,
             },
         )
 
@@ -239,15 +172,11 @@ def build_navigation_tools(
     context_manager: ContextManager,
 ) -> list[ToolDefinition]:
 
-    tools = NavigationTools(
-        context_manager
-    )
+    tools = NavigationTools(context_manager)
 
     return [
         ToolDefinition(
-            name=(
-                "search_nearby_rest_area"
-            ),
+            name=("search_nearby_rest_area"),
             description=(
                 "Find a nearby rest area "
                 "where the driver can stop "
@@ -261,15 +190,10 @@ def build_navigation_tools(
                 "type": "object",
                 "properties": {},
                 "required": [],
-                "additionalProperties":
-                    False,
+                "additionalProperties": False,
             },
-            handler=(
-                tools
-                .search_nearby_rest_area
-            ),
+            handler=(tools.search_nearby_rest_area),
         ),
-
         ToolDefinition(
             name="start_navigation",
             description=(
@@ -296,35 +220,23 @@ def build_navigation_tools(
                         ),
                     },
                 },
-                "required": [
-                    "poi_id"
-                ],
-                "additionalProperties":
-                    False,
+                "required": ["poi_id"],
+                "additionalProperties": False,
             },
-            handler=(
-                tools.start_navigation
-            ),
+            handler=(tools.start_navigation),
             requires_confirmation=True,
         ),
-
         ToolDefinition(
             name="cancel_navigation",
-            description=(
-                "Cancel the active "
-                "navigation session."
-            ),
+            description=("Cancel the active navigation session."),
             category="navigation",
             parameters={
                 "type": "object",
                 "properties": {},
                 "required": [],
-                "additionalProperties":
-                    False,
+                "additionalProperties": False,
             },
-            handler=(
-                tools.cancel_navigation
-            ),
+            handler=(tools.cancel_navigation),
             requires_confirmation=True,
         ),
     ]

@@ -81,17 +81,11 @@ class DriverStateEstimator:
         self.suspected_perclos = suspected_perclos
         self.drowsy_perclos = drowsy_perclos
 
-        self.suspected_closure_seconds = (
-            suspected_closure_seconds
-        )
+        self.suspected_closure_seconds = suspected_closure_seconds
 
-        self.drowsy_closure_seconds = (
-            drowsy_closure_seconds
-        )
+        self.drowsy_closure_seconds = drowsy_closure_seconds
 
-        self.yawn_window_ms = int(
-            yawn_window_seconds * 1000
-        )
+        self.yawn_window_ms = int(yawn_window_seconds * 1000)
 
         self.suspected_yawns = suspected_yawns
 
@@ -120,18 +114,12 @@ class DriverStateEstimator:
     ) -> float:
 
         if eye_closed:
-
             if self._eye_closed_since_ms is None:
                 self._eye_closed_since_ms = timestamp_ms
 
-            duration_ms = (
-                timestamp_ms
-                - self._eye_closed_since_ms
-            )
+            duration_ms = timestamp_ms - self._eye_closed_since_ms
 
-            return (
-                duration_ms / 1000.0
-            )
+            return duration_ms / 1000.0
 
         self._eye_closed_since_ms = None
 
@@ -152,16 +140,10 @@ class DriverStateEstimator:
         # -----------------------------------------------------
 
         if yawn_count > self._last_yawn_count:
-
-            new_events = (
-                yawn_count
-                - self._last_yawn_count
-            )
+            new_events = yawn_count - self._last_yawn_count
 
             for _ in range(new_events):
-                self._yawn_timestamps.append(
-                    timestamp_ms
-                )
+                self._yawn_timestamps.append(timestamp_ms)
 
         self._last_yawn_count = yawn_count
 
@@ -169,21 +151,12 @@ class DriverStateEstimator:
         # Remove events outside the rolling window
         # -----------------------------------------------------
 
-        cutoff = (
-            timestamp_ms
-            - self.yawn_window_ms
-        )
+        cutoff = timestamp_ms - self.yawn_window_ms
 
-        while (
-            self._yawn_timestamps
-            and
-            self._yawn_timestamps[0] < cutoff
-        ):
+        while self._yawn_timestamps and self._yawn_timestamps[0] < cutoff:
             self._yawn_timestamps.popleft()
 
-        return len(
-            self._yawn_timestamps
-        )
+        return len(self._yawn_timestamps)
 
     # =========================================================
     # Reset transient fatigue observations
@@ -213,11 +186,7 @@ class DriverStateEstimator:
         # 1. Driver not reliably observable
         # =====================================================
 
-        if (
-            driver_presence
-            != DriverPresence.PRESENT
-        ):
-
+        if driver_presence != DriverPresence.PRESENT:
             self._reset_transient_state()
 
             return DriverStateResult(
@@ -234,29 +203,21 @@ class DriverStateEstimator:
         # 2. Update fatigue evidence
         # =====================================================
 
-        closure_duration = (
-            self._update_eye_closure(
-                timestamp_ms=timestamp_ms,
-                eye_closed=eye_closed,
-            )
+        closure_duration = self._update_eye_closure(
+            timestamp_ms=timestamp_ms,
+            eye_closed=eye_closed,
         )
 
-        recent_yawns = (
-            self._update_yawns(
-                timestamp_ms=timestamp_ms,
-                yawn_count=yawn_count,
-            )
+        recent_yawns = self._update_yawns(
+            timestamp_ms=timestamp_ms,
+            yawn_count=yawn_count,
         )
 
         # =====================================================
         # 3. Strong fatigue evidence
         # =====================================================
 
-        if (
-            closure_duration
-            >= self.drowsy_closure_seconds
-        ):
-
+        if closure_duration >= self.drowsy_closure_seconds:
             return DriverStateResult(
                 state=DriverState.DROWSY,
                 risk_level=RiskLevel.HIGH,
@@ -267,12 +228,7 @@ class DriverStateEstimator:
                 reason="prolonged_eye_closure",
             )
 
-        if (
-            perclos_ready
-            and
-            perclos >= self.drowsy_perclos
-        ):
-
+        if perclos_ready and perclos >= self.drowsy_perclos:
             return DriverStateResult(
                 state=DriverState.DROWSY,
                 risk_level=RiskLevel.HIGH,
@@ -291,12 +247,9 @@ class DriverStateEstimator:
 
         if (
             perclos_ready
-            and
-            perclos >= self.suspected_perclos
-            and
-            recent_yawns >= self.suspected_yawns
+            and perclos >= self.suspected_perclos
+            and recent_yawns >= self.suspected_yawns
         ):
-
             return DriverStateResult(
                 state=DriverState.DROWSY,
                 risk_level=RiskLevel.HIGH,
@@ -311,11 +264,7 @@ class DriverStateEstimator:
         # 4. Suspected fatigue
         # =====================================================
 
-        if (
-            closure_duration
-            >= self.suspected_closure_seconds
-        ):
-
+        if closure_duration >= self.suspected_closure_seconds:
             return DriverStateResult(
                 state=DriverState.SUSPECTED,
                 risk_level=RiskLevel.MEDIUM,
@@ -326,12 +275,7 @@ class DriverStateEstimator:
                 reason="extended_eye_closure",
             )
 
-        if (
-            perclos_ready
-            and
-            perclos >= self.suspected_perclos
-        ):
-
+        if perclos_ready and perclos >= self.suspected_perclos:
             return DriverStateResult(
                 state=DriverState.SUSPECTED,
                 risk_level=RiskLevel.MEDIUM,
@@ -342,11 +286,7 @@ class DriverStateEstimator:
                 reason="elevated_perclos",
             )
 
-        if (
-            recent_yawns
-            >= self.suspected_yawns
-        ):
-
+        if recent_yawns >= self.suspected_yawns:
             return DriverStateResult(
                 state=DriverState.SUSPECTED,
                 risk_level=RiskLevel.MEDIUM,
@@ -362,7 +302,6 @@ class DriverStateEstimator:
         # =====================================================
 
         if not perclos_ready:
-
             return DriverStateResult(
                 state=DriverState.WARMING_UP,
                 risk_level=RiskLevel.UNKNOWN,

@@ -41,21 +41,13 @@ class PendingAction:
 
     display_text: str
 
-    metadata: dict[str, Any] = field(
-        default_factory=dict
-    )
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    created_at: float = field(
-        default_factory=time.time
-    )
+    created_at: float = field(default_factory=time.time)
 
     expires_after_seconds: float = 120.0
 
-    action_id: str = field(
-        default_factory=lambda: (
-            uuid.uuid4().hex
-        )
-    )
+    action_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     # ========================================================
     # Lifetime
@@ -79,10 +71,7 @@ class PendingAction:
         now: float | None = None,
     ) -> bool:
 
-        return (
-            self.age_seconds(now)
-            > self.expires_after_seconds
-        )
+        return self.age_seconds(now) > self.expires_after_seconds
 
     # ========================================================
     # Serialization
@@ -93,26 +82,13 @@ class PendingAction:
     ) -> dict[str, Any]:
 
         return {
-            "action_id":
-                self.action_id,
-
-            "tool_name":
-                self.tool_name,
-
-            "arguments":
-                self.arguments,
-
-            "display_text":
-                self.display_text,
-
-            "metadata":
-                self.metadata,
-
-            "created_at":
-                self.created_at,
-
-            "expires_after_seconds":
-                self.expires_after_seconds,
+            "action_id": self.action_id,
+            "tool_name": self.tool_name,
+            "arguments": self.arguments,
+            "display_text": self.display_text,
+            "metadata": self.metadata,
+            "created_at": self.created_at,
+            "expires_after_seconds": self.expires_after_seconds,
         }
 
 
@@ -135,10 +111,7 @@ class PendingActionStore:
     def __init__(
         self,
     ):
-        self._pending: (
-            PendingAction
-            | None
-        ) = None
+        self._pending: PendingAction | None = None
 
     # ========================================================
     # Set
@@ -163,7 +136,6 @@ class PendingActionStore:
             return None
 
         if self._pending.is_expired():
-
             self._pending = None
 
             return None
@@ -194,18 +166,9 @@ class PendingActionStore:
             return None
 
         return {
-            "action_id":
-                action.action_id,
-
-            "tool_name":
-                action.tool_name,
-
-            "arguments":
-                action.arguments,
-
-            "display_text":
-                action.display_text,
-
-            "metadata":
-                action.metadata,
+            "action_id": action.action_id,
+            "tool_name": action.tool_name,
+            "arguments": action.arguments,
+            "display_text": action.display_text,
+            "metadata": action.metadata,
         }

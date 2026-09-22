@@ -30,29 +30,19 @@ def main():
     load_dotenv()
 
     print()
-    print(
-        "========================================"
-    )
+    print("========================================")
 
-    print(
-        " VehicleMind Vehicle AI"
-    )
+    print(" VehicleMind Vehicle AI")
 
-    print(
-        " Context-Aware Vehicle Agent"
-    )
+    print(" Context-Aware Vehicle Agent")
 
-    print(
-        "========================================"
-    )
+    print("========================================")
 
     # ========================================================
     # Vehicle Context
     # ========================================================
 
-    context_manager = (
-        ContextManager()
-    )
+    context_manager = ContextManager()
 
     # --------------------------------------------------------
     # Mock current vehicle state
@@ -72,15 +62,9 @@ def main():
     # --------------------------------------------------------
 
     context_manager.update_driver(
-        presence=(
-            DriverPresence.PRESENT
-        ),
-        state=(
-            DriverState.NORMAL
-        ),
-        risk=(
-            RiskLevel.LOW
-        ),
+        presence=(DriverPresence.PRESENT),
+        state=(DriverState.NORMAL),
+        risk=(RiskLevel.LOW),
         perclos=0.12,
         eye_closure_seconds=0.0,
         recent_yawns=0,
@@ -106,34 +90,22 @@ def main():
     # Tools
     # ========================================================
 
-    registry = (
-        build_default_tool_registry(
-            context_manager
-        )
-    )
+    registry = build_default_tool_registry(context_manager)
 
     # ========================================================
     # LLM
     # ========================================================
 
-    llm = (
-        build_llm_client()
-    )
+    llm = build_llm_client()
 
     # ========================================================
     # Agent
     # ========================================================
 
-    agent = (
-        VehicleAgent(
-            llm=llm,
-            context_manager=(
-                context_manager
-            ),
-            tool_registry=(
-                registry
-            ),
-        )
+    agent = VehicleAgent(
+        llm=llm,
+        context_manager=(context_manager),
+        tool_registry=(registry),
     )
 
     # ========================================================
@@ -141,79 +113,49 @@ def main():
     # ========================================================
 
     print()
-    print(
-        "VehicleMind is ready."
-    )
+    print("VehicleMind is ready.")
 
-    print(
-        "Type 'context' to inspect "
-        "vehicle context."
-    )
+    print("Type 'context' to inspect vehicle context.")
 
-    print(
-        "Type 'quit' to exit."
-    )
+    print("Type 'quit' to exit.")
 
     while True:
-
         print()
 
         try:
-
-            user_text = input(
-                "You > "
-            ).strip()
+            user_text = input("You > ").strip()
 
         except (
             KeyboardInterrupt,
             EOFError,
         ):
-
             print()
             break
 
         if not user_text:
-
             continue
 
-        if (
-            user_text.lower()
-            in {
-                "quit",
-                "exit",
-                "q",
-            }
-        ):
-
+        if user_text.lower() in {
+            "quit",
+            "exit",
+            "q",
+        }:
             break
 
-        if (
-            user_text.lower()
-            == "context"
-        ):
-
-            print(
-                context_manager
-                .summary()
-            )
+        if user_text.lower() == "context":
+            print(context_manager.summary())
 
             continue
 
         try:
-
-            answer = (
-                agent.chat(
-                    user_text,
-                    debug=True,
-                )
+            answer = agent.chat(
+                user_text,
+                debug=True,
             )
 
         except Exception as exc:
-
             print()
-            print(
-                "[VehicleMind ERROR]"
-            )
+            print("[VehicleMind ERROR]")
 
             print(
                 type(exc).__name__,

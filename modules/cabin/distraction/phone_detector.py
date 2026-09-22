@@ -59,9 +59,7 @@ class PhoneDetector:
         device: Optional[str] = None,
     ):
 
-        self.confidence_threshold = (
-            confidence_threshold
-        )
+        self.confidence_threshold = confidence_threshold
 
         self.image_size = image_size
 
@@ -70,10 +68,7 @@ class PhoneDetector:
         # -----------------------------------------------------
 
         if device is None:
-
-            if (
-                torch.backends.mps.is_available()
-            ):
+            if torch.backends.mps.is_available():
                 self.device = "mps"
 
             elif torch.cuda.is_available():
@@ -85,18 +80,13 @@ class PhoneDetector:
         else:
             self.device = device
 
-        print(
-            "[VehicleMind] "
-            f"PhoneDetector device: {self.device}"
-        )
+        print(f"[VehicleMind] PhoneDetector device: {self.device}")
 
         # -----------------------------------------------------
         # YOLO
         # -----------------------------------------------------
 
-        self.model = YOLO(
-            model_name
-        )
+        self.model = YOLO(model_name)
 
         # -----------------------------------------------------
         # Do NOT hard-code the COCO class index.
@@ -108,31 +98,16 @@ class PhoneDetector:
 
         self.phone_class_ids = []
 
-        for class_id, name in (
-            self.model.names.items()
-        ):
-
-            if (
-                name.strip().lower()
-                == "cell phone"
-            ):
-
-                self.phone_class_ids.append(
-                    int(class_id)
-                )
+        for class_id, name in self.model.names.items():
+            if name.strip().lower() == "cell phone":
+                self.phone_class_ids.append(int(class_id))
 
         if not self.phone_class_ids:
-
             raise RuntimeError(
-                "The loaded YOLO model does not "
-                "contain a 'cell phone' class."
+                "The loaded YOLO model does not contain a 'cell phone' class."
             )
 
-        print(
-            "[VehicleMind] "
-            "Cell-phone class IDs: "
-            f"{self.phone_class_ids}"
-        )
+        print(f"[VehicleMind] Cell-phone class IDs: {self.phone_class_ids}")
 
     def detect(
         self,
@@ -151,12 +126,9 @@ class PhoneDetector:
             verbose=False,
         )
 
-        detections: List[
-            PhoneDetection
-        ] = []
+        detections: List[PhoneDetection] = []
 
         if not results:
-
             return PhoneDetectionResult(
                 detected=False,
                 detections=[],
@@ -165,11 +137,7 @@ class PhoneDetector:
 
         result = results[0]
 
-        if (
-            result.boxes is None
-            or len(result.boxes) == 0
-        ):
-
+        if result.boxes is None or len(result.boxes) == 0:
             return PhoneDetectionResult(
                 detected=False,
                 detections=[],
@@ -177,33 +145,13 @@ class PhoneDetector:
             )
 
         for box in result.boxes:
+            xyxy = box.xyxy[0].detach().cpu().numpy()
 
-            xyxy = (
-                box.xyxy[0]
-                .detach()
-                .cpu()
-                .numpy()
-            )
+            confidence = float(box.conf[0].detach().cpu().item())
 
-            confidence = float(
-                box.conf[0]
-                .detach()
-                .cpu()
-                .item()
-            )
+            class_id = int(box.cls[0].detach().cpu().item())
 
-            class_id = int(
-                box.cls[0]
-                .detach()
-                .cpu()
-                .item()
-            )
-
-            class_name = (
-                self.model.names[
-                    class_id
-                ]
-            )
+            class_name = self.model.names[class_id]
 
             detection = PhoneDetection(
                 x1=int(xyxy[0]),
@@ -215,15 +163,11 @@ class PhoneDetector:
                 class_name=class_name,
             )
 
-            detections.append(
-                detection
-            )
+            detections.append(detection)
 
         best_detection = max(
             detections,
-            key=lambda item: (
-                item.confidence
-            ),
+            key=lambda item: item.confidence,
         )
 
         return PhoneDetectionResult(

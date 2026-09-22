@@ -54,26 +54,13 @@ class DrivingPerceptionSnapshot:
     ) -> dict:
 
         return {
-            "vehicle_count":
-                self.vehicle_count,
-
-            "pedestrian_count":
-                self.pedestrian_count,
-
-            "rider_count":
-                self.rider_count,
-
-            "traffic_light_count":
-                self.traffic_light_count,
-
-            "traffic_sign_count":
-                self.traffic_sign_count,
-
-            "lane_detected":
-                self.lane_detected,
-
-            "drivable_area_detected":
-                self.drivable_area_detected,
+            "vehicle_count": self.vehicle_count,
+            "pedestrian_count": self.pedestrian_count,
+            "rider_count": self.rider_count,
+            "traffic_light_count": self.traffic_light_count,
+            "traffic_sign_count": self.traffic_sign_count,
+            "lane_detected": self.lane_detected,
+            "drivable_area_detected": self.drivable_area_detected,
         }
 
 
@@ -103,32 +90,16 @@ class DrivingPerceptionService:
         prefer_coreml: bool = True,
         warmup_runs: int = 2,
     ):
-        self.work_width = int(
-            work_width
-        )
+        self.work_width = int(work_width)
 
-        self.work_height = int(
-            work_height
-        )
+        self.work_height = int(work_height)
 
-        self.detector = (
-            PanopticDrivingDetector(
-                model_path=Path(
-                    model_path
-                ),
-                score_threshold=(
-                    score_threshold
-                ),
-                nms_threshold=(
-                    nms_threshold
-                ),
-                prefer_coreml=(
-                    prefer_coreml
-                ),
-                warmup_runs=(
-                    warmup_runs
-                ),
-            )
+        self.detector = PanopticDrivingDetector(
+            model_path=Path(model_path),
+            score_threshold=(score_threshold),
+            nms_threshold=(nms_threshold),
+            prefer_coreml=(prefer_coreml),
+            warmup_runs=(warmup_runs),
         )
 
     # ========================================================
@@ -144,42 +115,24 @@ class DrivingPerceptionService:
         # Resize once, consistent with current scene_demo.py
         # ----------------------------------------------------
 
-        if (
-            frame.shape[1]
-            != self.work_width
-            or
-            frame.shape[0]
-            != self.work_height
-        ):
-
-            working_frame = (
-                cv2.resize(
-                    frame,
-                    (
-                        self.work_width,
-                        self.work_height,
-                    ),
-                    interpolation=(
-                        cv2.INTER_AREA
-                    ),
-                )
+        if frame.shape[1] != self.work_width or frame.shape[0] != self.work_height:
+            working_frame = cv2.resize(
+                frame,
+                (
+                    self.work_width,
+                    self.work_height,
+                ),
+                interpolation=(cv2.INTER_AREA),
             )
 
         else:
-
-            working_frame = (
-                frame.copy()
-            )
+            working_frame = frame.copy()
 
         # ====================================================
         # YOLOPv2
         # ====================================================
 
-        scene_result = (
-            self.detector.detect(
-                working_frame
-            )
-        )
+        scene_result = self.detector.detect(working_frame)
 
         # ====================================================
         # Object counts
@@ -190,13 +143,8 @@ class DrivingPerceptionService:
             int,
         ] = {}
 
-        for obj in (
-            scene_result.objects
-        ):
-
-            class_name = (
-                obj.class_name
-            )
+        for obj in scene_result.objects:
+            class_name = obj.class_name
 
             counts[class_name] = (
                 counts.get(
@@ -215,18 +163,15 @@ class DrivingPerceptionService:
                 "car",
                 0,
             )
-            +
-            counts.get(
+            + counts.get(
                 "truck",
                 0,
             )
-            +
-            counts.get(
+            + counts.get(
                 "bus",
                 0,
             )
-            +
-            counts.get(
+            + counts.get(
                 "train",
                 0,
             )
@@ -236,11 +181,9 @@ class DrivingPerceptionService:
         # Pedestrians
         # ----------------------------------------------------
 
-        pedestrian_count = (
-            counts.get(
-                "person",
-                0,
-            )
+        pedestrian_count = counts.get(
+            "person",
+            0,
         )
 
         # ----------------------------------------------------
@@ -256,127 +199,69 @@ class DrivingPerceptionService:
                 "rider",
                 0,
             )
-            +
-            counts.get(
+            + counts.get(
                 "motorcycle",
                 0,
             )
-            +
-            counts.get(
+            + counts.get(
                 "bicycle",
                 0,
             )
         )
 
-        traffic_light_count = (
-            counts.get(
-                "traffic light",
-                0,
-            )
+        traffic_light_count = counts.get(
+            "traffic light",
+            0,
         )
 
-        traffic_sign_count = (
-            counts.get(
-                "traffic sign",
-                0,
-            )
+        traffic_sign_count = counts.get(
+            "traffic sign",
+            0,
         )
 
-        total_objects = len(
-            scene_result.objects
-        )
+        total_objects = len(scene_result.objects)
 
         # ====================================================
         # Drivable Area
         # ====================================================
 
-        drivable_pixels = int(
-            np.count_nonzero(
-                scene_result
-                .drivable_mask
-            )
+        drivable_pixels = int(np.count_nonzero(scene_result.drivable_mask))
+
+        total_pixels = int(scene_result.drivable_mask.size)
+
+        drivable_ratio = drivable_pixels / max(
+            total_pixels,
+            1,
         )
 
-        total_pixels = int(
-            scene_result
-            .drivable_mask
-            .size
-        )
-
-        drivable_ratio = (
-            drivable_pixels
-            /
-            max(
-                total_pixels,
-                1,
-            )
-        )
-
-        drivable_area_detected = (
-            drivable_pixels
-            > 1000
-        )
+        drivable_area_detected = drivable_pixels > 1000
 
         # ====================================================
         # Lane
         # ====================================================
 
-        lane_pixels = int(
-            np.count_nonzero(
-                scene_result
-                .lane_mask
-            )
-        )
+        lane_pixels = int(np.count_nonzero(scene_result.lane_mask))
 
-        lane_detected = (
-            lane_pixels
-            > 300
-        )
+        lane_detected = lane_pixels > 300
 
         # ====================================================
         # Snapshot
         # ====================================================
 
         return DrivingPerceptionSnapshot(
-            scene_result=(
-                scene_result
-            ),
-            working_frame=(
-                working_frame
-            ),
-            vehicle_count=(
-                vehicle_count
-            ),
-            pedestrian_count=(
-                pedestrian_count
-            ),
-            rider_count=(
-                rider_count
-            ),
-            traffic_light_count=(
-                traffic_light_count
-            ),
-            traffic_sign_count=(
-                traffic_sign_count
-            ),
-            total_objects=(
-                total_objects
-            ),
-            lane_detected=(
-                lane_detected
-            ),
-            drivable_area_detected=(
-                drivable_area_detected
-            ),
-            lane_pixels=(
-                lane_pixels
-            ),
-            drivable_pixels=(
-                drivable_pixels
-            ),
-            drivable_ratio=(
-                drivable_ratio
-            ),
+            scene_result=(scene_result),
+            working_frame=(working_frame),
+            vehicle_count=(vehicle_count),
+            pedestrian_count=(pedestrian_count),
+            rider_count=(rider_count),
+            traffic_light_count=(traffic_light_count),
+            traffic_sign_count=(traffic_sign_count),
+            total_objects=(total_objects),
+            lane_detected=(lane_detected),
+            drivable_area_detected=(drivable_area_detected),
+            lane_pixels=(lane_pixels),
+            drivable_pixels=(drivable_pixels),
+            drivable_ratio=(drivable_ratio),
         )
 
     # ========================================================
@@ -398,7 +283,5 @@ class DrivingPerceptionService:
             None,
         )
 
-        if callable(
-            close_fn
-        ):
+        if callable(close_fn):
             close_fn()

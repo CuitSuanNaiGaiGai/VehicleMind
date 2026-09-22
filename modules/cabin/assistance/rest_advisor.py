@@ -23,4 +23,3 @@ class MockRestAdvisor:
             distance_km=6.8,
             eta_minutes=8,
         )
-

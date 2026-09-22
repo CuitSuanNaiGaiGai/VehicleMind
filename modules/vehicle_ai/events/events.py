@@ -26,57 +26,37 @@ class EventType(StrEnum):
     # Driver
     # --------------------------------------------------------
 
-    DRIVER_STATE_CHANGED = (
-        "DRIVER_STATE_CHANGED"
-    )
+    DRIVER_STATE_CHANGED = "DRIVER_STATE_CHANGED"
 
-    DRIVER_RISK_CHANGED = (
-        "DRIVER_RISK_CHANGED"
-    )
+    DRIVER_RISK_CHANGED = "DRIVER_RISK_CHANGED"
 
-    DRIVER_ABSENT = (
-        "DRIVER_ABSENT"
-    )
+    DRIVER_ABSENT = "DRIVER_ABSENT"
 
-    DRIVER_PRESENT = (
-        "DRIVER_PRESENT"
-    )
+    DRIVER_PRESENT = "DRIVER_PRESENT"
 
-    HIGH_RISK_DETECTED = (
-        "HIGH_RISK_DETECTED"
-    )
+    HIGH_RISK_DETECTED = "HIGH_RISK_DETECTED"
 
     # --------------------------------------------------------
     # Driving scene
     # --------------------------------------------------------
 
-    TRAFFIC_LEVEL_CHANGED = (
-        "TRAFFIC_LEVEL_CHANGED"
-    )
+    TRAFFIC_LEVEL_CHANGED = "TRAFFIC_LEVEL_CHANGED"
 
-    LANE_LOST = (
-        "LANE_LOST"
-    )
+    LANE_LOST = "LANE_LOST"
 
-    DRIVABLE_AREA_LOST = (
-        "DRIVABLE_AREA_LOST"
-    )
+    DRIVABLE_AREA_LOST = "DRIVABLE_AREA_LOST"
 
     # --------------------------------------------------------
     # Vehicle
     # --------------------------------------------------------
 
-    NAVIGATION_STATE_CHANGED = (
-        "NAVIGATION_STATE_CHANGED"
-    )
+    NAVIGATION_STATE_CHANGED = "NAVIGATION_STATE_CHANGED"
 
     # --------------------------------------------------------
     # Human interaction
     # --------------------------------------------------------
 
-    USER_UTTERANCE = (
-        "USER_UTTERANCE"
-    )
+    USER_UTTERANCE = "USER_UTTERANCE"
 
 
 # ============================================================
@@ -127,56 +107,31 @@ class VehicleEvent:
 
     message: str
 
-    data: dict[str, Any] = field(
-        default_factory=dict
-    )
+    data: dict[str, Any] = field(default_factory=dict)
 
-    timestamp: float = field(
-        default_factory=time.time
-    )
+    timestamp: float = field(default_factory=time.time)
 
-    event_id: str = field(
-        default_factory=lambda: (
-            uuid.uuid4().hex
-        )
-    )
+    event_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     def to_dict(
         self,
     ) -> dict[str, Any]:
 
         return {
-            "event_id":
-                self.event_id,
-
-            "type":
-                self.type,
-
-            "priority":
-                self.priority,
-
-            "source":
-                self.source,
-
-            "message":
-                self.message,
-
-            "data":
-                self.data,
-
-            "timestamp":
-                self.timestamp,
+            "event_id": self.event_id,
+            "type": self.type,
+            "priority": self.priority,
+            "source": self.source,
+            "message": self.message,
+            "data": self.data,
+            "timestamp": self.timestamp,
         }
 
     def __str__(
         self,
     ) -> str:
 
-        return (
-            f"[{self.priority}] "
-            f"{self.type}: "
-            f"{self.message}"
-        )
+        return f"[{self.priority}] {self.type}: {self.message}"
 
 
 # ============================================================
@@ -196,18 +151,11 @@ def create_user_utterance_event(
     text = text.strip()
 
     if not text:
-
-        raise ValueError(
-            "User utterance cannot be empty."
-        )
+        raise ValueError("User utterance cannot be empty.")
 
     return VehicleEvent(
-        type=(
-            EventType.USER_UTTERANCE
-        ),
-        priority=(
-            EventPriority.HIGH
-        ),
+        type=(EventType.USER_UTTERANCE),
+        priority=(EventPriority.HIGH),
         source="user",
         message=text,
         data={

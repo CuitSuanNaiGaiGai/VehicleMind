@@ -20,13 +20,11 @@ class FaceLandmarkDetector:
         model_path = Path(model_path)
 
         if not model_path.exists():
-            raise FileNotFoundError(
-                f"Face Landmarker model not found: {model_path}"
-            )
+            raise FileNotFoundError(f"Face Landmarker model not found: {model_path}")
 
         base_options = mp.tasks.BaseOptions(
             model_asset_path=str(model_path),
-	    delegate=mp.tasks.BaseOptions.Delegate.CPU,
+            delegate=mp.tasks.BaseOptions.Delegate.CPU,
         )
 
         options = mp.tasks.vision.FaceLandmarkerOptions(
@@ -40,9 +38,7 @@ class FaceLandmarkDetector:
             output_facial_transformation_matrixes=False,
         )
 
-        self._detector = (
-            mp.tasks.vision.FaceLandmarker.create_from_options(options)
-        )
+        self._detector = mp.tasks.vision.FaceLandmarker.create_from_options(options)
 
     def detect(
         self,

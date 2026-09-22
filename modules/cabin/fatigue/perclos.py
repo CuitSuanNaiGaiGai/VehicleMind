@@ -30,9 +30,7 @@ class PerclosEstimator:
         min_observation_seconds: float = 5.0,
     ):
         self.window_ms = int(window_seconds * 1000)
-        self.min_observation_ms = int(
-            min_observation_seconds * 1000
-        )
+        self.min_observation_ms = int(min_observation_seconds * 1000)
 
         # Each element:
         # (start_ms, end_ms, eye_closed)
@@ -53,11 +51,8 @@ class PerclosEstimator:
     ) -> PerclosResult:
 
         if self._last_timestamp_ms is not None:
-
             if timestamp_ms <= self._last_timestamp_ms:
-                raise ValueError(
-                    "timestamp_ms must be monotonically increasing"
-                )
+                raise ValueError("timestamp_ms must be monotonically increasing")
 
             self._segments.append(
                 (
@@ -75,10 +70,7 @@ class PerclosEstimator:
         #
         # Remove segments completely outside the window.
         #
-        while (
-            self._segments
-            and self._segments[0][1] <= cutoff
-        ):
+        while self._segments and self._segments[0][1] <= cutoff:
             self._segments.popleft()
 
         #
@@ -86,11 +78,9 @@ class PerclosEstimator:
         # remains inside the window.
         #
         if self._segments:
-
             start_ms, end_ms, state = self._segments[0]
 
             if start_ms < cutoff < end_ms:
-
                 self._segments[0] = (
                     cutoff,
                     end_ms,
@@ -101,7 +91,6 @@ class PerclosEstimator:
         observed_ms = 0
 
         for start_ms, end_ms, state in self._segments:
-
             duration_ms = end_ms - start_ms
 
             # Face/eye information unavailable.

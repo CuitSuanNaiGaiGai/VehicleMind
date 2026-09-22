@@ -17,15 +17,9 @@ def main():
     # ========================================================
 
     driver = DriverContext(
-        presence=(
-            DriverPresence.PRESENT
-        ),
-        state=(
-            DriverState.SUSPECTED
-        ),
-        risk=(
-            RiskLevel.MEDIUM
-        ),
+        presence=(DriverPresence.PRESENT),
+        state=(DriverState.SUSPECTED),
+        risk=(RiskLevel.MEDIUM),
         perclos=0.27,
         eye_closed=False,
         eye_closure_seconds=0.35,
@@ -55,9 +49,7 @@ def main():
 
     vehicle = VehicleStatus(
         speed_kmh=68.0,
-        gear=(
-            GearState.D
-        ),
+        gear=(GearState.D),
         cabin_temperature_c=27.5,
         target_temperature_c=24.0,
         ac_enabled=True,
@@ -66,9 +58,7 @@ def main():
         media_playing=True,
         media_title="Driving Playlist",
         volume=28,
-        navigation_state=(
-            NavigationState.IDLE
-        ),
+        navigation_state=(NavigationState.IDLE),
     )
 
     # ========================================================
@@ -85,45 +75,28 @@ def main():
     # Human-readable
     # ========================================================
 
-    print(
-        context.summary()
-    )
+    print(context.summary())
 
     # ========================================================
     # Agent-facing JSON
     # ========================================================
 
-    print(
-        "Agent Context:"
-    )
+    print("Agent Context:")
 
-    print(
-        context.to_agent_json()
-    )
+    print(context.to_agent_json())
 
     # ========================================================
     # Freshness
     # ========================================================
 
     print()
-    print(
-        "Freshness:"
-    )
+    print("Freshness:")
 
-    print(
-        "  Driver:",
-        driver.is_fresh()
-    )
+    print("  Driver:", driver.is_fresh())
 
-    print(
-        "  Road:",
-        road.is_fresh()
-    )
+    print("  Road:", road.is_fresh())
 
-    print(
-        "  Vehicle:",
-        vehicle.is_fresh()
-    )
+    print("  Vehicle:", vehicle.is_fresh())
 
 
 if __name__ == "__main__":

@@ -54,15 +54,9 @@ class ToolRegistry:
     ) -> None:
 
         if tool.name in self._tools:
+            raise ValueError(f"Tool already registered: {tool.name}")
 
-            raise ValueError(
-                f"Tool already registered: "
-                f"{tool.name}"
-            )
-
-        self._tools[
-            tool.name
-        ] = tool
+        self._tools[tool.name] = tool
 
     # ========================================================
     # Lookup
@@ -74,22 +68,15 @@ class ToolRegistry:
     ) -> ToolDefinition:
 
         if name not in self._tools:
+            raise KeyError(f"Unknown tool: {name}")
 
-            raise KeyError(
-                f"Unknown tool: {name}"
-            )
-
-        return self._tools[
-            name
-        ]
+        return self._tools[name]
 
     def names(
         self,
     ) -> list[str]:
 
-        return sorted(
-            self._tools.keys()
-        )
+        return sorted(self._tools.keys())
 
     # ========================================================
     # Schemas
@@ -97,19 +84,13 @@ class ToolRegistry:
 
     def llm_schemas(
         self,
-    ) -> list[
-        dict[str, Any]
-    ]:
+    ) -> list[dict[str, Any]]:
         """
         Schemas that can later be passed to a function-calling
         capable LLM.
         """
 
-        return [
-            tool.llm_schema()
-            for tool
-            in self._tools.values()
-        ]
+        return [tool.llm_schema() for tool in self._tools.values()]
 
     # ========================================================
     # Execute
@@ -125,54 +106,32 @@ class ToolRegistry:
             arguments = {}
 
         if name not in self._tools:
-
             return ToolResult(
                 success=False,
-                message=(
-                    f"Tool '{name}' "
-                    "is not available."
-                ),
+                message=(f"Tool '{name}' is not available."),
                 error="UNKNOWN_TOOL",
             )
 
-        tool = self._tools[
-            name
-        ]
+        tool = self._tools[name]
 
         # ----------------------------------------------------
         # Basic required-field validation
         # ----------------------------------------------------
 
-        required = (
-            tool.parameters
-            .get(
-                "required",
-                [],
-            )
+        required = tool.parameters.get(
+            "required",
+            [],
         )
 
-        missing = [
-            field_name
-            for field_name
-            in required
-            if field_name
-            not in arguments
-        ]
+        missing = [field_name for field_name in required if field_name not in arguments]
 
         if missing:
-
             return ToolResult(
                 success=False,
-                message=(
-                    "Missing required "
-                    f"arguments: {missing}"
-                ),
-                error=(
-                    "MISSING_ARGUMENTS"
-                ),
+                message=(f"Missing required arguments: {missing}"),
+                error=("MISSING_ARGUMENTS"),
                 data={
-                    "missing":
-                        missing,
+                    "missing": missing,
                 },
             )
 
@@ -180,36 +139,20 @@ class ToolRegistry:
         # Reject unknown arguments.
         # ----------------------------------------------------
 
-        known_properties = (
-            tool.parameters
-            .get(
-                "properties",
-                {},
-            )
+        known_properties = tool.parameters.get(
+            "properties",
+            {},
         )
 
-        unknown = [
-            key
-            for key
-            in arguments
-            if key
-            not in known_properties
-        ]
+        unknown = [key for key in arguments if key not in known_properties]
 
         if unknown:
-
             return ToolResult(
                 success=False,
-                message=(
-                    "Unknown arguments: "
-                    f"{unknown}"
-                ),
-                error=(
-                    "UNKNOWN_ARGUMENTS"
-                ),
+                message=(f"Unknown arguments: {unknown}"),
+                error=("UNKNOWN_ARGUMENTS"),
                 data={
-                    "unknown":
-                        unknown,
+                    "unknown": unknown,
                 },
             )
 
@@ -218,27 +161,15 @@ class ToolRegistry:
         # ----------------------------------------------------
 
         try:
-
-            result = (
-                tool.handler(
-                    **arguments
-                )
-            )
+            result = tool.handler(**arguments)
 
         except Exception as exc:
-
             return ToolResult(
                 success=False,
-                message=(
-                    f"Tool '{name}' "
-                    "execution failed."
-                ),
-                error=(
-                    type(exc).__name__
-                ),
+                message=(f"Tool '{name}' execution failed."),
+                error=(type(exc).__name__),
                 data={
-                    "detail":
-                        str(exc),
+                    "detail": str(exc),
                 },
             )
 
@@ -246,10 +177,6 @@ class ToolRegistry:
             result,
             ToolResult,
         ):
-
-            raise TypeError(
-                f"Tool '{name}' must return "
-                "ToolResult."
-            )
+            raise TypeError(f"Tool '{name}' must return ToolResult.")
 
         return result

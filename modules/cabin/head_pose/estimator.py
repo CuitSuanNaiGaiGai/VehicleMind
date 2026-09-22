@@ -75,19 +75,14 @@ class HeadPoseEstimator:
             [
                 # Nose
                 (0.0, 0.0, 0.0),
-
                 # Chin
                 (0.0, -63.6, -12.5),
-
                 # Left eye outer corner
                 (-43.3, 32.7, -26.0),
-
                 # Right eye outer corner
                 (43.3, 32.7, -26.0),
-
                 # Left mouth corner
                 (-28.9, -28.9, -24.1),
-
                 # Right mouth corner
                 (28.9, -28.9, -24.1),
             ],
@@ -131,10 +126,7 @@ class HeadPoseEstimator:
            -178.0  ->  2.0
         """
 
-        pitch = (
-            HeadPoseEstimator
-            ._normalize_angle(pitch)
-        )
+        pitch = HeadPoseEstimator._normalize_angle(pitch)
 
         if pitch > 90.0:
             pitch -= 180.0
@@ -158,22 +150,13 @@ class HeadPoseEstimator:
         image_points = []
 
         for index in self.LANDMARK_INDICES:
-
             landmark = face[index]
 
-            x = (
-                landmark.x
-                * frame_width
-            )
+            x = landmark.x * frame_width
 
-            y = (
-                landmark.y
-                * frame_height
-            )
+            y = landmark.y * frame_height
 
-            image_points.append(
-                (x, y)
-            )
+            image_points.append((x, y))
 
         image_points = np.asarray(
             image_points,
@@ -184,19 +167,11 @@ class HeadPoseEstimator:
         # 2. Approximate camera intrinsics
         # =====================================================
 
-        focal_length = float(
-            frame_width
-        )
+        focal_length = float(frame_width)
 
-        center_x = (
-            frame_width
-            / 2.0
-        )
+        center_x = frame_width / 2.0
 
-        center_y = (
-            frame_height
-            / 2.0
-        )
+        center_y = frame_height / 2.0
 
         camera_matrix = np.array(
             [
@@ -228,18 +203,15 @@ class HeadPoseEstimator:
         # 3. solvePnP
         # =====================================================
 
-        success, rotation_vector, _ = (
-            cv2.solvePnP(
-                self.model_points,
-                image_points,
-                camera_matrix,
-                distortion,
-                flags=cv2.SOLVEPNP_ITERATIVE,
-            )
+        success, rotation_vector, _ = cv2.solvePnP(
+            self.model_points,
+            image_points,
+            camera_matrix,
+            distortion,
+            flags=cv2.SOLVEPNP_ITERATIVE,
         )
 
         if not success:
-
             return HeadPoseResult(
                 yaw=0.0,
                 pitch=0.0,
@@ -251,11 +223,7 @@ class HeadPoseEstimator:
         # 4. Rotation vector -> matrix
         # =====================================================
 
-        rotation_matrix, _ = (
-            cv2.Rodrigues(
-                rotation_vector
-            )
-        )
+        rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
 
         # =====================================================
         # 5. Rotation matrix -> Euler angles
@@ -279,37 +247,23 @@ class HeadPoseEstimator:
             _,
             _,
             euler_angles,
-        ) = cv2.decomposeProjectionMatrix(
-            projection_matrix
-        )
+        ) = cv2.decomposeProjectionMatrix(projection_matrix)
 
-        raw_pitch = float(
-            euler_angles[0, 0]
-        )
+        raw_pitch = float(euler_angles[0, 0])
 
-        raw_yaw = float(
-            euler_angles[1, 0]
-        )
+        raw_yaw = float(euler_angles[1, 0])
 
-        raw_roll = float(
-            euler_angles[2, 0]
-        )
+        raw_roll = float(euler_angles[2, 0])
 
         # =====================================================
         # 6. Normalize Euler representation
         # =====================================================
 
-        pitch = self._normalize_pitch(
-            raw_pitch
-        )
+        pitch = self._normalize_pitch(raw_pitch)
 
-        yaw = self._normalize_angle(
-            raw_yaw
-        )
+        yaw = self._normalize_angle(raw_yaw)
 
-        roll = self._normalize_angle(
-            raw_roll
-        )
+        roll = self._normalize_angle(raw_roll)
 
         return HeadPoseResult(
             yaw=yaw,

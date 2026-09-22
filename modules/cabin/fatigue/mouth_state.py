@@ -80,20 +80,14 @@ class MouthStateAnalyzer:
             image_height,
         )
 
-        vertical = np.linalg.norm(
-            upper - lower
-        )
+        vertical = np.linalg.norm(upper - lower)
 
-        horizontal = np.linalg.norm(
-            left - right
-        )
+        horizontal = np.linalg.norm(left - right)
 
         if horizontal < 1e-6:
             mar = 0.0
         else:
-            mar = float(
-                vertical / horizontal
-            )
+            mar = float(vertical / horizontal)
 
         return MouthStateResult(
             mar=mar,

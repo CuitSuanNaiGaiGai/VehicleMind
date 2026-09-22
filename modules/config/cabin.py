@@ -71,9 +71,7 @@ class BlinkConfig:
         minimum = _positive_int("min_closed_frames", self.min_closed_frames)
         maximum = _positive_int("max_closed_frames", self.max_closed_frames)
         if minimum > maximum:
-            raise ValueError(
-                "min_closed_frames must not exceed max_closed_frames"
-            )
+            raise ValueError("min_closed_frames must not exceed max_closed_frames")
 
 
 @dataclass(frozen=True)
@@ -83,13 +81,9 @@ class PerclosConfig:
 
     def __post_init__(self) -> None:
         window = _positive("window_seconds", self.window_seconds)
-        observation = _positive(
-            "min_observation_seconds", self.min_observation_seconds
-        )
+        observation = _positive("min_observation_seconds", self.min_observation_seconds)
         if observation > window:
-            raise ValueError(
-                "min_observation_seconds must not exceed window_seconds"
-            )
+            raise ValueError("min_observation_seconds must not exceed window_seconds")
 
 
 @dataclass(frozen=True)
@@ -118,16 +112,10 @@ class DriverStateConfig:
     suspected_yawns: int = 2
 
     def __post_init__(self) -> None:
-        suspected_perclos = _unit_interval(
-            "suspected_perclos", self.suspected_perclos
-        )
-        drowsy_perclos = _unit_interval(
-            "drowsy_perclos", self.drowsy_perclos
-        )
+        suspected_perclos = _unit_interval("suspected_perclos", self.suspected_perclos)
+        drowsy_perclos = _unit_interval("drowsy_perclos", self.drowsy_perclos)
         if suspected_perclos > drowsy_perclos:
-            raise ValueError(
-                "suspected_perclos must not exceed drowsy_perclos"
-            )
+            raise ValueError("suspected_perclos must not exceed drowsy_perclos")
 
         suspected_closure = _positive(
             "suspected_closure_seconds", self.suspected_closure_seconds
@@ -137,8 +125,7 @@ class DriverStateConfig:
         )
         if suspected_closure > drowsy_closure:
             raise ValueError(
-                "suspected_closure_seconds must not exceed "
-                "drowsy_closure_seconds"
+                "suspected_closure_seconds must not exceed drowsy_closure_seconds"
             )
 
         _positive("yawn_window_seconds", self.yawn_window_seconds)
@@ -221,20 +208,14 @@ class CabinPerceptionConfig:
         }
         unknown_sections = set(document) - set(section_types)
         if unknown_sections:
-            unknown_text = ", ".join(
-                sorted(str(item) for item in unknown_sections)
-            )
+            unknown_text = ", ".join(sorted(str(item) for item in unknown_sections))
             raise ValueError(f"unknown cabin configuration section: {unknown_text}")
 
         return cls(
-            presence=_section(
-                "presence", PresenceConfig, document.get("presence")
-            ),
+            presence=_section("presence", PresenceConfig, document.get("presence")),
             eye=_section("eye", EyeConfig, document.get("eye")),
             blink=_section("blink", BlinkConfig, document.get("blink")),
-            perclos=_section(
-                "perclos", PerclosConfig, document.get("perclos")
-            ),
+            perclos=_section("perclos", PerclosConfig, document.get("perclos")),
             mouth=_section("mouth", MouthConfig, document.get("mouth")),
             yawn=_section("yawn", YawnConfig, document.get("yawn")),
             driver_state=_section(

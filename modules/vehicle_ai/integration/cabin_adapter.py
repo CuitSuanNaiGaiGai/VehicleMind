@@ -27,9 +27,7 @@ class CabinContextAdapter:
         self,
         context_manager: ContextManager,
     ):
-        self.context_manager = (
-            context_manager
-        )
+        self.context_manager = context_manager
 
     # ========================================================
     # Enum helpers
@@ -47,21 +45,15 @@ class CabinContextAdapter:
             value,
             "value",
         ):
-            return str(
-                value.value
-            )
+            return str(value.value)
 
         if hasattr(
             value,
             "name",
         ):
-            return str(
-                value.name
-            )
+            return str(value.name)
 
-        return str(
-            value
-        )
+        return str(value)
 
     # ========================================================
     # Normalize Presence
@@ -72,22 +64,13 @@ class CabinContextAdapter:
         value: Any,
     ) -> DriverPresence:
 
-        text = (
-            self._enum_text(
-                value
-            )
-            .upper()
-        )
+        text = self._enum_text(value).upper()
 
         try:
-            return DriverPresence(
-                text
-            )
+            return DriverPresence(text)
 
         except ValueError:
-            return (
-                DriverPresence.UNKNOWN
-            )
+            return DriverPresence.UNKNOWN
 
     # ========================================================
     # Normalize Driver State
@@ -98,22 +81,13 @@ class CabinContextAdapter:
         value: Any,
     ) -> DriverState:
 
-        text = (
-            self._enum_text(
-                value
-            )
-            .upper()
-        )
+        text = self._enum_text(value).upper()
 
         try:
-            return DriverState(
-                text
-            )
+            return DriverState(text)
 
         except ValueError:
-            return (
-                DriverState.UNKNOWN
-            )
+            return DriverState.UNKNOWN
 
     # ========================================================
     # Normalize Risk
@@ -124,22 +98,13 @@ class CabinContextAdapter:
         value: Any,
     ) -> RiskLevel:
 
-        text = (
-            self._enum_text(
-                value
-            )
-            .upper()
-        )
+        text = self._enum_text(value).upper()
 
         try:
-            return RiskLevel(
-                text
-            )
+            return RiskLevel(text)
 
         except ValueError:
-            return (
-                RiskLevel.UNKNOWN
-            )
+            return RiskLevel.UNKNOWN
 
     # ========================================================
     # Update
@@ -162,38 +127,13 @@ class CabinContextAdapter:
         CabinPerceptionService.
         """
 
-        return (
-            self.context_manager
-            .update_driver(
-                presence=(
-                    self._presence(
-                        presence
-                    )
-                ),
-                state=(
-                    self._driver_state(
-                        driver_state
-                    )
-                ),
-                risk=(
-                    self._risk_level(
-                        risk
-                    )
-                ),
-                perclos=perclos,
-                eye_closed=(
-                    None
-                    if eye_closed is None
-                    else bool(eye_closed)
-                ),
-                eye_closure_seconds=float(
-                    eye_closure_seconds
-                ),
-                recent_yawns=int(
-                    recent_yawns
-                ),
-                blink_count=int(
-                    blink_count
-                ),
-            )
+        return self.context_manager.update_driver(
+            presence=(self._presence(presence)),
+            state=(self._driver_state(driver_state)),
+            risk=(self._risk_level(risk)),
+            perclos=perclos,
+            eye_closed=(None if eye_closed is None else bool(eye_closed)),
+            eye_closure_seconds=float(eye_closure_seconds),
+            recent_yawns=int(recent_yawns),
+            blink_count=int(blink_count),
         )

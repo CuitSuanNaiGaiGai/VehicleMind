@@ -24,9 +24,7 @@ class ToolResult:
 
     message: str
 
-    data: dict[str, Any] = field(
-        default_factory=dict
-    )
+    data: dict[str, Any] = field(default_factory=dict)
 
     error: str | None = None
 

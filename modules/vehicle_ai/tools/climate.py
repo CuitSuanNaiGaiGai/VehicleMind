@@ -28,9 +28,7 @@ class ClimateTools:
         self,
         context_manager: ContextManager,
     ):
-        self.context_manager = (
-            context_manager
-        )
+        self.context_manager = context_manager
 
     # ========================================================
     # Get climate
@@ -40,32 +38,17 @@ class ClimateTools:
         self,
     ) -> ToolResult:
 
-        context = (
-            self.context_manager
-            .get_context()
-        )
+        context = self.context_manager.get_context()
 
-        vehicle = (
-            context.vehicle
-        )
+        vehicle = context.vehicle
 
         return ToolResult(
             success=True,
-            message=(
-                "Climate status retrieved."
-            ),
+            message=("Climate status retrieved."),
             data={
-                "cabin_temperature_c":
-                    vehicle
-                    .cabin_temperature_c,
-
-                "target_temperature_c":
-                    vehicle
-                    .target_temperature_c,
-
-                "ac_enabled":
-                    vehicle
-                    .ac_enabled,
+                "cabin_temperature_c": vehicle.cabin_temperature_c,
+                "target_temperature_c": vehicle.target_temperature_c,
+                "ac_enabled": vehicle.ac_enabled,
             },
         )
 
@@ -78,65 +61,35 @@ class ClimateTools:
         temperature_c: float,
     ) -> ToolResult:
 
-        temperature_c = float(
-            temperature_c
-        )
+        temperature_c = float(temperature_c)
 
-        if not (
-            16.0
-            <= temperature_c
-            <= 30.0
-        ):
-
+        if not (16.0 <= temperature_c <= 30.0):
             return ToolResult(
                 success=False,
-                message=(
-                    "Requested temperature "
-                    "is outside the supported "
-                    "range."
-                ),
-                error=(
-                    "TEMPERATURE_OUT_OF_RANGE"
-                ),
+                message=("Requested temperature is outside the supported range."),
+                error=("TEMPERATURE_OUT_OF_RANGE"),
                 data={
                     "minimum_c": 16.0,
                     "maximum_c": 30.0,
                 },
             )
 
-        context_before = (
-            self.context_manager
-            .get_context()
-        )
+        context_before = self.context_manager.get_context()
 
-        old_temperature = (
-            context_before
-            .vehicle
-            .target_temperature_c
-        )
+        old_temperature = context_before.vehicle.target_temperature_c
 
         self.context_manager.update_vehicle(
-            target_temperature_c=(
-                temperature_c
-            ),
+            target_temperature_c=(temperature_c),
             ac_enabled=True,
         )
 
         return ToolResult(
             success=True,
-            message=(
-                "Target cabin temperature "
-                f"set to {temperature_c:.1f}°C."
-            ),
+            message=(f"Target cabin temperature set to {temperature_c:.1f}°C."),
             data={
-                "old_temperature_c":
-                    old_temperature,
-
-                "target_temperature_c":
-                    temperature_c,
-
-                "ac_enabled":
-                    True,
+                "old_temperature_c": old_temperature,
+                "target_temperature_c": temperature_c,
+                "ac_enabled": True,
             },
         )
 
@@ -149,27 +102,15 @@ class ClimateTools:
         enabled: bool,
     ) -> ToolResult:
 
-        enabled = bool(
-            enabled
-        )
+        enabled = bool(enabled)
 
-        self.context_manager.update_vehicle(
-            ac_enabled=enabled
-        )
+        self.context_manager.update_vehicle(ac_enabled=enabled)
 
         return ToolResult(
             success=True,
-            message=(
-                "Air conditioning "
-                + (
-                    "enabled."
-                    if enabled
-                    else "disabled."
-                )
-            ),
+            message=("Air conditioning " + ("enabled." if enabled else "disabled.")),
             data={
-                "ac_enabled":
-                    enabled,
+                "ac_enabled": enabled,
             },
         )
 
@@ -183,9 +124,7 @@ def build_climate_tools(
     context_manager: ContextManager,
 ) -> list[ToolDefinition]:
 
-    tools = ClimateTools(
-        context_manager
-    )
+    tools = ClimateTools(context_manager)
 
     return [
         ToolDefinition(
@@ -201,20 +140,13 @@ def build_climate_tools(
                 "type": "object",
                 "properties": {},
                 "required": [],
-                "additionalProperties":
-                    False,
+                "additionalProperties": False,
             },
-            handler=(
-                tools.get_climate_status
-            ),
+            handler=(tools.get_climate_status),
         ),
-
         ToolDefinition(
             name="set_temperature",
-            description=(
-                "Set the target cabin "
-                "temperature in Celsius."
-            ),
+            description=("Set the target cabin temperature in Celsius."),
             category="climate",
             parameters={
                 "type": "object",
@@ -223,47 +155,28 @@ def build_climate_tools(
                         "type": "number",
                         "minimum": 16,
                         "maximum": 30,
-                        "description": (
-                            "Target cabin "
-                            "temperature in "
-                            "degrees Celsius."
-                        ),
+                        "description": ("Target cabin temperature in degrees Celsius."),
                     },
                 },
-                "required": [
-                    "temperature_c"
-                ],
-                "additionalProperties":
-                    False,
+                "required": ["temperature_c"],
+                "additionalProperties": False,
             },
-            handler=(
-                tools.set_temperature
-            ),
+            handler=(tools.set_temperature),
         ),
-
         ToolDefinition(
             name="set_ac",
-            description=(
-                "Turn the cabin air "
-                "conditioning on or off."
-            ),
+            description=("Turn the cabin air conditioning on or off."),
             category="climate",
             parameters={
                 "type": "object",
                 "properties": {
                     "enabled": {
-                        "type":
-                            "boolean",
+                        "type": "boolean",
                     },
                 },
-                "required": [
-                    "enabled"
-                ],
-                "additionalProperties":
-                    False,
+                "required": ["enabled"],
+                "additionalProperties": False,
             },
-            handler=(
-                tools.set_ac
-            ),
+            handler=(tools.set_ac),
         ),
     ]

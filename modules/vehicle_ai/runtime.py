@@ -50,62 +50,38 @@ class VehicleMindRuntime:
         # Shared context
         # ====================================================
 
-        self.context_manager = (
-            ContextManager()
-        )
+        self.context_manager = ContextManager()
 
         # ====================================================
         # Perception adapters
         # ====================================================
 
-        self.cabin = (
-            CabinContextAdapter(
-                self.context_manager
-            )
-        )
+        self.cabin = CabinContextAdapter(self.context_manager)
 
-        self.driving = (
-            DrivingContextAdapter(
-                self.context_manager
-            )
-        )
+        self.driving = DrivingContextAdapter(self.context_manager)
 
         # ====================================================
         # Semantic event infrastructure
         # ====================================================
 
-        self.event_detector = (
-            EventDetector()
-        )
+        self.event_detector = EventDetector()
 
-        self.event_bus = (
-            EventBus()
-        )
+        self.event_bus = EventBus()
 
         # ====================================================
         # Vehicle tools
         # ====================================================
 
-        self.tools: ToolRegistry = (
-            build_default_tool_registry(
-                self.context_manager
-            )
-        )
+        self.tools: ToolRegistry = build_default_tool_registry(self.context_manager)
 
         # ====================================================
         # Vehicle Agent
         # ====================================================
 
-        self.agent = (
-            VehicleAgent(
-                llm=llm,
-                context_manager=(
-                    self.context_manager
-                ),
-                tool_registry=(
-                    self.tools
-                ),
-            )
+        self.agent = VehicleAgent(
+            llm=llm,
+            context_manager=(self.context_manager),
+            tool_registry=(self.tools),
         )
 
     # ========================================================
@@ -119,21 +95,14 @@ class VehicleMindRuntime:
         if not changes:
             return []
 
-        context = (
-            self.context_manager
-            .get_context()
+        context = self.context_manager.get_context()
+
+        events = self.event_detector.detect(
+            changes=changes,
+            context=context,
         )
 
-        events = (
-            self.event_detector.detect(
-                changes=changes,
-                context=context,
-            )
-        )
-
-        self.event_bus.publish_many(
-            events
-        )
+        self.event_bus.publish_many(events)
 
         return events
 
@@ -145,17 +114,9 @@ class VehicleMindRuntime:
         self,
         **kwargs,
     ):
-        changes = (
-            self.cabin.update(
-                **kwargs
-            )
-        )
+        changes = self.cabin.update(**kwargs)
 
-        return (
-            self._process_changes(
-                changes
-            )
-        )
+        return self._process_changes(changes)
 
     # ========================================================
     # Driving Perception
@@ -165,17 +126,9 @@ class VehicleMindRuntime:
         self,
         **kwargs,
     ):
-        changes = (
-            self.driving.update(
-                **kwargs
-            )
-        )
+        changes = self.driving.update(**kwargs)
 
-        return (
-            self._process_changes(
-                changes
-            )
-        )
+        return self._process_changes(changes)
 
     # ========================================================
     # Agent
@@ -187,11 +140,9 @@ class VehicleMindRuntime:
         debug: bool = True,
     ) -> str:
 
-        return (
-            self.agent.chat(
-                text,
-                debug=debug,
-            )
+        return self.agent.chat(
+            text,
+            debug=debug,
         )
 
     # ========================================================
@@ -202,7 +153,4 @@ class VehicleMindRuntime:
         self,
     ) -> str:
 
-        return (
-            self.context_manager
-            .summary()
-        )
+        return self.context_manager.summary()

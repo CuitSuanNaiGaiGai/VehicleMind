@@ -10,6 +10,11 @@ from modules.vehicle_ai.agent.action_state import (
 from modules.vehicle_ai.agent.prompts import (
     SYSTEM_PROMPT,
 )
+from modules.vehicle_ai.agent.message_helpers import (
+    assistant_tool_message,
+    pending_action_message,
+    print_pending_action,
+)
 
 from modules.vehicle_ai.context import (
     ContextManager,
@@ -59,36 +64,24 @@ class VehicleAgent:
     ):
         self.llm = llm
 
-        self.context_manager = (
-            context_manager
-        )
+        self.context_manager = context_manager
 
-        self.tool_registry = (
-            tool_registry
-        )
+        self.tool_registry = tool_registry
 
-        self.max_tool_rounds = (
-            max_tool_rounds
-        )
+        self.max_tool_rounds = max_tool_rounds
 
         # ----------------------------------------------------
         # Natural language history
         # ----------------------------------------------------
 
-        self.history: list[
-            dict
-        ] = []
+        self.history: list[dict] = []
 
         # ----------------------------------------------------
         # Grounded action state
         # ----------------------------------------------------
 
-        self.pending_actions = (
-            PendingActionStore()
-        )
-        self.context_selector = (
-            ContextSelector()
-        )
+        self.pending_actions = PendingActionStore()
+        self.context_selector = ContextSelector()
 
     # ========================================================
     # Vehicle Context
@@ -104,56 +97,34 @@ class VehicleAgent:
         # Obtain latest complete runtime context.
         # --------------------------------------------------------
 
-        full_context = (
-            self.context_manager
-            .get_context()
-        )
+        full_context = self.context_manager.get_context()
 
         # --------------------------------------------------------
         # Select only information relevant to this turn.
         # --------------------------------------------------------
 
-        selection = (
-            self.context_selector
-            .select(
-                user_text=(
-                    user_text
-                ),
-                vehicle_context=(
-                    full_context
-                ),
-            )
+        selection = self.context_selector.select(
+            user_text=(user_text),
+            vehicle_context=(full_context),
         )
 
-        selected_context = (
-            selection.context
-        )
+        selected_context = selection.context
 
         if debug:
-
             print()
-            print(
-                "[Context Selector]"
-            )
+            print("[Context Selector]")
 
             print(
                 "  topics:",
-                [
-                    topic.value
-                    for topic
-                    in selection.topics
-                ],
+                [topic.value for topic in selection.topics],
             )
 
             print(
                 "  matched:",
-                selection
-                .matched_keywords,
+                selection.matched_keywords,
             )
 
-            print(
-                "  context:"
-            )
+            print("  context:")
 
             print(
                 json.dumps(
@@ -169,11 +140,8 @@ class VehicleAgent:
         # --------------------------------------------------------
 
         if not selected_context:
-
             return {
-                "role":
-                    "system",
-
+                "role": "system",
                 "content": (
                     "CURRENT RELEVANT "
                     "VEHICLE CONTEXT:\n"
@@ -182,19 +150,15 @@ class VehicleAgent:
                 ),
             }
 
-        context_json = (
-            json.dumps(
-                selected_context,
-                ensure_ascii=False,
-                indent=2,
-                default=str,
-            )
+        context_json = json.dumps(
+            selected_context,
+            ensure_ascii=False,
+            indent=2,
+            default=str,
         )
 
         return {
-            "role":
-                "system",
-
+            "role": "system",
             "content": (
                 "CURRENT RELEVANT "
                 "VEHICLE CONTEXT:\n"
@@ -204,6 +168,7 @@ class VehicleAgent:
                 "current user request."
             ),
         }
+
     # ========================================================
     # Pending Action Context
     # ========================================================
@@ -211,42 +176,7 @@ class VehicleAgent:
     def _pending_action_message(
         self,
     ) -> dict:
-
-        pending = (
-            self.pending_actions
-            .to_agent_context()
-        )
-
-        if pending is None:
-
-            return {
-                "role": "system",
-                "content": (
-                    "PENDING ACTION:\n"
-                    "None"
-                ),
-            }
-
-        pending_json = (
-            json.dumps(
-                pending,
-                ensure_ascii=False,
-                indent=2,
-                default=str,
-            )
-        )
-
-        return {
-            "role": "system",
-            "content": (
-                "PENDING ACTION:\n"
-                f"{pending_json}\n\n"
-                "If the user confirms this "
-                "action, execute the exact "
-                "tool_name with the exact "
-                "stored arguments."
-            ),
-        }
+        return pending_action_message(self.pending_actions)
 
     # ========================================================
     # Tool-call assistant message
@@ -256,34 +186,7 @@ class VehicleAgent:
         self,
         response,
     ) -> dict:
-
-        return {
-            "role":
-                "assistant",
-
-            "content":
-                response.content,
-
-            "tool_calls": [
-                {
-                    "id":
-                        call.id,
-
-                    "type":
-                        "function",
-
-                    "function": {
-                        "name":
-                            call.name,
-
-                        "arguments":
-                            call.arguments_json,
-                    },
-                }
-                for call
-                in response.tool_calls
-            ],
-        }
+        return assistant_tool_message(response)
 
     # ========================================================
     # Tool argument grounding
@@ -305,42 +208,16 @@ class VehicleAgent:
         This prevents entity drift caused by LLM paraphrasing.
         """
 
-        grounded = dict(
-            arguments
-        )
+        grounded = dict(arguments)
 
-        if (
-            tool_name
-            == "start_navigation"
-        ):
+        if tool_name == "start_navigation":
+            pending = self.pending_actions.get()
 
-            pending = (
-                self.pending_actions
-                .get()
-            )
-
-            if (
-                pending is not None
-                and
-                pending.tool_name
-                == "start_navigation"
-            ):
-
-                pending_poi_id = (
-                    pending
-                    .arguments
-                    .get(
-                        "poi_id"
-                    )
-                )
+            if pending is not None and pending.tool_name == "start_navigation":
+                pending_poi_id = pending.arguments.get("poi_id")
 
                 if pending_poi_id:
-
-                    grounded[
-                        "poi_id"
-                    ] = (
-                        pending_poi_id
-                    )
+                    grounded["poi_id"] = pending_poi_id
 
         return grounded
 
@@ -364,76 +241,32 @@ class VehicleAgent:
         """
 
         if not tool_result.success:
-
             return
 
         # ----------------------------------------------------
         # Rest-area search
         # ----------------------------------------------------
 
-        if (
-            tool_name
-            == "search_nearby_rest_area"
-        ):
+        if tool_name == "search_nearby_rest_area":
+            poi_id = tool_result.data.get("poi_id")
 
-            poi_id = (
-                tool_result
-                .data
-                .get(
-                    "poi_id"
-                )
-            )
+            name = tool_result.data.get("name")
 
-            name = (
-                tool_result
-                .data
-                .get(
-                    "name"
-                )
-            )
-
-            if (
-                poi_id
-                and
-                name
-            ):
-
+            if poi_id and name:
                 self.pending_actions.set(
                     PendingAction(
-                        tool_name=(
-                            "start_navigation"
-                        ),
+                        tool_name=("start_navigation"),
                         arguments={
-                            "poi_id":
-                                poi_id,
+                            "poi_id": poi_id,
                         },
-                        display_text=(
-                            f"Navigate to {name}"
-                        ),
+                        display_text=(f"Navigate to {name}"),
                         metadata={
-                            "poi_id":
-                                poi_id,
-
-                            "name":
-                                name,
-
-                            "distance_km":
-                                tool_result
-                                .data
-                                .get(
-                                    "distance_km"
-                                ),
-
-                            "eta_minutes":
-                                tool_result
-                                .data
-                                .get(
-                                    "eta_minutes"
-                                ),
+                            "poi_id": poi_id,
+                            "name": name,
+                            "distance_km": tool_result.data.get("distance_km"),
+                            "eta_minutes": tool_result.data.get("eta_minutes"),
                         },
-                        expires_after_seconds=(
-                            120.0
-                        ),
+                        expires_after_seconds=(120.0),
                     )
                 )
 
@@ -441,22 +274,14 @@ class VehicleAgent:
         # Navigation started
         # ----------------------------------------------------
 
-        elif (
-            tool_name
-            == "start_navigation"
-        ):
-
+        elif tool_name == "start_navigation":
             self.pending_actions.clear()
 
         # ----------------------------------------------------
         # Navigation cancelled
         # ----------------------------------------------------
 
-        elif (
-            tool_name
-            == "cancel_navigation"
-        ):
-
+        elif tool_name == "cancel_navigation":
             self.pending_actions.clear()
 
     # ========================================================
@@ -466,32 +291,7 @@ class VehicleAgent:
     def _print_pending_action(
         self,
     ) -> None:
-
-        pending = (
-            self.pending_actions
-            .get()
-        )
-
-        if pending is None:
-
-            print(
-                "[Pending Action] None"
-            )
-
-            return
-
-        print(
-            "[Pending Action]"
-        )
-
-        print(
-            json.dumps(
-                pending.to_dict(),
-                ensure_ascii=False,
-                indent=2,
-                default=str,
-            )
-        )
+        print_pending_action(self.pending_actions)
 
     # ========================================================
     # Chat
@@ -503,12 +303,9 @@ class VehicleAgent:
         debug: bool = True,
     ) -> str:
 
-        user_text = (
-            user_text.strip()
-        )
+        user_text = user_text.strip()
 
         if not user_text:
-
             return ""
 
         # ----------------------------------------------------
@@ -517,49 +314,31 @@ class VehicleAgent:
 
         messages = [
             {
-                "role":
-                    "system",
-
-                "content":
-                    SYSTEM_PROMPT,
+                "role": "system",
+                "content": SYSTEM_PROMPT,
             },
-
             self._context_message(
                 user_text=user_text,
                 debug=debug,
             ),
-
             self._pending_action_message(),
-
             *self.history,
-
             {
-                "role":
-                    "user",
-
-                "content":
-                    user_text,
+                "role": "user",
+                "content": user_text,
             },
         ]
 
-        tools = (
-            self.tool_registry
-            .llm_schemas()
-        )
+        tools = self.tool_registry.llm_schemas()
 
         # ====================================================
         # Agent Loop
         # ====================================================
 
-        for _ in range(
-            self.max_tool_rounds
-        ):
-
-            response = (
-                self.llm.chat(
-                    messages=messages,
-                    tools=tools,
-                )
+        for _ in range(self.max_tool_rounds):
+            response = self.llm.chat(
+                messages=messages,
+                tools=tools,
             )
 
             # =================================================
@@ -567,37 +346,23 @@ class VehicleAgent:
             # =================================================
 
             if not response.tool_calls:
-
-                final_text = (
-                    response.content
-                    or ""
-                )
+                final_text = response.content or ""
 
                 self.history.append(
                     {
-                        "role":
-                            "user",
-
-                        "content":
-                            user_text,
+                        "role": "user",
+                        "content": user_text,
                     }
                 )
 
                 self.history.append(
                     {
-                        "role":
-                            "assistant",
-
-                        "content":
-                            final_text,
+                        "role": "assistant",
+                        "content": final_text,
                     }
                 )
 
-                self.history = (
-                    self.history[
-                        -12:
-                    ]
-                )
+                self.history = self.history[-12:]
 
                 return final_text
 
@@ -605,42 +370,23 @@ class VehicleAgent:
             # Tool Calls
             # =================================================
 
-            messages.append(
-                self._assistant_tool_message(
-                    response
-                )
-            )
+            messages.append(self._assistant_tool_message(response))
 
-            for call in (
-                response.tool_calls
-            ):
-
+            for call in response.tool_calls:
                 # --------------------------------------------
                 # Deterministic grounding
                 # --------------------------------------------
 
-                grounded_arguments = (
-                    self
-                    ._ground_tool_arguments(
-                        tool_name=(
-                            call.name
-                        ),
-                        arguments=(
-                            call.arguments
-                        ),
-                    )
+                grounded_arguments = self._ground_tool_arguments(
+                    tool_name=(call.name),
+                    arguments=(call.arguments),
                 )
 
                 if debug:
-
                     print()
-                    print(
-                        "[Agent Tool Call]"
-                    )
+                    print("[Agent Tool Call]")
 
-                    print(
-                        f"  {call.name}"
-                    )
+                    print(f"  {call.name}")
 
                     print(
                         json.dumps(
@@ -650,14 +396,8 @@ class VehicleAgent:
                         )
                     )
 
-                    if (
-                        grounded_arguments
-                        != call.arguments
-                    ):
-
-                        print(
-                            "[Grounded Arguments]"
-                        )
+                    if grounded_arguments != call.arguments:
+                        print("[Grounded Arguments]")
 
                         print(
                             json.dumps(
@@ -671,16 +411,9 @@ class VehicleAgent:
                 # Execute
                 # --------------------------------------------
 
-                tool_result = (
-                    self.tool_registry
-                    .execute(
-                        name=(
-                            call.name
-                        ),
-                        arguments=(
-                            grounded_arguments
-                        ),
-                    )
+                tool_result = self.tool_registry.execute(
+                    name=(call.name),
+                    arguments=(grounded_arguments),
                 )
 
                 # --------------------------------------------
@@ -688,24 +421,16 @@ class VehicleAgent:
                 # --------------------------------------------
 
                 self._update_action_state(
-                    tool_name=(
-                        call.name
-                    ),
-                    tool_result=(
-                        tool_result
-                    ),
+                    tool_name=(call.name),
+                    tool_result=(tool_result),
                 )
 
                 if debug:
-
-                    print(
-                        "[Tool Result]"
-                    )
+                    print("[Tool Result]")
 
                     print(
                         json.dumps(
-                            tool_result
-                            .to_dict(),
+                            tool_result.to_dict(),
                             ensure_ascii=False,
                             indent=2,
                             default=str,
@@ -714,13 +439,10 @@ class VehicleAgent:
 
                     self._print_pending_action()
 
-                result_json = (
-                    json.dumps(
-                        tool_result
-                        .to_dict(),
-                        ensure_ascii=False,
-                        default=str,
-                    )
+                result_json = json.dumps(
+                    tool_result.to_dict(),
+                    ensure_ascii=False,
+                    default=str,
                 )
 
                 # --------------------------------------------
@@ -729,21 +451,13 @@ class VehicleAgent:
 
                 messages.append(
                     {
-                        "role":
-                            "tool",
-
-                        "tool_call_id":
-                            call.id,
-
-                        "content":
-                            result_json,
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": result_json,
                     }
                 )
 
-        return (
-            "本次请求涉及过多连续工具调用，"
-            "已停止执行。"
-        )
+        return "本次请求涉及过多连续工具调用，已停止执行。"
 
     # ========================================================
     # Reset

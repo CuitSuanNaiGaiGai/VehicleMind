@@ -19,29 +19,17 @@ def build_llm_client(
     provider: str | None = None,
 ) -> BaseLLMClient:
 
-    provider = (
-        provider
-        or os.getenv(
-            "VEHICLEMIND_LLM_PROVIDER",
-            "qwen",
-        )
+    provider = provider or os.getenv(
+        "VEHICLEMIND_LLM_PROVIDER",
+        "qwen",
     )
 
-    provider = (
-        provider
-        .strip()
-        .lower()
-    )
+    provider = provider.strip().lower()
 
     if provider == "qwen":
-
         return QwenClient()
 
     if provider == "glm":
-
         return GLMClient()
 
-    raise ValueError(
-        "Unsupported LLM provider: "
-        f"{provider}"
-    )
+    raise ValueError(f"Unsupported LLM provider: {provider}")

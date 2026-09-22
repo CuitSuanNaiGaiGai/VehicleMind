@@ -28,15 +28,13 @@ def letterbox(
     # Compute padding
     ratio = r, r  # width, height ratios
     new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[
-        1]  # wh padding
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
     if auto:  # minimum rectangle
         dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
     elif scaleFill:  # stretch
         dw, dh = 0.0, 0.0
         new_unpad = (new_shape[1], new_shape[0])
-        ratio = new_shape[1] / shape[1], new_shape[0] / shape[
-            0]  # width, height ratios
+        ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
 
     # divide padding into 2 sides
     dw /= 2
@@ -63,7 +61,7 @@ def letterbox(
 
 def _make_grid(nx=20, ny=20):
     xv, yv = np.meshgrid(np.arange(0, nx), np.arange(0, ny))
-    return np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype('float32')
+    return np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype("float32")
 
 
 def _sigmoid(arr):
@@ -80,8 +78,8 @@ def split_for_trace_model(pred=None, anchor_grid=None):
         pred[i] = pred[i].reshape(bs, 3, 85, ny, nx).transpose(0, 1, 3, 4, 2)
         y = _sigmoid(pred[i])
         gr = _make_grid(nx, ny)
-        y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + gr) * st[i]  # xy
-        y[..., 2:4] = (y[..., 2:4] * 2)**2 * anchor_grid[i]  # wh
+        y[..., 0:2] = (y[..., 0:2] * 2.0 - 0.5 + gr) * st[i]  # xy
+        y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
         z.append(y.reshape(bs, -1, 85))
 
     pred = np.concatenate(z, 1)
@@ -114,6 +112,7 @@ def _box_iou(box1, box2):
         iou (Tensor[N, M]): the NxM matrix containing the pairwise
             IoU values for every element in boxes1 and boxes2
     """
+
     def box_area(box):
         # box = 4xn
         return (box[2] - box[0]) * (box[3] - box[1])
@@ -122,10 +121,17 @@ def _box_iou(box1, box2):
     area2 = box_area(box2.T)
 
     # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
-    inter = (np.minimum(box1[:, None, 2:], box2[:, 2:]) -
-             np.maximum(box1[:, None, :2], box2[:, :2])).clamp(0).prod(2)
-    return inter / (area1[:, None] + area2 - inter
-                    )  # iou = inter / (area1 + area2 - inter)
+    inter = (
+        (
+            np.minimum(box1[:, None, 2:], box2[:, 2:])
+            - np.maximum(box1[:, None, :2], box2[:, :2])
+        )
+        .clamp(0)
+        .prod(2)
+    )
+    return inter / (
+        area1[:, None] + area2 - inter
+    )  # iou = inter / (area1 + area2 - inter)
 
 
 def _nms(boxes, scores, iou_threshold):
@@ -158,11 +164,11 @@ def _nms(boxes, scores, iou_threshold):
 
 
 def non_max_suppression(
-        prediction,
-        conf_thres=0.25,
-        iou_thres=0.45,
-        multi_label=False,
-        labels=(),
+    prediction,
+    conf_thres=0.25,
+    iou_thres=0.45,
+    multi_label=False,
+    labels=(),
 ):
     """Runs Non-Maximum Suppression (NMS) on inference results
 
@@ -187,11 +193,11 @@ def non_max_suppression(
 
         # Cat apriori labels if autolabelling
         if labels and len(labels[xi]):
-            l = labels[xi]
-            v = np.zeros((len(l), nc + 5), device=x.device)
-            v[:, :4] = l[:, 1:5]  # box
+            label_batch = labels[xi]
+            v = np.zeros((len(label_batch), nc + 5), device=x.device)
+            v[:, :4] = label_batch[:, 1:5]  # box
             v[:, 4] = 1.0  # conf
-            v[range(len(l)), l[:, 0].long() + 5] = 1.0  # cls
+            v[range(len(label_batch)), label_batch[:, 0].long() + 5] = 1.0  # cls
             x = np.concatenate((x, v), 0)
 
         # If none remain process next image
@@ -207,22 +213,21 @@ def non_max_suppression(
         # Detections matrix nx6 (xyxy, conf, cls)
         if multi_label:
             i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
-            x = np.concatenate((box[i], x[i, j + 5, None], j[:, None].float()),
-                               1)
+            x = np.concatenate((box[i], x[i, j + 5, None], j[:, None].float()), 1)
         else:  # best class only
             conf = np.max(x[:, 5:], axis=1, keepdims=True)
             j = np.argmax(x[:, 5:], axis=1)
             j = j.reshape((j.shape[0], 1))
-            x = np.concatenate((box, conf, j.astype('float32')),
-                               1)[conf.reshape(-1) > conf_thres]
+            x = np.concatenate((box, conf, j.astype("float32")), 1)[
+                conf.reshape(-1) > conf_thres
+            ]
 
         # Check shape
         n = x.shape[0]  # number of boxes
         if not n:  # no boxes
             continue
         elif n > max_nms:  # excess boxes
-            x = x[x[:, 4].argsort(
-                descending=True)[:max_nms]]  # sort by confidence
+            x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
 
         # NMS
         boxes, scores = x[:, :4], x[:, 4]  # boxes (offset by class), scores
@@ -237,7 +242,7 @@ def non_max_suppression(
 
         output[xi] = x[i]
         if (time.time() - t) > time_limit:
-            print(f'WARNING: NMS time limit {time_limit}s exceeded')
+            print(f"WARNING: NMS time limit {time_limit}s exceeded")
             break  # time limit exceeded
 
     return output
@@ -246,10 +251,13 @@ def non_max_suppression(
 def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
     # Rescale coords (xyxy) from img1_shape to img0_shape
     if ratio_pad is None:  # calculate from img0_shape
-        gain = min(img1_shape[0] / img0_shape[0],
-                   img1_shape[1] / img0_shape[1])  # gain  = old / new
-        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (
-            img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+        gain = min(
+            img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1]
+        )  # gain  = old / new
+        pad = (
+            (img1_shape[1] - img0_shape[1] * gain) / 2,
+            (img1_shape[0] - img0_shape[0] * gain) / 2,
+        )  # wh padding
     else:
         gain = ratio_pad[0][0]
         pad = ratio_pad[1]
@@ -280,7 +288,7 @@ def driving_area_mask(seg, pad_wh=None):
         seg_width = int(temp_seg.shape[1])
         seg_height = int(temp_seg.shape[0])
 
-        temp_seg = temp_seg[pad_h:seg_height - pad_h, pad_w:seg_width - pad_w]
+        temp_seg = temp_seg[pad_h : seg_height - pad_h, pad_w : seg_width - pad_w]
 
         return 1.0 - temp_seg
 
@@ -296,6 +304,6 @@ def lane_line_mask(ll, pad_wh=None):
         seg_width = int(temp_ll.shape[1])
         seg_height = int(temp_ll.shape[0])
 
-        temp_ll = temp_ll[pad_h:seg_height - pad_h, pad_w:seg_width - pad_w]
+        temp_ll = temp_ll[pad_h : seg_height - pad_h, pad_w : seg_width - pad_w]
 
         return temp_ll

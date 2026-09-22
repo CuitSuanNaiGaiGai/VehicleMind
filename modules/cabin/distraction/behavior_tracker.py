@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-import numpy as np
 
 from modules.cabin.distraction.phone_detector import (
     PhoneDetection,
@@ -11,7 +10,6 @@ from modules.cabin.distraction.phone_detector import (
 
 
 class PhoneBehaviorState(str, Enum):
-
     NO_PHONE = "NO_PHONE"
 
     PHONE_PRESENT = "PHONE_PRESENT"
@@ -23,7 +21,6 @@ class PhoneBehaviorState(str, Enum):
 
 @dataclass
 class DriverInteractionZone:
-
     x1: int
     y1: int
     x2: int
@@ -32,7 +29,6 @@ class DriverInteractionZone:
 
 @dataclass
 class PhoneBehaviorResult:
-
     state: PhoneBehaviorState
 
     phone_detected: bool
@@ -43,13 +39,9 @@ class PhoneBehaviorResult:
 
     confidence: float
 
-    interaction_zone: Optional[
-        DriverInteractionZone
-    ]
+    interaction_zone: Optional[DriverInteractionZone]
 
-    associated_phone: Optional[
-        PhoneDetection
-    ]
+    associated_phone: Optional[PhoneDetection]
 
 
 class PhoneBehaviorTracker:
@@ -91,17 +83,11 @@ class PhoneBehaviorTracker:
         missing_tolerance_seconds: float = 0.25,
     ):
 
-        self.near_duration_ms = int(
-            near_duration_seconds * 1000
-        )
+        self.near_duration_ms = int(near_duration_seconds * 1000)
 
-        self.use_duration_ms = int(
-            use_duration_seconds * 1000
-        )
+        self.use_duration_ms = int(use_duration_seconds * 1000)
 
-        self.missing_tolerance_ms = int(
-            missing_tolerance_seconds * 1000
-        )
+        self.missing_tolerance_ms = int(missing_tolerance_seconds * 1000)
 
         self._associated_since_ms = None
 
@@ -123,16 +109,9 @@ class PhoneBehaviorTracker:
         ys = []
 
         for landmark in face:
+            xs.append(landmark.x * frame_width)
 
-            xs.append(
-                landmark.x
-                * frame_width
-            )
-
-            ys.append(
-                landmark.y
-                * frame_height
-            )
+            ys.append(landmark.y * frame_height)
 
         x1 = int(
             max(
@@ -201,10 +180,7 @@ class PhoneBehaviorTracker:
             face_y2 - face_y1,
         )
 
-        face_center_x = (
-            face_x1
-            + face_x2
-        ) / 2.0
+        face_center_x = (face_x1 + face_x2) / 2.0
 
         # -----------------------------------------------------
         # Build an approximate driver upper-body interaction
@@ -218,40 +194,33 @@ class PhoneBehaviorTracker:
         #     downward toward chest/lap region.
         # -----------------------------------------------------
 
-        zone_width = (
-            face_width
-            * 2.6
-        )
+        zone_width = face_width * 2.6
 
         zone_x1 = int(
             max(
                 0,
-                face_center_x
-                - zone_width / 2.0,
+                face_center_x - zone_width / 2.0,
             )
         )
 
         zone_x2 = int(
             min(
                 frame_width - 1,
-                face_center_x
-                + zone_width / 2.0,
+                face_center_x + zone_width / 2.0,
             )
         )
 
         zone_y1 = int(
             max(
                 0,
-                face_y1
-                - 0.25 * face_height,
+                face_y1 - 0.25 * face_height,
             )
         )
 
         zone_y2 = int(
             min(
                 frame_height - 1,
-                face_y2
-                + 3.0 * face_height,
+                face_y2 + 3.0 * face_height,
             )
         )
 
@@ -271,15 +240,9 @@ class PhoneBehaviorTracker:
         phone: PhoneDetection,
     ):
 
-        center_x = (
-            phone.x1
-            + phone.x2
-        ) / 2.0
+        center_x = (phone.x1 + phone.x2) / 2.0
 
-        center_y = (
-            phone.y1
-            + phone.y2
-        ) / 2.0
+        center_y = (phone.y1 + phone.y2) / 2.0
 
         return (
             center_x,
@@ -295,19 +258,9 @@ class PhoneBehaviorTracker:
         (
             center_x,
             center_y,
-        ) = PhoneBehaviorTracker._phone_center(
-            phone
-        )
+        ) = PhoneBehaviorTracker._phone_center(phone)
 
-        return (
-            zone.x1
-            <= center_x
-            <= zone.x2
-            and
-            zone.y1
-            <= center_y
-            <= zone.y2
-        )
+        return zone.x1 <= center_x <= zone.x2 and zone.y1 <= center_y <= zone.y2
 
     def _find_associated_phone(
         self,
@@ -318,25 +271,18 @@ class PhoneBehaviorTracker:
         candidates = []
 
         for phone in detections.detections:
-
             if self._inside_zone(
                 phone,
                 zone,
             ):
-
-                candidates.append(
-                    phone
-                )
+                candidates.append(phone)
 
         if not candidates:
-
             return None
 
         return max(
             candidates,
-            key=lambda item: (
-                item.confidence
-            ),
+            key=lambda item: item.confidence,
         )
 
     # =========================================================
@@ -360,10 +306,7 @@ class PhoneBehaviorTracker:
         # -----------------------------------------------------
 
         if face is None:
-
-            self._reset_if_too_long_missing(
-                timestamp_ms
-            )
+            self._reset_if_too_long_missing(timestamp_ms)
 
             return PhoneBehaviorResult(
                 state=(
@@ -376,8 +319,7 @@ class PhoneBehaviorTracker:
                 associated_duration=0.0,
                 confidence=(
                     phone_result.best_detection.confidence
-                    if phone_result.best_detection
-                    is not None
+                    if phone_result.best_detection is not None
                     else 0.0
                 ),
                 interaction_zone=None,
@@ -399,10 +341,7 @@ class PhoneBehaviorTracker:
         # -----------------------------------------------------
 
         if not phone_result.detected:
-
-            self._reset_if_too_long_missing(
-                timestamp_ms
-            )
+            self._reset_if_too_long_missing(timestamp_ms)
 
             return PhoneBehaviorResult(
                 state=PhoneBehaviorState.NO_PHONE,
@@ -421,18 +360,13 @@ class PhoneBehaviorTracker:
         # interaction region.
         # -----------------------------------------------------
 
-        associated_phone = (
-            self._find_associated_phone(
-                phone_result,
-                zone,
-            )
+        associated_phone = self._find_associated_phone(
+            phone_result,
+            zone,
         )
 
         if associated_phone is None:
-
-            self._reset_if_too_long_missing(
-                timestamp_ms
-            )
+            self._reset_if_too_long_missing(timestamp_ms)
 
             return PhoneBehaviorResult(
                 state=PhoneBehaviorState.PHONE_PRESENT,
@@ -441,8 +375,7 @@ class PhoneBehaviorTracker:
                 associated_duration=0.0,
                 confidence=(
                     phone_result.best_detection.confidence
-                    if phone_result.best_detection
-                    is not None
+                    if phone_result.best_detection is not None
                     else 0.0
                 ),
                 interaction_zone=zone,
@@ -453,64 +386,34 @@ class PhoneBehaviorTracker:
         # Associated with driver
         # -----------------------------------------------------
 
-        self._last_associated_ms = (
-            timestamp_ms
-        )
+        self._last_associated_ms = timestamp_ms
 
         if self._associated_since_ms is None:
+            self._associated_since_ms = timestamp_ms
 
-            self._associated_since_ms = (
-                timestamp_ms
-            )
+        associated_ms = timestamp_ms - self._associated_since_ms
 
-        associated_ms = (
-            timestamp_ms
-            - self._associated_since_ms
-        )
-
-        associated_duration = (
-            associated_ms
-            / 1000.0
-        )
+        associated_duration = associated_ms / 1000.0
 
         # -----------------------------------------------------
         # Behavior states
         # -----------------------------------------------------
 
-        if (
-            associated_ms
-            >= self.use_duration_ms
-        ):
+        if associated_ms >= self.use_duration_ms:
+            state = PhoneBehaviorState.PHONE_USE
 
-            state = (
-                PhoneBehaviorState.PHONE_USE
-            )
-
-        elif (
-            associated_ms
-            >= self.near_duration_ms
-        ):
-
-            state = (
-                PhoneBehaviorState.PHONE_NEAR_DRIVER
-            )
+        elif associated_ms >= self.near_duration_ms:
+            state = PhoneBehaviorState.PHONE_NEAR_DRIVER
 
         else:
-
-            state = (
-                PhoneBehaviorState.PHONE_PRESENT
-            )
+            state = PhoneBehaviorState.PHONE_PRESENT
 
         return PhoneBehaviorResult(
             state=state,
             phone_detected=True,
             phone_near_driver=True,
-            associated_duration=(
-                associated_duration
-            ),
-            confidence=(
-                associated_phone.confidence
-            ),
+            associated_duration=(associated_duration),
+            confidence=(associated_phone.confidence),
             interaction_zone=zone,
             associated_phone=associated_phone,
         )
@@ -524,25 +427,14 @@ class PhoneBehaviorTracker:
         timestamp_ms: int,
     ) -> None:
 
-        if (
-            self._last_associated_ms
-            is None
-        ):
-
+        if self._last_associated_ms is None:
             self._associated_since_ms = None
 
             return
 
-        missing_ms = (
-            timestamp_ms
-            - self._last_associated_ms
-        )
+        missing_ms = timestamp_ms - self._last_associated_ms
 
-        if (
-            missing_ms
-            > self.missing_tolerance_ms
-        ):
-
+        if missing_ms > self.missing_tolerance_ms:
             self._associated_since_ms = None
 
             self._last_associated_ms = None

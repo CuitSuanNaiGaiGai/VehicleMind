@@ -24,33 +24,20 @@ def execute(
     arguments=None,
 ):
     print()
-    print(
-        "----------------------------------------"
+    print("----------------------------------------")
+
+    print("[TOOL CALL]")
+
+    print(f"  name      : {name}")
+
+    print(f"  arguments : {arguments or {}}")
+
+    result = registry.execute(
+        name=name,
+        arguments=arguments,
     )
 
-    print(
-        f"[TOOL CALL]"
-    )
-
-    print(
-        f"  name      : {name}"
-    )
-
-    print(
-        f"  arguments : "
-        f"{arguments or {}}"
-    )
-
-    result = (
-        registry.execute(
-            name=name,
-            arguments=arguments,
-        )
-    )
-
-    print(
-        "[TOOL RESULT]"
-    )
+    print("[TOOL RESULT]")
 
     print(
         json.dumps(
@@ -71,25 +58,17 @@ def execute(
 
 def main():
     print()
-    print(
-        "========================================"
-    )
+    print("========================================")
 
-    print(
-        " VehicleMind Tool Demo"
-    )
+    print(" VehicleMind Tool Demo")
 
-    print(
-        "========================================"
-    )
+    print("========================================")
 
     # ========================================================
     # Context
     # ========================================================
 
-    manager = (
-        ContextManager()
-    )
+    manager = ContextManager()
 
     manager.update_vehicle(
         gear=GearState.D,
@@ -101,15 +80,9 @@ def main():
     )
 
     manager.update_driver(
-        presence=(
-            DriverPresence.PRESENT
-        ),
-        state=(
-            DriverState.DROWSY
-        ),
-        risk=(
-            RiskLevel.HIGH
-        ),
+        presence=(DriverPresence.PRESENT),
+        state=(DriverState.DROWSY),
+        risk=(RiskLevel.HIGH),
         perclos=0.31,
         recent_yawns=2,
     )
@@ -118,24 +91,13 @@ def main():
     # Registry
     # ========================================================
 
-    registry = (
-        build_default_tool_registry(
-            manager
-        )
-    )
+    registry = build_default_tool_registry(manager)
 
     print()
-    print(
-        "Available tools:"
-    )
+    print("Available tools:")
 
-    for name in (
-        registry.names()
-    ):
-
-        print(
-            f"  - {name}"
-        )
+    for name in registry.names():
+        print(f"  - {name}")
 
     # ========================================================
     # Scenario A
@@ -162,28 +124,19 @@ def main():
     # User: 我有点困，找个地方休息
     # ========================================================
 
-    rest_result = (
-        execute(
-            registry,
-            "search_nearby_rest_area",
-        )
+    rest_result = execute(
+        registry,
+        "search_nearby_rest_area",
     )
 
     if rest_result.success:
-
-        poi_id = (
-            rest_result
-            .data[
-                "poi_id"
-            ]
-        )
+        poi_id = rest_result.data["poi_id"]
 
         execute(
             registry,
             "start_navigation",
             {
-                "poi_id":
-                    poi_id,
+                "poi_id": poi_id,
             },
         )
 
@@ -197,8 +150,7 @@ def main():
         registry,
         "play_music",
         {
-            "query":
-                "Relaxing Driving Playlist",
+            "query": "Relaxing Driving Playlist",
         },
     )
 
@@ -247,37 +199,23 @@ def main():
     # ========================================================
 
     print()
-    print(
-        "========================================"
-    )
+    print("========================================")
 
-    print(
-        " Final Vehicle Context"
-    )
+    print(" Final Vehicle Context")
 
-    print(
-        "========================================"
-    )
+    print("========================================")
 
-    print(
-        manager.summary()
-    )
+    print(manager.summary())
 
     # ========================================================
     # LLM schemas
     # ========================================================
 
-    print(
-        "========================================"
-    )
+    print("========================================")
 
-    print(
-        " Function Calling Schemas"
-    )
+    print(" Function Calling Schemas")
 
-    print(
-        "========================================"
-    )
+    print("========================================")
 
     print(
         json.dumps(

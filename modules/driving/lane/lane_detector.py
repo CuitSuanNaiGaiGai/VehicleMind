@@ -63,13 +63,9 @@ class LaneDetector:
     ):
         self.smoothing = smoothing
 
-        self.min_abs_slope = (
-            min_abs_slope
-        )
+        self.min_abs_slope = min_abs_slope
 
-        self.max_abs_slope = (
-            max_abs_slope
-        )
+        self.max_abs_slope = max_abs_slope
 
         self._left_line = None
         self._right_line = None
@@ -162,11 +158,7 @@ class LaneDetector:
             150,
         )
 
-        color_mask = (
-            self._lane_color_mask(
-                frame
-            )
-        )
+        color_mask = self._lane_color_mask(frame)
 
         color_edges = cv2.Canny(
             color_mask,
@@ -188,13 +180,9 @@ class LaneDetector:
         edges: np.ndarray,
     ) -> np.ndarray:
 
-        height, width = (
-            edges.shape[:2]
-        )
+        height, width = edges.shape[:2]
 
-        mask = np.zeros_like(
-            edges
-        )
+        mask = np.zeros_like(edges)
 
         # Broad trapezoid representing the road ahead.
         polygon = np.array(
@@ -248,47 +236,26 @@ class LaneDetector:
         ys = []
         weights = []
 
-        center_x = (
-            width / 2.0
-        )
+        center_x = width / 2.0
 
         for segment in segments:
+            x1, y1, x2, y2 = segment
 
-            x1, y1, x2, y2 = (
-                segment
-            )
+            dx = x2 - x1
 
-            dx = (
-                x2 - x1
-            )
-
-            dy = (
-                y2 - y1
-            )
+            dy = y2 - y1
 
             if abs(dx) < 1:
                 continue
 
-            slope = (
-                dy / dx
-            )
+            slope = dy / dx
 
-            abs_slope = abs(
-                slope
-            )
+            abs_slope = abs(slope)
 
-            if (
-                abs_slope
-                < self.min_abs_slope
-                or
-                abs_slope
-                > self.max_abs_slope
-            ):
+            if abs_slope < self.min_abs_slope or abs_slope > self.max_abs_slope:
                 continue
 
-            midpoint_x = (
-                x1 + x2
-            ) / 2.0
+            midpoint_x = (x1 + x2) / 2.0
 
             # ------------------------------------------------
             # In image coordinates:
@@ -298,23 +265,11 @@ class LaneDetector:
             # ------------------------------------------------
 
             if left:
-
-                if (
-                    slope >= 0
-                    or
-                    midpoint_x
-                    >= center_x
-                ):
+                if slope >= 0 or midpoint_x >= center_x:
                     continue
 
             else:
-
-                if (
-                    slope <= 0
-                    or
-                    midpoint_x
-                    <= center_x
-                ):
+                if slope <= 0 or midpoint_x <= center_x:
                     continue
 
             length = float(
@@ -324,17 +279,11 @@ class LaneDetector:
                 )
             )
 
-            xs.extend(
-                [x1, x2]
-            )
+            xs.extend([x1, x2])
 
-            ys.extend(
-                [y1, y2]
-            )
+            ys.extend([y1, y2])
 
-            weights.extend(
-                [length, length]
-            )
+            weights.extend([length, length])
 
         if len(xs) < 4:
             return None
@@ -364,7 +313,6 @@ class LaneDetector:
         # ----------------------------------------------------
 
         try:
-
             coefficients = np.polyfit(
                 ys,
                 xs,
@@ -376,26 +324,17 @@ class LaneDetector:
             np.linalg.LinAlgError,
             ValueError,
         ):
-
             return None
 
         a, b = coefficients
 
-        y_bottom = (
-            height - 1
-        )
+        y_bottom = height - 1
 
-        y_top = int(
-            height * 0.55
-        )
+        y_top = int(height * 0.55)
 
-        x_bottom = int(
-            a * y_bottom + b
-        )
+        x_bottom = int(a * y_bottom + b)
 
-        x_top = int(
-            a * y_top + b
-        )
+        x_top = int(a * y_top + b)
 
         # Keep coordinates inside a reasonable range.
         x_bottom = int(
@@ -437,9 +376,7 @@ class LaneDetector:
         if previous is None:
             return current
 
-        alpha = (
-            self.smoothing
-        )
+        alpha = self.smoothing
 
         smoothed = []
 
@@ -447,20 +384,11 @@ class LaneDetector:
             previous,
             current,
         ):
+            value = alpha * old + (1.0 - alpha) * new
 
-            value = (
-                alpha * old
-                +
-                (1.0 - alpha) * new
-            )
+            smoothed.append(int(value))
 
-            smoothed.append(
-                int(value)
-            )
-
-        return tuple(
-            smoothed
-        )
+        return tuple(smoothed)
 
     # ========================================================
     # Main
@@ -471,21 +399,11 @@ class LaneDetector:
         frame: np.ndarray,
     ) -> LaneResult:
 
-        height, width = (
-            frame.shape[:2]
-        )
+        height, width = frame.shape[:2]
 
-        edges = (
-            self._extract_edges(
-                frame
-            )
-        )
+        edges = self._extract_edges(frame)
 
-        roi = (
-            self._road_roi(
-                edges
-            )
-        )
+        roi = self._road_roi(edges)
 
         lines = cv2.HoughLinesP(
             roi,
@@ -499,7 +417,6 @@ class LaneDetector:
         segments = []
 
         if lines is not None:
-
             lines = np.asarray(
                 lines,
                 dtype=np.int32,
@@ -511,7 +428,6 @@ class LaneDetector:
                 x2,
                 y2,
             ) in lines:
-
                 segments.append(
                     (
                         int(x1),
@@ -521,36 +437,28 @@ class LaneDetector:
                     )
                 )
 
-        current_left = (
-            self._fit_lane(
-                segments,
-                height,
-                width,
-                left=True,
-            )
+        current_left = self._fit_lane(
+            segments,
+            height,
+            width,
+            left=True,
         )
 
-        current_right = (
-            self._fit_lane(
-                segments,
-                height,
-                width,
-                left=False,
-            )
+        current_right = self._fit_lane(
+            segments,
+            height,
+            width,
+            left=False,
         )
 
-        self._left_line = (
-            self._smooth_line(
-                self._left_line,
-                current_left,
-            )
+        self._left_line = self._smooth_line(
+            self._left_line,
+            current_left,
         )
 
-        self._right_line = (
-            self._smooth_line(
-                self._right_line,
-                current_right,
-            )
+        self._right_line = self._smooth_line(
+            self._right_line,
+            current_right,
         )
 
         # ----------------------------------------------------
@@ -559,46 +467,18 @@ class LaneDetector:
 
         lane_center = None
 
-        if (
-            self._left_line
-            is not None
-            and
-            self._right_line
-            is not None
-        ):
+        if self._left_line is not None and self._right_line is not None:
+            left_bottom_x = self._left_line[0]
 
-            left_bottom_x = (
-                self._left_line[0]
-            )
+            right_bottom_x = self._right_line[0]
 
-            right_bottom_x = (
-                self._right_line[0]
-            )
-
-            lane_center = int(
-                (
-                    left_bottom_x
-                    +
-                    right_bottom_x
-                )
-                / 2.0
-            )
+            lane_center = int((left_bottom_x + right_bottom_x) / 2.0)
 
         return LaneResult(
-            left_detected=(
-                current_left
-                is not None
-            ),
-            right_detected=(
-                current_right
-                is not None
-            ),
-            left_lane=(
-                self._left_line
-            ),
-            right_lane=(
-                self._right_line
-            ),
+            left_detected=(current_left is not None),
+            right_detected=(current_right is not None),
+            left_lane=(self._left_line),
+            right_lane=(self._right_line),
             lane_center=lane_center,
         )
 

@@ -54,17 +54,10 @@ class DrivingContextAdapter:
         drivable_area_detected: bool = False,
         traffic_level: str | None = None,
     ):
-        vehicle_count = int(
-            vehicle_count
-        )
+        vehicle_count = int(vehicle_count)
 
         if traffic_level is None:
-
-            traffic_level = (
-                self.estimate_traffic_level(
-                    vehicle_count
-                )
-            )
+            traffic_level = self.estimate_traffic_level(vehicle_count)
 
         total_objects = (
             int(vehicle_count)
@@ -74,35 +67,14 @@ class DrivingContextAdapter:
             + int(traffic_sign_count)
         )
 
-        return (
-            self.context_manager
-            .update_road(
-                vehicle_count=(
-                    vehicle_count
-                ),
-                pedestrian_count=int(
-                    pedestrian_count
-                ),
-                rider_count=int(
-                    rider_count
-                ),
-                traffic_light_count=int(
-                    traffic_light_count
-                ),
-                traffic_sign_count=int(
-                    traffic_sign_count
-                ),
-                total_objects=(
-                    total_objects
-                ),
-                lane_detected=bool(
-                    lane_detected
-                ),
-                drivable_area_detected=bool(
-                    drivable_area_detected
-                ),
-                traffic_level=(
-                    traffic_level
-                ),
-            )
+        return self.context_manager.update_road(
+            vehicle_count=(vehicle_count),
+            pedestrian_count=int(pedestrian_count),
+            rider_count=int(rider_count),
+            traffic_light_count=int(traffic_light_count),
+            traffic_sign_count=int(traffic_sign_count),
+            total_objects=(total_objects),
+            lane_detected=bool(lane_detected),
+            drivable_area_detected=bool(drivable_area_detected),
+            traffic_level=(traffic_level),
         )

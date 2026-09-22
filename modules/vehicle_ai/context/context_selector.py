@@ -49,14 +49,9 @@ class ContextSelection:
     ) -> dict[str, Any]:
 
         return {
-            "topics": [
-                topic.value
-                for topic in self.topics
-            ],
-            "context":
-                self.context,
-            "matched_keywords":
-                self.matched_keywords,
+            "topics": [topic.value for topic in self.topics],
+            "context": self.context,
+            "matched_keywords": self.matched_keywords,
         }
 
 
@@ -226,15 +221,9 @@ class ContextSelector:
         dict[str, list[str]],
     ]:
 
-        text = (
-            user_text
-            .strip()
-            .lower()
-        )
+        text = user_text.strip().lower()
 
-        topics: set[
-            ContextTopic
-        ] = set()
+        topics: set[ContextTopic] = set()
 
         matched: dict[
             str,
@@ -242,46 +231,21 @@ class ContextSelector:
         ] = {}
 
         groups = {
-            ContextTopic.DRIVER:
-                self.DRIVER_KEYWORDS,
-
-            ContextTopic.CLIMATE:
-                self.CLIMATE_KEYWORDS,
-
-            ContextTopic.MEDIA:
-                self.MEDIA_KEYWORDS,
-
-            ContextTopic.NAVIGATION:
-                self.NAVIGATION_KEYWORDS,
-
-            ContextTopic.ROAD:
-                self.ROAD_KEYWORDS,
-
-            ContextTopic.VEHICLE:
-                self.VEHICLE_KEYWORDS,
+            ContextTopic.DRIVER: self.DRIVER_KEYWORDS,
+            ContextTopic.CLIMATE: self.CLIMATE_KEYWORDS,
+            ContextTopic.MEDIA: self.MEDIA_KEYWORDS,
+            ContextTopic.NAVIGATION: self.NAVIGATION_KEYWORDS,
+            ContextTopic.ROAD: self.ROAD_KEYWORDS,
+            ContextTopic.VEHICLE: self.VEHICLE_KEYWORDS,
         }
 
-        for topic, keywords in (
-            groups.items()
-        ):
-
-            hits = [
-                keyword
-                for keyword in keywords
-                if keyword in text
-            ]
+        for topic, keywords in groups.items():
+            hits = [keyword for keyword in keywords if keyword in text]
 
             if hits:
+                topics.add(topic)
 
-                topics.add(
-                    topic
-                )
-
-                matched[
-                    topic.value
-                ] = sorted(
-                    hits
-                )
+                matched[topic.value] = sorted(hits)
 
         # ----------------------------------------------------
         # Domain coupling rules
@@ -289,35 +253,17 @@ class ContextSelector:
 
         # Driver fatigue questions frequently involve whether
         # the vehicle is moving.
-        if (
-            ContextTopic.DRIVER
-            in topics
-        ):
-
-            topics.add(
-                ContextTopic.VEHICLE
-            )
+        if ContextTopic.DRIVER in topics:
+            topics.add(ContextTopic.VEHICLE)
 
         # Navigation decisions should know whether the vehicle
         # is moving and current navigation state.
-        if (
-            ContextTopic.NAVIGATION
-            in topics
-        ):
-
-            topics.add(
-                ContextTopic.VEHICLE
-            )
+        if ContextTopic.NAVIGATION in topics:
+            topics.add(ContextTopic.VEHICLE)
 
         # Road questions also benefit from speed / gear.
-        if (
-            ContextTopic.ROAD
-            in topics
-        ):
-
-            topics.add(
-                ContextTopic.VEHICLE
-            )
+        if ContextTopic.ROAD in topics:
+            topics.add(ContextTopic.VEHICLE)
 
         return (
             topics,
@@ -334,11 +280,7 @@ class ContextSelector:
         vehicle_context: VehicleContext,
     ) -> ContextSelection:
 
-        topics, matched = (
-            self.detect_topics(
-                user_text
-            )
-        )
+        topics, matched = self.detect_topics(user_text)
 
         selected: dict[
             str,
@@ -349,218 +291,76 @@ class ContextSelector:
         # Driver
         # ----------------------------------------------------
 
-        if (
-            ContextTopic.DRIVER
-            in topics
-        ):
-
-            selected[
-                "driver"
-            ] = {
-                "presence":
-                    vehicle_context
-                    .driver
-                    .presence,
-
-                "state":
-                    vehicle_context
-                    .driver
-                    .state,
-
-                "risk":
-                    vehicle_context
-                    .driver
-                    .risk,
-
-                "perclos":
-                    vehicle_context
-                    .driver
-                    .perclos,
-
-                "eye_closed":
-                    vehicle_context
-                    .driver
-                    .eye_closed,
-
-                "eye_closure_seconds":
-                    vehicle_context
-                    .driver
-                    .eye_closure_seconds,
-
-                "recent_yawns":
-                    vehicle_context
-                    .driver
-                    .recent_yawns,
+        if ContextTopic.DRIVER in topics:
+            selected["driver"] = {
+                "presence": vehicle_context.driver.presence,
+                "state": vehicle_context.driver.state,
+                "risk": vehicle_context.driver.risk,
+                "perclos": vehicle_context.driver.perclos,
+                "eye_closed": vehicle_context.driver.eye_closed,
+                "eye_closure_seconds": vehicle_context.driver.eye_closure_seconds,
+                "recent_yawns": vehicle_context.driver.recent_yawns,
             }
 
         # ----------------------------------------------------
         # Climate
         # ----------------------------------------------------
 
-        if (
-            ContextTopic.CLIMATE
-            in topics
-        ):
-
-            selected[
-                "climate"
-            ] = {
-                "cabin_temperature_c":
-                    vehicle_context
-                    .vehicle
-                    .cabin_temperature_c,
-
-                "target_temperature_c":
-                    vehicle_context
-                    .vehicle
-                    .target_temperature_c,
-
-                "ac_enabled":
-                    vehicle_context
-                    .vehicle
-                    .ac_enabled,
-
-                "driver_window_open":
-                    vehicle_context
-                    .vehicle
-                    .driver_window_open,
-
-                "passenger_window_open":
-                    vehicle_context
-                    .vehicle
-                    .passenger_window_open,
+        if ContextTopic.CLIMATE in topics:
+            selected["climate"] = {
+                "cabin_temperature_c": vehicle_context.vehicle.cabin_temperature_c,
+                "target_temperature_c": vehicle_context.vehicle.target_temperature_c,
+                "ac_enabled": vehicle_context.vehicle.ac_enabled,
+                "driver_window_open": vehicle_context.vehicle.driver_window_open,
+                "passenger_window_open": vehicle_context.vehicle.passenger_window_open,
             }
 
         # ----------------------------------------------------
         # Media
         # ----------------------------------------------------
 
-        if (
-            ContextTopic.MEDIA
-            in topics
-        ):
-
-            selected[
-                "media"
-            ] = {
-                "media_playing":
-                    vehicle_context
-                    .vehicle
-                    .media_playing,
-
-                "media_title":
-                    vehicle_context
-                    .vehicle
-                    .media_title,
-
-                "volume":
-                    vehicle_context
-                    .vehicle
-                    .volume,
+        if ContextTopic.MEDIA in topics:
+            selected["media"] = {
+                "media_playing": vehicle_context.vehicle.media_playing,
+                "media_title": vehicle_context.vehicle.media_title,
+                "volume": vehicle_context.vehicle.volume,
             }
 
         # ----------------------------------------------------
         # Navigation
         # ----------------------------------------------------
 
-        if (
-            ContextTopic.NAVIGATION
-            in topics
-        ):
-
-            selected[
-                "navigation"
-            ] = {
-                "state":
-                    vehicle_context
-                    .vehicle
-                    .navigation_state,
-
-                "destination_id":
-                    vehicle_context
-                    .vehicle
-                    .navigation_destination_id,
-
-                "destination":
-                    vehicle_context
-                    .vehicle
-                    .navigation_destination,
+        if ContextTopic.NAVIGATION in topics:
+            selected["navigation"] = {
+                "state": vehicle_context.vehicle.navigation_state,
+                "destination_id": vehicle_context.vehicle.navigation_destination_id,
+                "destination": vehicle_context.vehicle.navigation_destination,
             }
 
         # ----------------------------------------------------
         # Road
         # ----------------------------------------------------
 
-        if (
-            ContextTopic.ROAD
-            in topics
-        ):
-
-            selected[
-                "road"
-            ] = {
-                "vehicle_count":
-                    vehicle_context
-                    .road
-                    .vehicle_count,
-
-                "pedestrian_count":
-                    vehicle_context
-                    .road
-                    .pedestrian_count,
-
-                "rider_count":
-                    vehicle_context
-                    .road
-                    .rider_count,
-
-                "traffic_light_count":
-                    vehicle_context
-                    .road
-                    .traffic_light_count,
-
-                "traffic_sign_count":
-                    vehicle_context
-                    .road
-                    .traffic_sign_count,
-
-                "lane_detected":
-                    vehicle_context
-                    .road
-                    .lane_detected,
-
-                "drivable_area_detected":
-                    vehicle_context
-                    .road
-                    .drivable_area_detected,
-
-                "traffic_level":
-                    vehicle_context
-                    .road
-                    .traffic_level,
+        if ContextTopic.ROAD in topics:
+            selected["road"] = {
+                "vehicle_count": vehicle_context.road.vehicle_count,
+                "pedestrian_count": vehicle_context.road.pedestrian_count,
+                "rider_count": vehicle_context.road.rider_count,
+                "traffic_light_count": vehicle_context.road.traffic_light_count,
+                "traffic_sign_count": vehicle_context.road.traffic_sign_count,
+                "lane_detected": vehicle_context.road.lane_detected,
+                "drivable_area_detected": vehicle_context.road.drivable_area_detected,
+                "traffic_level": vehicle_context.road.traffic_level,
             }
 
         # ----------------------------------------------------
         # Vehicle
         # ----------------------------------------------------
 
-        if (
-            ContextTopic.VEHICLE
-            in topics
-        ):
-
-            selected[
-                "vehicle"
-            ] = {
-                "speed_kmh":
-                    vehicle_context
-                    .vehicle
-                    .speed_kmh,
-
-                "gear":
-                    vehicle_context
-                    .vehicle
-                    .gear,
+        if ContextTopic.VEHICLE in topics:
+            selected["vehicle"] = {
+                "speed_kmh": vehicle_context.vehicle.speed_kmh,
+                "gear": vehicle_context.vehicle.gear,
             }
 
         # ----------------------------------------------------
@@ -573,8 +373,7 @@ class ContextSelector:
         return ContextSelection(
             topics=sorted(
                 topics,
-                key=lambda topic:
-                    topic.value,
+                key=lambda topic: topic.value,
             ),
             context=selected,
             matched_keywords=matched,

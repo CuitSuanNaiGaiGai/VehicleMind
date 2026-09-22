@@ -16,27 +16,18 @@ def test(
     text,
 ):
     print()
-    print(
-        "========================================"
-    )
+    print("========================================")
 
-    print(
-        f"User: {text}"
-    )
+    print(f"User: {text}")
 
-    result = (
-        selector.select(
-            user_text=text,
-            vehicle_context=context,
-        )
+    result = selector.select(
+        user_text=text,
+        vehicle_context=context,
     )
 
     print(
         "Topics:",
-        [
-            topic.value
-            for topic in result.topics
-        ],
+        [topic.value for topic in result.topics],
     )
 
     print(
@@ -44,9 +35,7 @@ def test(
         result.matched_keywords,
     )
 
-    print(
-        "Selected Context:"
-    )
+    print("Selected Context:")
 
     print(
         json.dumps(
@@ -60,9 +49,7 @@ def test(
 
 def main():
 
-    manager = (
-        ContextManager()
-    )
+    manager = ContextManager()
 
     manager.update_vehicle(
         speed_kmh=68.0,
@@ -74,15 +61,9 @@ def main():
     )
 
     manager.update_driver(
-        presence=(
-            DriverPresence.PRESENT
-        ),
-        state=(
-            DriverState.DROWSY
-        ),
-        risk=(
-            RiskLevel.HIGH
-        ),
+        presence=(DriverPresence.PRESENT),
+        state=(DriverState.DROWSY),
+        risk=(RiskLevel.HIGH),
         perclos=0.31,
         eye_closed=True,
         eye_closure_seconds=2.2,
@@ -100,13 +81,9 @@ def main():
         traffic_level="HEAVY",
     )
 
-    context = (
-        manager.get_context()
-    )
+    context = manager.get_context()
 
-    selector = (
-        ContextSelector()
-    )
+    selector = ContextSelector()
 
     test(
         selector,

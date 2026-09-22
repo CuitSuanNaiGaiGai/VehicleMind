@@ -6,73 +6,15 @@ import time
 from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
-from enum import StrEnum
 from typing import Any
 
-
-# ============================================================
-# Enum definitions
-# ============================================================
-
-
-class DriverPresence(StrEnum):
-    """
-    High-level driver presence state.
-
-    This is intentionally aligned with the output of
-    VehicleMind Cabin Intelligence.
-    """
-
-    UNKNOWN = "UNKNOWN"
-    PRESENT = "PRESENT"
-    ABSENT = "ABSENT"
-
-
-class DriverState(StrEnum):
-    """
-    High-level driver state.
-    """
-
-    UNKNOWN = "UNKNOWN"
-    WARMING_UP = "WARMING_UP"
-    NORMAL = "NORMAL"
-    SUSPECTED = "SUSPECTED"
-    DROWSY = "DROWSY"
-
-
-class RiskLevel(StrEnum):
-    """
-    Driver-related risk level.
-    """
-
-    UNKNOWN = "UNKNOWN"
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
-
-
-class GearState(StrEnum):
-    """
-    Simplified vehicle gear state.
-    """
-
-    P = "P"
-    R = "R"
-    N = "N"
-    D = "D"
-    UNKNOWN = "UNKNOWN"
-
-
-class NavigationState(StrEnum):
-    """
-    Navigation state used by the future vehicle agent.
-    """
-
-    IDLE = "IDLE"
-    SEARCHING = "SEARCHING"
-    ACTIVE = "ACTIVE"
-    ARRIVED = "ARRIVED"
-
+from modules.vehicle_ai.context.enums import (
+    DriverPresence,
+    DriverState,
+    GearState,
+    NavigationState,
+    RiskLevel,
+)
 
 # ============================================================
 # Utility
@@ -108,17 +50,11 @@ class DriverContext:
     directly consuming low-level MediaPipe landmarks.
     """
 
-    presence: DriverPresence = (
-        DriverPresence.UNKNOWN
-    )
+    presence: DriverPresence = DriverPresence.UNKNOWN
 
-    state: DriverState = (
-        DriverState.UNKNOWN
-    )
+    state: DriverState = DriverState.UNKNOWN
 
-    risk: RiskLevel = (
-        RiskLevel.UNKNOWN
-    )
+    risk: RiskLevel = RiskLevel.UNKNOWN
 
     # --------------------------------------------------------
     # Fatigue evidence
@@ -138,9 +74,7 @@ class DriverContext:
     # Metadata
     # --------------------------------------------------------
 
-    updated_at: float = field(
-        default_factory=current_timestamp
-    )
+    updated_at: float = field(default_factory=current_timestamp)
 
     source: str = "cabin_perception"
 
@@ -149,9 +83,7 @@ class DriverContext:
         Mark this context as freshly updated.
         """
 
-        self.updated_at = (
-            current_timestamp()
-        )
+        self.updated_at = current_timestamp()
 
     def age_seconds(
         self,
@@ -172,10 +104,7 @@ class DriverContext:
         now: float | None = None,
     ) -> bool:
 
-        return (
-            self.age_seconds(now)
-            <= max_age_seconds
-        )
+        return self.age_seconds(now) <= max_age_seconds
 
 
 # ============================================================
@@ -219,17 +148,13 @@ class RoadContext:
     # Metadata
     # --------------------------------------------------------
 
-    updated_at: float = field(
-        default_factory=current_timestamp
-    )
+    updated_at: float = field(default_factory=current_timestamp)
 
     source: str = "driving_perception"
 
     def touch(self) -> None:
 
-        self.updated_at = (
-            current_timestamp()
-        )
+        self.updated_at = current_timestamp()
 
     def age_seconds(
         self,
@@ -250,10 +175,7 @@ class RoadContext:
         now: float | None = None,
     ) -> bool:
 
-        return (
-            self.age_seconds(now)
-            <= max_age_seconds
-        )
+        return self.age_seconds(now) <= max_age_seconds
 
 
 # ============================================================
@@ -278,9 +200,7 @@ class VehicleStatus:
 
     speed_kmh: float = 0.0
 
-    gear: GearState = (
-        GearState.P
-    )
+    gear: GearState = GearState.P
 
     # --------------------------------------------------------
     # Climate
@@ -314,9 +234,7 @@ class VehicleStatus:
     # Navigation
     # --------------------------------------------------------
 
-    navigation_state: NavigationState = (
-        NavigationState.IDLE
-    )
+    navigation_state: NavigationState = NavigationState.IDLE
     navigation_destination_id: str | None = None
     navigation_destination: str | None = None
 
@@ -324,17 +242,13 @@ class VehicleStatus:
     # Metadata
     # --------------------------------------------------------
 
-    updated_at: float = field(
-        default_factory=current_timestamp
-    )
+    updated_at: float = field(default_factory=current_timestamp)
 
     source: str = "vehicle_state"
 
     def touch(self) -> None:
 
-        self.updated_at = (
-            current_timestamp()
-        )
+        self.updated_at = current_timestamp()
 
     def age_seconds(
         self,
@@ -355,10 +269,7 @@ class VehicleStatus:
         now: float | None = None,
     ) -> bool:
 
-        return (
-            self.age_seconds(now)
-            <= max_age_seconds
-        )
+        return self.age_seconds(now) <= max_age_seconds
 
 
 # ============================================================
@@ -384,21 +295,13 @@ class VehicleContext:
     directly accessing individual perception modules.
     """
 
-    driver: DriverContext = field(
-        default_factory=DriverContext
-    )
+    driver: DriverContext = field(default_factory=DriverContext)
 
-    road: RoadContext = field(
-        default_factory=RoadContext
-    )
+    road: RoadContext = field(default_factory=RoadContext)
 
-    vehicle: VehicleStatus = field(
-        default_factory=VehicleStatus
-    )
+    vehicle: VehicleStatus = field(default_factory=VehicleStatus)
 
-    created_at: float = field(
-        default_factory=current_timestamp
-    )
+    created_at: float = field(default_factory=current_timestamp)
 
     # ========================================================
     # Serialization
@@ -409,9 +312,7 @@ class VehicleContext:
         Full machine-readable representation.
         """
 
-        return asdict(
-            self
-        )
+        return asdict(self)
 
     def to_json(
         self,
@@ -446,119 +347,38 @@ class VehicleContext:
 
         return {
             "driver": {
-                "presence": (
-                    self.driver.presence
-                ),
-                "state": (
-                    self.driver.state
-                ),
-                "risk": (
-                    self.driver.risk
-                ),
-                "perclos": (
-                    self.driver.perclos
-                ),
-                "eye_closed": (
-                    self.driver.eye_closed
-                ),
-                "eye_closure_seconds": (
-                    self.driver
-                    .eye_closure_seconds
-                ),
-                "recent_yawns": (
-                    self.driver
-                    .recent_yawns
-                ),
+                "presence": (self.driver.presence),
+                "state": (self.driver.state),
+                "risk": (self.driver.risk),
+                "perclos": (self.driver.perclos),
+                "eye_closed": (self.driver.eye_closed),
+                "eye_closure_seconds": (self.driver.eye_closure_seconds),
+                "recent_yawns": (self.driver.recent_yawns),
             },
-
             "road": {
-                "vehicle_count": (
-                    self.road
-                    .vehicle_count
-                ),
-                "pedestrian_count": (
-                    self.road
-                    .pedestrian_count
-                ),
-                "rider_count": (
-                    self.road
-                    .rider_count
-                ),
-                "traffic_light_count": (
-                    self.road
-                    .traffic_light_count
-                ),
-                "traffic_sign_count": (
-                    self.road
-                    .traffic_sign_count
-                ),
-                "total_objects": (
-                    self.road
-                    .total_objects
-                ),
-                "lane_detected": (
-                    self.road
-                    .lane_detected
-                ),
-                "drivable_area_detected": (
-                    self.road
-                    .drivable_area_detected
-                ),
-                "traffic_level": (
-                    self.road
-                    .traffic_level
-                ),
+                "vehicle_count": (self.road.vehicle_count),
+                "pedestrian_count": (self.road.pedestrian_count),
+                "rider_count": (self.road.rider_count),
+                "traffic_light_count": (self.road.traffic_light_count),
+                "traffic_sign_count": (self.road.traffic_sign_count),
+                "total_objects": (self.road.total_objects),
+                "lane_detected": (self.road.lane_detected),
+                "drivable_area_detected": (self.road.drivable_area_detected),
+                "traffic_level": (self.road.traffic_level),
             },
-
             "vehicle": {
-                "speed_kmh": (
-                    self.vehicle
-                    .speed_kmh
-                ),
-                "gear": (
-                    self.vehicle.gear
-                ),
-                "cabin_temperature_c": (
-                    self.vehicle
-                    .cabin_temperature_c
-                ),
-                "target_temperature_c": (
-                    self.vehicle
-                    .target_temperature_c
-                ),
-                "ac_enabled": (
-                    self.vehicle
-                    .ac_enabled
-                ),
-                "driver_window_open": (
-                    self.vehicle
-                    .driver_window_open
-                ),
-                "media_playing": (
-                    self.vehicle
-                    .media_playing
-                ),
-                "media_title": (
-                    self.vehicle
-                    .media_title
-                ),
-                "volume": (
-                    self.vehicle.volume
-                ),
-                "navigation_state": (
-                    self.vehicle
-                    .navigation_state
-                ),
-
-                "navigation_destination_id": (
-                    self.vehicle
-                    .navigation_destination_id
-                ),
-
-                "navigation_destination": (
-                    self.vehicle
-                    .navigation_destination
-                ),
+                "speed_kmh": (self.vehicle.speed_kmh),
+                "gear": (self.vehicle.gear),
+                "cabin_temperature_c": (self.vehicle.cabin_temperature_c),
+                "target_temperature_c": (self.vehicle.target_temperature_c),
+                "ac_enabled": (self.vehicle.ac_enabled),
+                "driver_window_open": (self.vehicle.driver_window_open),
+                "media_playing": (self.vehicle.media_playing),
+                "media_title": (self.vehicle.media_title),
+                "volume": (self.vehicle.volume),
+                "navigation_state": (self.vehicle.navigation_state),
+                "navigation_destination_id": (self.vehicle.navigation_destination_id),
+                "navigation_destination": (self.vehicle.navigation_destination),
             },
         }
 
@@ -587,9 +407,7 @@ class VehicleContext:
         """
 
         perclos_text = (
-            "N/A"
-            if self.driver.perclos is None
-            else f"{self.driver.perclos:.3f}"
+            "N/A" if self.driver.perclos is None else f"{self.driver.perclos:.3f}"
         )
 
         return (
@@ -640,4 +458,3 @@ class VehicleContext:
             "\n"
             "=========================================\n"
         )
-

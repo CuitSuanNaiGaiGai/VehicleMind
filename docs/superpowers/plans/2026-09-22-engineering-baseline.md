@@ -229,7 +229,7 @@ git commit -m "refactor: centralize cabin perception configuration"
 - Produces: a source-size check with maximum 500 lines for `modules/**/*.py` and 300 lines for `apps/**/*_demo.py` entry points.
 - Preserves: `PanopticDrivingDetector.detect(frame) -> DrivingSceneResult` and all documented CLI commands.
 
-- [ ] **Step 1: Write the failing size-policy test**
+- [x] **Step 1: Write the failing size-policy test**
 
 ```python
 from scripts.check_source_size import find_oversized_sources
@@ -239,17 +239,17 @@ def test_source_files_respect_size_policy():
     assert find_oversized_sources() == []
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `uv run --group dev python -m pytest tests/test_source_size.py -q`
 
 Expected: FAIL listing the existing oversized modules and demo entry points.
 
-- [ ] **Step 3: Extract by responsibility without changing public APIs**
+- [x] **Step 3: Extract by responsibility without changing public APIs**
 
 Move dataclasses, ONNX session creation, preprocessing, decoding, and visual rendering into focused files. Keep entry points responsible only for argument parsing, service construction, loop orchestration, and shutdown. Remove only zero-byte modules that have no importers.
 
-- [ ] **Step 4: Verify behavior and size GREEN**
+- [x] **Step 4: Verify behavior and size GREEN**
 
 Run: `uv run --group dev python scripts/check_source_size.py`
 
@@ -259,7 +259,7 @@ Run: `uv run --group dev python -m pytest tests/test_source_size.py tests/drivin
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps modules scripts tests

@@ -21,19 +21,13 @@ def main():
     # LLM
     # ========================================================
 
-    llm = (
-        build_llm_client()
-    )
+    llm = build_llm_client()
 
     # ========================================================
     # ONE unified VehicleMind runtime
     # ========================================================
 
-    runtime = (
-        VehicleMindRuntime(
-            llm=llm
-        )
-    )
+    runtime = VehicleMindRuntime(llm=llm)
 
     # ========================================================
     # Vehicle State
@@ -88,86 +82,55 @@ def main():
     # ========================================================
 
     print()
-    print(
-        runtime.context_summary()
-    )
+    print(runtime.context_summary())
 
-    print(
-        "VehicleMind Integrated Runtime Ready"
-    )
+    print("VehicleMind Integrated Runtime Ready")
 
-    print(
-        "Type 'context' to inspect context."
-    )
+    print("Type 'context' to inspect context.")
 
-    print(
-        "Type 'quit' to exit."
-    )
+    print("Type 'quit' to exit.")
 
     # ========================================================
     # Agent CLI
     # ========================================================
 
     while True:
-
         print()
 
         try:
-
-            text = input(
-                "You > "
-            ).strip()
+            text = input("You > ").strip()
 
         except (
             KeyboardInterrupt,
             EOFError,
         ):
-
             print()
             break
 
         if not text:
-
             continue
 
-        if (
-            text.lower()
-            in {
-                "quit",
-                "exit",
-                "q",
-            }
-        ):
-
+        if text.lower() in {
+            "quit",
+            "exit",
+            "q",
+        }:
             break
 
-        if (
-            text.lower()
-            == "context"
-        ):
-
-            print(
-                runtime
-                .context_summary()
-            )
+        if text.lower() == "context":
+            print(runtime.context_summary())
 
             continue
 
         try:
-
-            answer = (
-                runtime.chat(
-                    text,
-                    debug=True,
-                )
+            answer = runtime.chat(
+                text,
+                debug=True,
             )
 
         except Exception as exc:
-
             print()
-            print(
-                "[VehicleMind ERROR]"
-            )
+            print("[VehicleMind ERROR]")
 
             print(
                 type(exc).__name__,

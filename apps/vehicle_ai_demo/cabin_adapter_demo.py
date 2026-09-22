@@ -11,9 +11,7 @@ def main():
 
     manager = ContextManager()
 
-    adapter = CabinContextAdapter(
-        manager
-    )
+    adapter = CabinContextAdapter(manager)
 
     # ========================================================
     # Simulate one Cabin Intelligence frame
@@ -30,16 +28,12 @@ def main():
         blink_count=12,
     )
 
-    print(
-        "========== NORMAL =========="
-    )
+    print("========== NORMAL ==========")
 
     for change in changes:
         print(change)
 
-    print(
-        manager.summary()
-    )
+    print(manager.summary())
 
     # ========================================================
     # Simulate fatigue
@@ -56,16 +50,12 @@ def main():
         blink_count=18,
     )
 
-    print(
-        "========== DROWSY =========="
-    )
+    print("========== DROWSY ==========")
 
     for change in changes:
         print(change)
 
-    print(
-        manager.summary()
-    )
+    print(manager.summary())
 
 
 if __name__ == "__main__":

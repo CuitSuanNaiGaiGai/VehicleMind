@@ -35,16 +35,10 @@ class BlinkDetector:
         is_blinking = False
 
         if is_closed:
-
             self.closed_frames += 1
 
         else:
-
-            if (
-                self.min_closed_frames
-                <= self.closed_frames
-                <= self.max_closed_frames
-            ):
+            if self.min_closed_frames <= self.closed_frames <= self.max_closed_frames:
                 self.blink_count += 1
                 is_blinking = True
 

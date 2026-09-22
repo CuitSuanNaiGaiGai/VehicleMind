@@ -72,13 +72,7 @@ class ContextChange:
         self,
     ) -> str:
 
-        return (
-            f"{self.domain}."
-            f"{self.field}: "
-            f"{self.old_value} "
-            f"-> "
-            f"{self.new_value}"
-        )
+        return f"{self.domain}.{self.field}: {self.old_value} -> {self.new_value}"
 
 
 # ============================================================
@@ -123,24 +117,12 @@ class ContextManager:
         self._lock = RLock()
 
         if initial_context is None:
-
-            self._context = (
-                VehicleContext()
-            )
+            self._context = VehicleContext()
 
         else:
+            self._context = deepcopy(initial_context)
 
-            self._context = (
-                deepcopy(
-                    initial_context
-                )
-            )
-
-        self._changes: deque[
-            ContextChange
-        ] = deque(
-            maxlen=max_change_history
-        )
+        self._changes: deque[ContextChange] = deque(maxlen=max_change_history)
 
     # ========================================================
     # Snapshot
@@ -157,10 +139,7 @@ class ContextManager:
         """
 
         with self._lock:
-
-            return deepcopy(
-                self._context
-            )
+            return deepcopy(self._context)
 
     def get_agent_context(
         self,
@@ -171,11 +150,7 @@ class ContextManager:
         """
 
         with self._lock:
-
-            return deepcopy(
-                self._context
-                .to_agent_context()
-            )
+            return deepcopy(self._context.to_agent_context())
 
     # ========================================================
     # Internal update
@@ -194,35 +169,22 @@ class ContextManager:
         """
 
         with self._lock:
-
             target = getattr(
                 self._context,
                 domain.value,
             )
 
-            changes: list[
-                ContextChange
-            ] = []
+            changes: list[ContextChange] = []
 
             now = time.time()
 
-            for field_name, new_value in (
-                updates.items()
-            ):
-
+            for field_name, new_value in updates.items():
                 # ------------------------------------------------
                 # Protect internal metadata.
                 # ------------------------------------------------
 
-                if field_name in (
-                    self._IGNORED_FIELDS
-                ):
-
-                    raise ValueError(
-                        "Field cannot be updated "
-                        "directly: "
-                        f"{field_name}"
-                    )
+                if field_name in (self._IGNORED_FIELDS):
+                    raise ValueError(f"Field cannot be updated directly: {field_name}")
 
                 # ------------------------------------------------
                 # Validate field.
@@ -232,11 +194,8 @@ class ContextManager:
                     target,
                     field_name,
                 ):
-
                     raise AttributeError(
-                        f"{domain.value} context "
-                        f"has no field "
-                        f"'{field_name}'"
+                        f"{domain.value} context has no field '{field_name}'"
                     )
 
                 old_value = getattr(
@@ -248,10 +207,7 @@ class ContextManager:
                 # Ignore identical values.
                 # ------------------------------------------------
 
-                if (
-                    old_value
-                    == new_value
-                ):
+                if old_value == new_value:
                     continue
 
                 # ------------------------------------------------
@@ -272,13 +228,9 @@ class ContextManager:
                     timestamp=now,
                 )
 
-                changes.append(
-                    change
-                )
+                changes.append(change)
 
-                self._changes.append(
-                    change
-                )
+                self._changes.append(change)
 
             # ----------------------------------------------------
             # Refresh timestamp only if actual state changed.
@@ -360,66 +312,45 @@ class ContextManager:
         field-level change information.
         """
 
-        data = asdict(
-            context
-        )
+        data = asdict(context)
 
         updates = {
             key: value
-            for key, value
-            in data.items()
-            if key not in (
-                self._IGNORED_FIELDS
-            )
+            for key, value in data.items()
+            if key not in (self._IGNORED_FIELDS)
         }
 
-        return self.update_driver(
-            **updates
-        )
+        return self.update_driver(**updates)
 
     def set_road_context(
         self,
         context: RoadContext,
     ) -> list[ContextChange]:
 
-        data = asdict(
-            context
-        )
+        data = asdict(context)
 
         updates = {
             key: value
-            for key, value
-            in data.items()
-            if key not in (
-                self._IGNORED_FIELDS
-            )
+            for key, value in data.items()
+            if key not in (self._IGNORED_FIELDS)
         }
 
-        return self.update_road(
-            **updates
-        )
+        return self.update_road(**updates)
 
     def set_vehicle_status(
         self,
         context: VehicleStatus,
     ) -> list[ContextChange]:
 
-        data = asdict(
-            context
-        )
+        data = asdict(context)
 
         updates = {
             key: value
-            for key, value
-            in data.items()
-            if key not in (
-                self._IGNORED_FIELDS
-            )
+            for key, value in data.items()
+            if key not in (self._IGNORED_FIELDS)
         }
 
-        return self.update_vehicle(
-            **updates
-        )
+        return self.update_vehicle(**updates)
 
     # ========================================================
     # Change history
@@ -437,16 +368,9 @@ class ContextManager:
             return []
 
         with self._lock:
+            history = list(self._changes)
 
-            history = list(
-                self._changes
-            )
-
-            return deepcopy(
-                history[
-                    -limit:
-                ]
-            )
+            return deepcopy(history[-limit:])
 
     def consume_changes(
         self,
@@ -459,23 +383,17 @@ class ContextManager:
         """
 
         with self._lock:
-
-            changes = list(
-                self._changes
-            )
+            changes = list(self._changes)
 
             self._changes.clear()
 
-            return deepcopy(
-                changes
-            )
+            return deepcopy(changes)
 
     def clear_changes(
         self,
     ) -> None:
 
         with self._lock:
-
             self._changes.clear()
 
     # ========================================================
@@ -490,59 +408,26 @@ class ContextManager:
         """
 
         with self._lock:
-
             now = time.time()
 
-            driver_age = (
-                self._context
-                .driver
-                .age_seconds(now)
-            )
+            driver_age = self._context.driver.age_seconds(now)
 
-            road_age = (
-                self._context
-                .road
-                .age_seconds(now)
-            )
+            road_age = self._context.road.age_seconds(now)
 
-            vehicle_age = (
-                self._context
-                .vehicle
-                .age_seconds(now)
-            )
+            vehicle_age = self._context.vehicle.age_seconds(now)
 
             return {
                 "driver": {
-                    "age_seconds":
-                        driver_age,
-                    "fresh":
-                        self._context
-                        .driver
-                        .is_fresh(
-                            now=now
-                        ),
+                    "age_seconds": driver_age,
+                    "fresh": self._context.driver.is_fresh(now=now),
                 },
-
                 "road": {
-                    "age_seconds":
-                        road_age,
-                    "fresh":
-                        self._context
-                        .road
-                        .is_fresh(
-                            now=now
-                        ),
+                    "age_seconds": road_age,
+                    "fresh": self._context.road.is_fresh(now=now),
                 },
-
                 "vehicle": {
-                    "age_seconds":
-                        vehicle_age,
-                    "fresh":
-                        self._context
-                        .vehicle
-                        .is_fresh(
-                            now=now
-                        ),
+                    "age_seconds": vehicle_age,
+                    "fresh": self._context.vehicle.is_fresh(now=now),
                 },
             }
 
@@ -555,8 +440,4 @@ class ContextManager:
     ) -> str:
 
         with self._lock:
-
-            return (
-                self._context
-                .summary()
-            )
+            return self._context.summary()

@@ -12,9 +12,7 @@ from modules.vehicle_ai.llm.base import (
 )
 
 
-class GLMClient(
-    BaseLLMClient
-):
+class GLMClient(BaseLLMClient):
     """
     Zhipu GLM client.
     """
@@ -25,38 +23,19 @@ class GLMClient(
         model: str | None = None,
         base_url: str | None = None,
     ):
-        self.api_key = (
-            api_key
-            or os.getenv(
-                "GLM_API_KEY"
-            )
-        )
+        self.api_key = api_key or os.getenv("GLM_API_KEY")
 
         if not self.api_key:
+            raise RuntimeError("GLM_API_KEY is not configured.")
 
-            raise RuntimeError(
-                "GLM_API_KEY "
-                "is not configured."
-            )
-
-        self.model = (
-            model
-            or os.getenv(
-                "GLM_MODEL",
-                "glm-4.5",
-            )
+        self.model = model or os.getenv(
+            "GLM_MODEL",
+            "glm-4.5",
         )
 
-        self.base_url = (
-            base_url
-            or os.getenv(
-                "GLM_BASE_URL",
-                (
-                    "https://"
-                    "open.bigmodel.cn/"
-                    "api/paas/v4"
-                ),
-            )
+        self.base_url = base_url or os.getenv(
+            "GLM_BASE_URL",
+            ("https://open.bigmodel.cn/api/paas/v4"),
         )
 
         self.client = ZhipuAI(
@@ -64,15 +43,9 @@ class GLMClient(
             base_url=self.base_url,
         )
 
-        print(
-            "[VehicleMind] "
-            "LLM provider: GLM"
-        )
+        print("[VehicleMind] LLM provider: GLM")
 
-        print(
-            "[VehicleMind] "
-            f"LLM model: {self.model}"
-        )
+        print(f"[VehicleMind] LLM model: {self.model}")
 
     def chat(
         self,
@@ -81,50 +54,24 @@ class GLMClient(
     ) -> LLMResponse:
 
         kwargs = {
-            "model":
-                self.model,
-
-            "messages":
-                messages,
-
-            "temperature":
-                0.2,
-
-            "stream":
-                False,
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.2,
+            "stream": False,
         }
 
         if tools:
+            kwargs["tools"] = tools
 
-            kwargs[
-                "tools"
-            ] = tools
+        response = self.client.chat.completions.create(**kwargs)
 
-        response = (
-            self.client
-            .chat
-            .completions
-            .create(
-                **kwargs
-            )
-        )
+        choice = response.choices[0]
 
-        choice = (
-            response
-            .choices[0]
-        )
-
-        message = (
-            choice.message
-        )
+        message = choice.message
 
         normalized_calls = []
 
-        for call in (
-            message.tool_calls
-            or []
-        ):
-
+        for call in message.tool_calls or []:
             # Only process normal function calls.
             if (
                 getattr(
@@ -136,50 +83,25 @@ class GLMClient(
             ):
                 continue
 
-            arguments_json = (
-                call
-                .function
-                .arguments
-                or "{}"
-            )
+            arguments_json = call.function.arguments or "{}"
 
             try:
-
-                arguments = (
-                    json.loads(
-                        arguments_json
-                    )
-                )
+                arguments = json.loads(arguments_json)
 
             except json.JSONDecodeError:
-
                 arguments = {}
 
             normalized_calls.append(
                 LLMToolCall(
                     id=call.id,
-                    name=(
-                        call
-                        .function
-                        .name
-                    ),
-                    arguments=(
-                        arguments
-                    ),
-                    arguments_json=(
-                        arguments_json
-                    ),
+                    name=(call.function.name),
+                    arguments=(arguments),
+                    arguments_json=(arguments_json),
                 )
             )
 
         return LLMResponse(
-            content=(
-                message.content
-            ),
-            tool_calls=(
-                normalized_calls
-            ),
-            finish_reason=(
-                choice.finish_reason
-            ),
+            content=(message.content),
+            tool_calls=(normalized_calls),
+            finish_reason=(choice.finish_reason),
         )

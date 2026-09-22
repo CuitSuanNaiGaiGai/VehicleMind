@@ -57,25 +57,13 @@ class EventBus:
         self._subscribers: dict[
             EventType,
             list[EventCallback],
-        ] = defaultdict(
-            list
-        )
+        ] = defaultdict(list)
 
-        self._global_subscribers: list[
-            EventCallback
-        ] = []
+        self._global_subscribers: list[EventCallback] = []
 
-        self._history: deque[
-            VehicleEvent
-        ] = deque(
-            maxlen=max_history
-        )
+        self._history: deque[VehicleEvent] = deque(maxlen=max_history)
 
-        self._pending: deque[
-            VehicleEvent
-        ] = deque(
-            maxlen=max_history
-        )
+        self._pending: deque[VehicleEvent] = deque(maxlen=max_history)
 
     # ========================================================
     # Subscribe
@@ -91,12 +79,7 @@ class EventBus:
         """
 
         with self._lock:
-
-            self._subscribers[
-                event_type
-            ].append(
-                callback
-            )
+            self._subscribers[event_type].append(callback)
 
     def subscribe_all(
         self,
@@ -107,10 +90,7 @@ class EventBus:
         """
 
         with self._lock:
-
-            self._global_subscribers.append(
-                callback
-            )
+            self._global_subscribers.append(callback)
 
     # ========================================================
     # Publish
@@ -125,14 +105,9 @@ class EventBus:
         """
 
         with self._lock:
+            self._history.append(event)
 
-            self._history.append(
-                event
-            )
-
-            self._pending.append(
-                event
-            )
+            self._pending.append(event)
 
             callbacks = list(
                 self._subscribers.get(
@@ -141,9 +116,7 @@ class EventBus:
                 )
             )
 
-            global_callbacks = list(
-                self._global_subscribers
-            )
+            global_callbacks = list(self._global_subscribers)
 
         # ----------------------------------------------------
         # Execute callbacks outside the lock.
@@ -153,19 +126,11 @@ class EventBus:
         # undesirable.
         # ----------------------------------------------------
 
-        for callback in (
-            global_callbacks
-        ):
-
-            callback(
-                event
-            )
+        for callback in global_callbacks:
+            callback(event)
 
         for callback in callbacks:
-
-            callback(
-                event
-            )
+            callback(event)
 
     def publish_many(
         self,
@@ -173,10 +138,7 @@ class EventBus:
     ) -> None:
 
         for event in events:
-
-            self.publish(
-                event
-            )
+            self.publish(event)
 
     # ========================================================
     # Pending events
@@ -190,12 +152,7 @@ class EventBus:
         """
 
         with self._lock:
-
-            return deepcopy(
-                list(
-                    self._pending
-                )
-            )
+            return deepcopy(list(self._pending))
 
     def consume_pending(
         self,
@@ -208,16 +165,11 @@ class EventBus:
         """
 
         with self._lock:
-
-            events = list(
-                self._pending
-            )
+            events = list(self._pending)
 
             self._pending.clear()
 
-            return deepcopy(
-                events
-            )
+            return deepcopy(events)
 
     # ========================================================
     # History
@@ -232,16 +184,9 @@ class EventBus:
             return []
 
         with self._lock:
+            history = list(self._history)
 
-            history = list(
-                self._history
-            )
-
-            return deepcopy(
-                history[
-                    -limit:
-                ]
-            )
+            return deepcopy(history[-limit:])
 
     # ========================================================
     # Clear
@@ -252,5 +197,4 @@ class EventBus:
     ) -> None:
 
         with self._lock:
-
             self._pending.clear()

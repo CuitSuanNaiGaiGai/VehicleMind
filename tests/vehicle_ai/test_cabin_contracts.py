@@ -31,9 +31,7 @@ def test_vehicle_ai_demos_use_semantic_presence() -> None:
                 continue
             for keyword in node.keywords:
                 if keyword.arg == "face_present":
-                    stale_arguments.append(
-                        f"{relative_path}:{keyword.lineno}"
-                    )
+                    stale_arguments.append(f"{relative_path}:{keyword.lineno}")
 
     assert stale_arguments == [], (
         "frame-level face_present must not be used as semantic driver "

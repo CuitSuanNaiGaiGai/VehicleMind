@@ -121,19 +121,15 @@ def draw_driver_status_panel(
     state = result.state.value
 
     if result.state == DriverState.NORMAL:
-
         state_color = (0, 220, 0)
 
     elif result.state == DriverState.SUSPECTED:
-
         state_color = (0, 200, 255)
 
     elif result.state == DriverState.DROWSY:
-
         state_color = (0, 0, 255)
 
     else:
-
         state_color = (180, 180, 180)
 
     _draw_text(
@@ -168,10 +164,7 @@ def draw_driver_status_panel(
 
     _draw_text(
         frame,
-        (
-            "Eye Closure: "
-            f"{result.continuous_eye_closure:.1f}s"
-        ),
+        (f"Eye Closure: {result.continuous_eye_closure:.1f}s"),
         x,
         271,
         scale=0.58,
@@ -211,7 +204,6 @@ def draw_driver_status_panel(
     #
 
     if result.state == DriverState.DROWSY:
-
         _draw_text(
             frame,
             "Fatigue risk detected.",
@@ -231,7 +223,6 @@ def draw_driver_status_panel(
         )
 
         if recommendation is not None:
-
             cv2.line(
                 frame,
                 (x, 470),
@@ -280,7 +271,6 @@ def draw_driver_status_panel(
             )
 
             if button_y2 > button_y1:
-
                 cv2.rectangle(
                     frame,
                     (x, button_y1),
@@ -299,7 +289,6 @@ def draw_driver_status_panel(
                 )
 
     elif result.state == DriverState.SUSPECTED:
-
         _draw_text(
             frame,
             "Please stay alert.",
@@ -311,7 +300,6 @@ def draw_driver_status_panel(
         )
 
     elif result.state == DriverState.NORMAL:
-
         _draw_text(
             frame,
             "Driver condition normal.",
@@ -322,4 +310,3 @@ def draw_driver_status_panel(
         )
 
     return frame
-
