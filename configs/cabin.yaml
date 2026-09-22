@@ -1,0 +1,29 @@
+presence:
+  present_confirm_seconds: 0.15
+  absence_timeout_seconds: 1.5
+  startup_timeout_seconds: 1.0
+
+eye:
+  ear_threshold: 0.21
+
+blink:
+  min_closed_frames: 2
+  max_closed_frames: 15
+
+perclos:
+  window_seconds: 30.0
+  min_observation_seconds: 5.0
+
+mouth:
+  mar_threshold: 0.35
+
+yawn:
+  min_open_seconds: 1.2
+
+driver_state:
+  suspected_perclos: 0.25
+  drowsy_perclos: 0.30
+  suspected_closure_seconds: 1.2
+  drowsy_closure_seconds: 2.0
+  yawn_window_seconds: 60.0
+  suspected_yawns: 2

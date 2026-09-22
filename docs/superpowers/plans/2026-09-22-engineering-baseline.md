@@ -161,7 +161,7 @@ git commit -m "fix: align cabin demos with semantic context contract"
 - Produces: `CabinPerceptionConfig.load(path: str | Path) -> CabinPerceptionConfig` and nested immutable threshold dataclasses.
 - Consumes: YAML containing `presence`, `eye`, `blink`, `perclos`, `mouth`, `yawn`, and `driver_state` mappings.
 
-- [ ] **Step 1: Write failing configuration tests**
+- [x] **Step 1: Write failing configuration tests**
 
 ```python
 from pathlib import Path
@@ -184,23 +184,23 @@ def test_invalid_perclos_threshold_is_rejected(tmp_path):
         CabinPerceptionConfig.load(path)
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `uv run --group dev python -m pytest tests/config/test_cabin_config.py -q`
 
 Expected: FAIL because `modules.config.cabin` does not exist.
 
-- [ ] **Step 3: Implement focused immutable configuration types**
+- [x] **Step 3: Implement focused immutable configuration types**
 
 Each nested dataclass validates only its own fields in `__post_init__`. `CabinPerceptionService.__init__` accepts `config: CabinPerceptionConfig | None = None`; `None` loads the repository defaults without changing existing threshold values.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `uv run --group dev python -m pytest tests/config/test_cabin_config.py -q`
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add configs/cabin.yaml modules/config modules/cabin/perception_service.py tests/config

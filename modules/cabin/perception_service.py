@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from modules.config import CabinPerceptionConfig
+
 
 from modules.cabin.face.landmarks import (
     FaceLandmarkDetector,
@@ -129,7 +131,11 @@ class CabinPerceptionService:
     def __init__(
         self,
         model_path: str | Path,
+        config: CabinPerceptionConfig | None = None,
     ):
+        if config is None:
+            config = CabinPerceptionConfig.load_default()
+
         # ====================================================
         # Face
         # ====================================================
@@ -148,9 +154,15 @@ class CabinPerceptionService:
 
         self.presence_tracker = (
             DriverPresenceTracker(
-                present_confirm_seconds=0.15,
-                absence_timeout_seconds=1.5,
-                startup_timeout_seconds=1.0,
+                present_confirm_seconds=(
+                    config.presence.present_confirm_seconds
+                ),
+                absence_timeout_seconds=(
+                    config.presence.absence_timeout_seconds
+                ),
+                startup_timeout_seconds=(
+                    config.presence.startup_timeout_seconds
+                ),
             )
         )
 
@@ -160,21 +172,23 @@ class CabinPerceptionService:
 
         self.eye_analyzer = (
             EyeStateAnalyzer(
-                ear_threshold=0.21,
+                ear_threshold=config.eye.ear_threshold,
             )
         )
 
         self.blink_detector = (
             BlinkDetector(
-                min_closed_frames=2,
-                max_closed_frames=15,
+                min_closed_frames=config.blink.min_closed_frames,
+                max_closed_frames=config.blink.max_closed_frames,
             )
         )
 
         self.perclos_estimator = (
             PerclosEstimator(
-                window_seconds=30.0,
-                min_observation_seconds=5.0,
+                window_seconds=config.perclos.window_seconds,
+                min_observation_seconds=(
+                    config.perclos.min_observation_seconds
+                ),
             )
         )
 
@@ -184,13 +198,13 @@ class CabinPerceptionService:
 
         self.mouth_analyzer = (
             MouthStateAnalyzer(
-                mar_threshold=0.35,
+                mar_threshold=config.mouth.mar_threshold,
             )
         )
 
         self.yawn_detector = (
             YawnDetector(
-                min_open_seconds=1.2,
+                min_open_seconds=config.yawn.min_open_seconds,
             )
         )
 
@@ -200,12 +214,20 @@ class CabinPerceptionService:
 
         self.driver_state_estimator = (
             DriverStateEstimator(
-                suspected_perclos=0.25,
-                drowsy_perclos=0.30,
-                suspected_closure_seconds=1.2,
-                drowsy_closure_seconds=2.0,
-                yawn_window_seconds=60.0,
-                suspected_yawns=2,
+                suspected_perclos=(
+                    config.driver_state.suspected_perclos
+                ),
+                drowsy_perclos=config.driver_state.drowsy_perclos,
+                suspected_closure_seconds=(
+                    config.driver_state.suspected_closure_seconds
+                ),
+                drowsy_closure_seconds=(
+                    config.driver_state.drowsy_closure_seconds
+                ),
+                yawn_window_seconds=(
+                    config.driver_state.yawn_window_seconds
+                ),
+                suspected_yawns=config.driver_state.suspected_yawns,
             )
         )
 
