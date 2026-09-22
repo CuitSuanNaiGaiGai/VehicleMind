@@ -35,6 +35,12 @@ def test_showcase_replay_completes_the_perception_to_action_loop() -> None:
     )
     assert result.unauthorized_sensitive_executions == 0
     assert result.remaining_scripted_responses == 0
+    assert set(result.metrics) == {
+        "total_ms",
+        "context_update_ms",
+        "agent_ms",
+        "confirmation_ms",
+    }
     assert all(assertion.passed for assertion in result.assertions)
 
 

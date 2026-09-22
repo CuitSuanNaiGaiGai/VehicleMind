@@ -522,7 +522,7 @@ Review checkpoint: report the semantic digest, scenario outcome, unauthorized ac
 - Produces: `ReplayArtifactPaths(resolved_config, run_card, summary_json, trace_json, report_html, report_css, report_js, media)`
 - Produces: `write_replay_report(result, scenario, run_snapshot, output_dir) -> ReplayArtifactPaths`
 
-- [ ] **Step 1: Write failing report tests**
+- [x] **Step 1: Write failing report tests**
 
 Use a completed `ReplayResult` and assert:
 
@@ -549,7 +549,7 @@ assert "Chain of thought" not in html
 
 Also assert refusal to overwrite an existing result directory, safe JSON embedding for `</script>` and Unicode line separators in scenario-controlled text, copied package-local media, and byte-identical `summary.json` for two semantic-equivalent runs after excluding measured durations.
 
-- [ ] **Step 2: Run report tests and verify they fail**
+- [x] **Step 2: Run report tests and verify they fail**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_replay_report.py -q
@@ -557,13 +557,13 @@ uv run --group dev python -m pytest tests/vehicle_ai/replay/test_replay_report.p
 
 Expected: import failure for `write_replay_report`.
 
-- [ ] **Step 3: Implement evidence writers**
+- [x] **Step 3: Implement evidence writers**
 
 First refactor `modules/config/snapshot.py` so `render_run_artifacts` returns the exact resolved-config YAML and run-card Markdown used by the existing `write_run_artifacts`; keep the current writer behavior unchanged and cover the shared renderer in `tests/config/test_snapshot.py`.
 
 Write the rendered `resolved_config.yaml` and `run_card.md`, complete trace JSON, and `summary.json` with scenario ID, pass/fail, semantic digest, named assertions, final context, event types, tool outcomes, unauthorized-sensitive-action count, and measured stage durations. Copy the chosen cabin/road media into `media/` and the UI CSS/JavaScript beside `report.html`. Use one staging directory followed by a directory rename so partial result packages are never published.
 
-- [ ] **Step 4: Implement the static dashboard**
+- [x] **Step 4: Implement the static dashboard**
 
 The report must contain these visible sections:
 
@@ -577,7 +577,7 @@ The report must contain these visible sections:
 
 Keep data in a JSON script element and render with `textContent`; do not interpolate scenario strings into executable JavaScript or raw HTML. Before embedding JSON, escape `<`, `>`, `&`, U+2028, and U+2029 so a value containing `</script>` cannot terminate the data element. CSS and JavaScript remain separate files and each stays under 300 lines.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 uv run --group dev python -m pytest tests/vehicle_ai/replay/test_replay_report.py tests/config/test_snapshot.py -q

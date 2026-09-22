@@ -190,6 +190,9 @@ class ReplayRunner:
 
     def run(self, scenario: ReplayScenario) -> ReplayResult:
         started = time.perf_counter()
+        context_seconds = 0.0
+        agent_seconds = 0.0
+        confirmation_seconds = 0.0
         llm = ScriptedLLMClient(scenario.responses)
         runtime = VehicleMindRuntime(llm=llm)
         recorder = TraceRecorder()
@@ -199,6 +202,7 @@ class ReplayRunner:
             for domain in ("vehicle", "cabin", "road"):
                 observation = getattr(step, domain)
                 if observation is not None:
+                    stage_started = time.perf_counter()
                     self._apply_observation(
                         runtime,
                         recorder,
@@ -206,6 +210,7 @@ class ReplayRunner:
                         domain=domain,
                         observation=observation,
                     )
+                    context_seconds += time.perf_counter() - stage_started
 
             if step.user_text is not None:
                 recorder.add(
@@ -213,7 +218,9 @@ class ReplayRunner:
                     kind="user_utterance",
                     data={"text": step.user_text},
                 )
+                stage_started = time.perf_counter()
                 answer = runtime.chat(step.user_text, debug=False)
+                agent_seconds += time.perf_counter() - stage_started
                 recorder.add(
                     at_ms=step.at_ms,
                     kind="agent_response",
@@ -243,7 +250,9 @@ class ReplayRunner:
                     raise RuntimeError(
                         "scenario requested confirmation without an action"
                     )
+                stage_started = time.perf_counter()
                 result = runtime.agent.confirm_pending(pending.action_id)
+                confirmation_seconds += time.perf_counter() - stage_started
                 recorder.add(
                     at_ms=step.at_ms,
                     kind="confirmation",
@@ -305,7 +314,12 @@ class ReplayRunner:
             semantic_sha256=semantic_digest(scenario.scenario_id, trace),
             assertions=assertions,
             final_context=context,
-            metrics={"total_ms": (time.perf_counter() - started) * 1000},
+            metrics={
+                "total_ms": (time.perf_counter() - started) * 1000,
+                "context_update_ms": context_seconds * 1000,
+                "agent_ms": agent_seconds * 1000,
+                "confirmation_ms": confirmation_seconds * 1000,
+            },
             event_types=event_types,
             successful_tools=successful_tools,
             unauthorized_sensitive_executions=unauthorized,

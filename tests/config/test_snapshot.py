@@ -12,6 +12,7 @@ from modules.config.overrides import resolve_overrides
 from modules.config.snapshot import (
     RunProvenance,
     build_run_snapshot,
+    render_run_artifacts,
     select_asset_records,
     write_run_artifacts,
 )
@@ -88,6 +89,15 @@ def test_writer_creates_machine_and_human_artifacts(tmp_path: Path) -> None:
     assert "Driving score threshold" in run_card
     assert "0.42" in run_card
     assert "No benchmark metrics are recorded" in run_card
+
+
+def test_shared_renderer_matches_written_artifacts(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    rendered = render_run_artifacts(snapshot)
+    paths = write_run_artifacts(tmp_path / "demo-001", snapshot)
+
+    assert paths.manifest.read_text(encoding="utf-8") == rendered.manifest
+    assert paths.run_card.read_text(encoding="utf-8") == rendered.run_card
 
 
 def test_writer_refuses_to_overwrite_run_artifacts(tmp_path: Path) -> None:

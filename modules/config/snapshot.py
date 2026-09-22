@@ -54,6 +54,12 @@ class RunArtifactPaths:
     run_card: Path
 
 
+@dataclass(frozen=True)
+class RunArtifactTexts:
+    manifest: str
+    run_card: str
+
+
 def _plain(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {str(key): _plain(item) for key, item in value.items()}
@@ -211,6 +217,19 @@ def _render_run_card(snapshot: Mapping[str, object]) -> str:
     return "\n".join(lines)
 
 
+def render_run_artifacts(
+    snapshot: Mapping[str, object],
+) -> RunArtifactTexts:
+    return RunArtifactTexts(
+        manifest=yaml.safe_dump(
+            _plain(snapshot),
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        run_card=_render_run_card(snapshot),
+    )
+
+
 def write_run_artifacts(
     output_dir: Path,
     snapshot: Mapping[str, object],
@@ -220,12 +239,7 @@ def write_run_artifacts(
     if output_dir.exists():
         raise FileExistsError(f"run artifact directory already exists: {output_dir}")
 
-    manifest_text = yaml.safe_dump(
-        _plain(snapshot),
-        sort_keys=False,
-        allow_unicode=True,
-    )
-    run_card_text = _render_run_card(snapshot)
+    rendered = render_run_artifacts(snapshot)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     staging_dir = Path(
         tempfile.mkdtemp(
@@ -234,8 +248,8 @@ def write_run_artifacts(
         )
     )
     try:
-        (staging_dir / manifest.name).write_text(manifest_text, encoding="utf-8")
-        (staging_dir / run_card.name).write_text(run_card_text, encoding="utf-8")
+        (staging_dir / manifest.name).write_text(rendered.manifest, encoding="utf-8")
+        (staging_dir / run_card.name).write_text(rendered.run_card, encoding="utf-8")
         staging_dir.rename(output_dir)
     finally:
         if staging_dir.exists():

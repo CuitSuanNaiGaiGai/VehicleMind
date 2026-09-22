@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VehicleMind Replay Result</title>
+    <link rel="stylesheet" href="report.css">
+    <script src="report.js" defer></script>
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">VEHICLEMIND · OFFLINE EVIDENCE</p>
+        <h1>VehicleMind Replay Result</h1>
+        <p id="scenario-description" class="subtitle"></p>
+      </div>
+      <div id="status-badge" class="status"></div>
+    </header>
+
+    <main>
+      <section class="metrics" id="headline-metrics"></section>
+
+      <section class="media-grid">
+        <article class="panel">
+          <div class="panel-title"><span>01</span> Cabin perception</div>
+          <img id="cabin-media" alt="Recorded cabin perception demonstration">
+        </article>
+        <article class="panel">
+          <div class="panel-title"><span>02</span> Road perception</div>
+          <img id="road-media" alt="Recorded road perception demonstration">
+        </article>
+      </section>
+
+      <section class="context-grid" id="context-grid"></section>
+
+      <section class="panel timeline-panel">
+        <div class="panel-title"><span>03</span> Event and action timeline</div>
+        <div id="timeline" class="timeline"></div>
+      </section>
+
+      <section class="split-grid">
+        <article class="panel">
+          <div class="panel-title"><span>04</span> Scenario assertions</div>
+          <div id="assertions"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><span>05</span> Provenance and limitations</div>
+          <div id="provenance"></div>
+          <ul id="limitations" class="limitations"></ul>
+        </article>
+      </section>
+    </main>
+
+    <script id="vehiclemind-data" type="application/json">__VEHICLEMIND_DATA__</script>
+  </body>
+</html>
