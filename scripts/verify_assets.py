@@ -114,6 +114,11 @@ def verify_assets(manifest_path: Path, root: Path) -> list[str]:
     return errors
 
 
+def validate_manifest(manifest_path: Path) -> list[str]:
+    _, errors = _load_manifest(manifest_path)
+    return errors
+
+
 def main() -> int:
     repository_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Verify VehicleMind model assets")
@@ -123,9 +128,18 @@ def main() -> int:
         default=repository_root / "assets/model_manifest.yaml",
     )
     parser.add_argument("--root", type=Path, default=repository_root)
+    parser.add_argument(
+        "--schema-only",
+        action="store_true",
+        help="Validate manifest structure without requiring local model files",
+    )
     args = parser.parse_args()
 
-    errors = verify_assets(args.manifest, args.root)
+    errors = (
+        validate_manifest(args.manifest)
+        if args.schema_only
+        else verify_assets(args.manifest, args.root)
+    )
     if errors:
         print("Asset verification failed:")
         for error in errors:

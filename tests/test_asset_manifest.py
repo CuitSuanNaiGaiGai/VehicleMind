@@ -5,10 +5,14 @@ from pathlib import Path
 
 import yaml
 
-from scripts.verify_assets import verify_assets
+from scripts.verify_assets import validate_manifest, verify_assets
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_repository_manifest_schema_is_valid() -> None:
+    assert validate_manifest(REPOSITORY_ROOT / "assets/model_manifest.yaml") == []
 
 
 def test_missing_repository_assets_have_actionable_errors(tmp_path: Path) -> None:

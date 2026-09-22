@@ -62,3 +62,7 @@ warn_unused_configs = true
 [tool.coverage.run]
 branch = true
 source = ["modules"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

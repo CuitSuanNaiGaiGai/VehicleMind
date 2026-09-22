@@ -334,7 +334,7 @@ git commit -m "docs: document environment and third-party assets"
 - CI installs only the core and development dependency groups.
 - Smoke tests run deterministic context, selector, event, tool, and cabin-adapter demos without cameras, weights, or API keys.
 
-- [ ] **Step 1: Add a failing subprocess smoke test for every core demo**
+- [x] **Step 1: Add a failing subprocess smoke test for every core demo**
 
 ```python
 import subprocess
@@ -364,17 +364,17 @@ def test_core_demo_exits_successfully(module):
     assert result.returncode == 0, result.stderr
 ```
 
-- [ ] **Step 2: Verify RED against the stale baseline, then GREEN after Task 2**
+- [x] **Step 2: Verify RED against the stale baseline, then GREEN after Task 2**
 
 Run: `uv run --group dev python -m pytest tests/smoke/test_core_demos.py -q`
 
 Expected after Task 2: all cases pass.
 
-- [ ] **Step 3: Add CI jobs**
+- [x] **Step 3: Add CI jobs**
 
 CI runs `ruff check`, `mypy` on the focused core packages, pytest with coverage, the source-size check, and asset-manifest schema validation. Hardware-dependent perception tests are explicitly marked and excluded from the default job.
 
-- [ ] **Step 4: Verify locally**
+- [x] **Step 4: Verify locally**
 
 Run: `uv run --group dev ruff check .`
 
@@ -382,7 +382,7 @@ Run: `uv run --group dev python -m pytest -q`
 
 Expected: both commands exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .github pyproject.toml tests/smoke
