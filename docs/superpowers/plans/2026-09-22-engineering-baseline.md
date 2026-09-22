@@ -413,14 +413,14 @@ Expected: all commands exit 0; core coverage is reported and no source-size viol
 
 Mark only requirements proven by the verification output. Leave `LICENSE` unchecked until the repository owner selects a license, and leave branch protection unchecked until the GitHub rule is confirmed by API readback.
 
-- [ ] **Step 3: Push and create a Pull Request**
+- [x] **Step 3: Push and create a Pull Request**
 
 ```bash
 git push -u origin codex/engineering-baseline
 gh pr create --base main --head codex/engineering-baseline --title "Establish VehicleMind engineering baseline" --body-file docs/superpowers/plans/2026-09-22-engineering-baseline.md
 ```
 
-- [ ] **Step 4: Enable and verify main protection after CI exists**
+- [x] **Step 4: Enable and verify main protection after CI exists**
 
 Require pull requests and the exact CI check names introduced in `.github/workflows/ci.yml`; query the protection endpoint afterward and save the result in the handoff report.
 
