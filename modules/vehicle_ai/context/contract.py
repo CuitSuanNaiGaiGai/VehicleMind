@@ -36,16 +36,16 @@ CONTEXT_FIELD_CONTRACTS: Mapping[str, Mapping[str, FieldContract]] = {
         "perclos": FieldContract("number", nullable=True, minimum=0, maximum=1),
         "eye_closed": FieldContract("boolean", nullable=True),
         "eye_closure_seconds": FieldContract("number", minimum=0),
-        "recent_yawns": FieldContract("integer", minimum=0),
-        "blink_count": FieldContract("integer", minimum=0),
+        "recent_yawns": FieldContract("integer", minimum=0, maximum=1_000_000),
+        "blink_count": FieldContract("integer", minimum=0, maximum=1_000_000),
     },
     "road": {
-        "vehicle_count": FieldContract("integer", minimum=0),
-        "pedestrian_count": FieldContract("integer", minimum=0),
-        "rider_count": FieldContract("integer", minimum=0),
-        "traffic_light_count": FieldContract("integer", minimum=0),
-        "traffic_sign_count": FieldContract("integer", minimum=0),
-        "total_objects": FieldContract("integer", minimum=0),
+        "vehicle_count": FieldContract("integer", minimum=0, maximum=1_000_000),
+        "pedestrian_count": FieldContract("integer", minimum=0, maximum=1_000_000),
+        "rider_count": FieldContract("integer", minimum=0, maximum=1_000_000),
+        "traffic_light_count": FieldContract("integer", minimum=0, maximum=1_000_000),
+        "traffic_sign_count": FieldContract("integer", minimum=0, maximum=1_000_000),
+        "total_objects": FieldContract("integer", minimum=0, maximum=1_000_000),
         "lane_detected": FieldContract("boolean"),
         "drivable_area_detected": FieldContract("boolean"),
         "traffic_level": FieldContract(
@@ -77,20 +77,20 @@ def _validate_field(name: str, value: object, rule: FieldContract) -> None:
             return
         raise TypeError(f"{name} cannot be null")
 
-    numeric_value: float | None = None
+    numeric_value: int | float | None = None
     if rule.kind == "boolean":
         if type(value) is not bool:
             raise TypeError(f"{name} must be a boolean")
     elif rule.kind == "integer":
         if type(value) is not int:
             raise TypeError(f"{name} must be an integer")
-        numeric_value = float(value)
+        numeric_value = value
     elif rule.kind == "number":
         if isinstance(value, bool) or not isinstance(value, int | float):
             raise TypeError(f"{name} must be a number")
-        if not math.isfinite(value):
+        if isinstance(value, float) and not math.isfinite(value):
             raise ValueError(f"{name} must be finite")
-        numeric_value = float(value)
+        numeric_value = value
     elif rule.kind == "enum":
         enum_type = rule.enum_type
         if enum_type is None:

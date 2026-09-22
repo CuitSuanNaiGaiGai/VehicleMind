@@ -10,7 +10,11 @@ from enum import StrEnum
 from threading import RLock
 from typing import Any
 
-from modules.vehicle_ai.context.contract import validate_domain_updates
+from modules.vehicle_ai.context.contract import (
+    CONTEXT_SCHEMA_VERSION,
+    CONTEXT_FIELD_CONTRACTS,
+    validate_domain_updates,
+)
 from modules.vehicle_ai.context.models import (
     DriverContext,
     RoadContext,
@@ -118,6 +122,17 @@ class ContextManager:
             self._context = VehicleContext()
 
         else:
+            if (
+                type(initial_context.schema_version) is not int
+                or initial_context.schema_version != CONTEXT_SCHEMA_VERSION
+            ):
+                raise ValueError("initial context schema_version is unsupported")
+            for domain, rules in CONTEXT_FIELD_CONTRACTS.items():
+                value = getattr(initial_context, domain)
+                validate_domain_updates(
+                    domain,
+                    {field_name: getattr(value, field_name) for field_name in rules},
+                )
             self._context = deepcopy(initial_context)
 
         self._changes: deque[ContextChange] = deque(maxlen=max_change_history)

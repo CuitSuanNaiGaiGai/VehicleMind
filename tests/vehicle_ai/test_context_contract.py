@@ -4,7 +4,12 @@ from dataclasses import fields
 
 import pytest
 
-from modules.vehicle_ai.context import ContextManager, DriverContext, RoadContext
+from modules.vehicle_ai.context import (
+    ContextManager,
+    DriverContext,
+    RoadContext,
+    VehicleContext,
+)
 from modules.vehicle_ai.context import VehicleStatus
 from modules.vehicle_ai.context.contract import (
     CONTEXT_FIELD_CONTRACTS,
@@ -96,3 +101,34 @@ def test_valid_boundaries_preserve_unknown_and_false() -> None:
     assert context.road.lane_detected is False
     assert context.road.traffic_level == "UNKNOWN"
     assert context.vehicle.volume == 0
+
+
+@pytest.mark.parametrize(
+    ("domain", "values"),
+    [
+        ("road", {"vehicle_count": 10**400}),
+        ("vehicle", {"speed_kmh": 10**400}),
+    ],
+)
+def test_huge_integer_uses_contract_error(
+    domain: str, values: dict[str, object]
+) -> None:
+    manager = ContextManager()
+    before = manager.get_context()
+
+    with pytest.raises(ValueError):
+        getattr(manager, f"update_{domain}")(**values)
+
+    assert manager.get_context() == before
+
+
+def test_invalid_initial_context_is_rejected() -> None:
+    context = VehicleContext()
+    context.vehicle.speed_kmh = -7
+    with pytest.raises(ValueError, match="speed_kmh"):
+        ContextManager(context)
+
+    context = VehicleContext()
+    context.schema_version = 99
+    with pytest.raises(ValueError, match="schema_version"):
+        ContextManager(context)
