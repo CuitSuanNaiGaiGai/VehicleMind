@@ -40,7 +40,7 @@ def test_vehicle_ai_demos_use_semantic_presence() -> None:
 
 
 def test_cabin_snapshot_models_unobserved_eye_state() -> None:
-    tree = _parse("modules/cabin/perception_service.py")
+    tree = _parse("modules/cabin/snapshot.py")
 
     annotation = None
     for node in tree.body:

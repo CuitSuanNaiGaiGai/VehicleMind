@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import time
+
 from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from modules.driving.perception.panoptic_detector import (
-    DrivingSceneResult,
-    PanopticDrivingDetector,
-)
+from modules.driving.perception.types import DrivingSceneResult
+from modules.observation import ObservationMetadata, ObservationSequencer
 
 
 # ============================================================
@@ -22,6 +22,8 @@ class DrivingPerceptionSnapshot:
     """
     High-level semantic representation of one road frame.
     """
+
+    metadata: ObservationMetadata
 
     scene_result: DrivingSceneResult
 
@@ -90,6 +92,8 @@ class DrivingPerceptionService:
         prefer_coreml: bool = True,
         warmup_runs: int = 2,
     ):
+        from modules.driving.perception.panoptic_detector import PanopticDrivingDetector
+
         self.work_width = int(work_width)
 
         self.work_height = int(work_height)
@@ -101,6 +105,8 @@ class DrivingPerceptionService:
             prefer_coreml=(prefer_coreml),
             warmup_runs=(warmup_runs),
         )
+        self._started_at = time.perf_counter()
+        self._observations = ObservationSequencer("driving_perception")
 
     # ========================================================
     # Process one frame
@@ -109,7 +115,11 @@ class DrivingPerceptionService:
     def process_frame(
         self,
         frame: np.ndarray,
+        timestamp_ms: int | None = None,
     ) -> DrivingPerceptionSnapshot:
+        processing_started = time.perf_counter()
+        if timestamp_ms is None:
+            timestamp_ms = max(0, int((processing_started - self._started_at) * 1000))
 
         # ----------------------------------------------------
         # Resize once, consistent with current scene_demo.py
@@ -249,6 +259,10 @@ class DrivingPerceptionService:
         # ====================================================
 
         return DrivingPerceptionSnapshot(
+            metadata=self._observations.next(
+                timestamp_ms=timestamp_ms,
+                processing_ms=(time.perf_counter() - processing_started) * 1000,
+            ),
             scene_result=(scene_result),
             working_frame=(working_frame),
             vehicle_count=(vehicle_count),

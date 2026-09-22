@@ -92,7 +92,14 @@ def main():
         if not ok:
             raise RuntimeError("Failed to read road frame.")
 
-        driving_result = driving.process_frame(road_frame)
+        source_fps = float(road.get(cv2.CAP_PROP_FPS))
+        frame_index = max(0, int(road.get(cv2.CAP_PROP_POS_FRAMES)) - 1)
+        source_timestamp_ms = (
+            round(frame_index * 1000 / source_fps) if source_fps > 0 else 0
+        )
+        driving_result = driving.process_frame(
+            road_frame, timestamp_ms=source_timestamp_ms
+        )
 
         print()
         print("========== DRIVING ==========")

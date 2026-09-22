@@ -237,7 +237,10 @@ def driving_worker(
             # Perception
             # --------------------------------------------
 
-            snapshot = service.process_frame(frame)
+            frame_index = max(0, int(video.get(cv2.CAP_PROP_POS_FRAMES)) - 1)
+            snapshot = service.process_frame(
+                frame, timestamp_ms=round(frame_index * 1000 / source_fps)
+            )
 
             # --------------------------------------------
             # SAME shared VehicleMind runtime
