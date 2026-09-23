@@ -11,7 +11,7 @@ SCRIPT = (
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js 不可用")
-def test_report_ui_renders_failed_assertion_and_quality_in_chinese() -> None:
+def test_report_ui_renders_bilingual_metrics_and_failed_assertion() -> None:
     harness = r"""
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -37,7 +37,11 @@ const data = {
       {name: 'tool:start_navigation', passed: true}],
   },
   trace: [
-    {at_ms: 1, kind: 'event', data: {type: 'HIGH_RISK_DETECTED', data: {risk: 'HIGH'}}},
+    {at_ms: 1, kind: 'event', data: {type: 'HIGH_RISK_DETECTED', data: {
+      risk: 'HIGH', old_state: 'NORMAL', new_state: 'DROWSY',
+      old_presence: 'UNKNOWN', new_presence: 'PRESENT',
+      old_level: 'LOW', new_level: 'MODERATE',
+    }}},
     {at_ms: 2, kind: 'confirmation', data: {
       tool_name: 'start_navigation', success: false, error: 'CONFIRMATION_EXPIRED',
     }},
@@ -65,6 +69,12 @@ assert.match(allText(roots['assertions']), /预期：ACTIVE（进行中）/);
 assert.match(allText(roots['assertions']), /实际：IDLE（未启动）/);
 assert.match(allText(roots['assertions']), /start_navigation（启动导航）/);
 assert.match(allText(roots['timeline']), /HIGH_RISK_DETECTED（检测到高风险）/);
+assert.match(allText(roots['timeline']), /old_state（原状态）/);
+assert.match(allText(roots['timeline']), /new_state（新状态）/);
+assert.match(allText(roots['timeline']), /old_presence（原在位状态）/);
+assert.match(allText(roots['timeline']), /new_presence（新在位状态）/);
+assert.match(allText(roots['timeline']), /old_level（原交通密度）/);
+assert.match(allText(roots['timeline']), /new_level（新交通密度）/);
 assert.match(allText(roots['timeline']), /错误码：CONFIRMATION_EXPIRED/);
 """
     result = subprocess.run(

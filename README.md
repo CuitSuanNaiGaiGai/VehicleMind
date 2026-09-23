@@ -22,15 +22,16 @@ VehicleMind 用离线视频与可复现的录制观测，展示“驾驶员状�
 
 ```bash
 uv sync --group dev
+VM_RUN_ID="drowsy-rest-stop-$(date +%Y%m%d-%H%M%S)-$RANDOM"
 uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
   --scenario assets/scenarios/drowsy_rest_stop.yaml \
-  --output-root runs --run-id drowsy-rest-stop-bilingual
-open runs/drowsy-rest-stop-bilingual/report.html
+  --output-root runs --run-id "$VM_RUN_ID"
+open "runs/$VM_RUN_ID/report.html"
 ```
 
 场景为“驾驶员疲劳风险升高 → 驾驶员请求查找服务区 → Agent 搜索 → 用户确认 → 启动模拟导航”。报告页面展示舱内外观测、统一上下文、风险事件、Agent 与工具时间线、断言和证据边界。结果目录还有 `summary.json`、`trace.json` 和配置快照，供自动化检查。命令参数、JSON 字段和工具名保留原协议英文；中文只用于展示层。
 
-旧报告不会自动更新；此前生成的 `runs/drowsy-rest-stop/report.html` 仍会显示旧英文页面。上面的新运行标识会生成独立的双语报告，不覆盖旧结果。结果目录不会被覆盖；再次运行时，请换一个 `--run-id` 或 `--output-root`。
+旧报告不会自动更新；此前生成的 `runs/drowsy-rest-stop/report.html` 仍会显示旧英文页面。上面的命令每次生成新的运行标识和独立双语报告，不覆盖旧结果。结果目录不会被覆盖；若手工指定 `--run-id`，请确保目录名尚未使用。
 
 本模式不需要摄像头、视频、模型权重、API Key 或网络。若工作树有未提交改动，调试时可增加 `--allow-dirty`；此类结果会标记为 dirty，不适合作为正式项目证据。
 

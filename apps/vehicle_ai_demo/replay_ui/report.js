@@ -19,6 +19,9 @@ const labels = {
   driver_window_open: "驾驶员车窗开启", media_playing: "媒体播放中",
   media_title: "媒体标题", volume: "音量", processing_ms: "处理耗时",
   old_risk: "原风险等级", new_risk: "新风险等级",
+  old_state: "原状态", new_state: "新状态",
+  old_presence: "原在位状态", new_presence: "新在位状态",
+  old_level: "原交通密度", new_level: "新交通密度",
   driver_state: "驾驶状态", vehicle_speed_kmh: "车速", poi_id: "地点标识",
   applied: "已应用", expected: "预期", actual: "实际",
 };
