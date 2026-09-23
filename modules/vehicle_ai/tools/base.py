@@ -50,6 +50,7 @@ class ToolExecutionRecord:
     confirmed: bool
     success: bool
     error: str | None
+    result_data: dict[str, Any] = field(default_factory=dict)
 
 
 # ============================================================

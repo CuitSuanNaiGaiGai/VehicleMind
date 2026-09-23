@@ -270,7 +270,6 @@ def test_agent_stages_sensitive_tool_call_instead_of_executing() -> None:
                     ),
                 ),
             ),
-            ScriptedResponse(content="Please confirm opening the window."),
         )
     )
     runtime = VehicleMindRuntime(llm=llm)
@@ -278,11 +277,96 @@ def test_agent_stages_sensitive_tool_call_instead_of_executing() -> None:
     answer = runtime.chat("Open my window", debug=False)
 
     pending = runtime.agent.pending_actions.get()
-    assert answer == "Please confirm opening the window."
+    assert answer == "车机操作已准备好，尚未执行，待确认后才会执行。"
     assert pending is not None
     assert pending.tool_name == "set_driver_window"
     assert pending.arguments == {"open": True}
     assert runtime.context_manager.get_context().vehicle.driver_window_open is False
+
+
+def test_confirmation_required_stops_tool_loop_and_does_not_claim_failure() -> None:
+    llm = ScriptedLLMClient(
+        responses=(
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="call-window",
+                        name="set_driver_window",
+                        arguments={"open": True},
+                        arguments_json='{"open": true}',
+                    ),
+                ),
+            ),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+
+    answer = runtime.chat("打开驾驶员车窗", debug=False)
+
+    assert "待确认" in answer
+    assert "尚未执行" in answer
+    assert "失败" not in answer
+    assert len(llm.requests) == 1
+    assert runtime.agent.pending_actions.get() is not None
+    assert runtime.context_manager.get_context().vehicle.driver_window_open is False
+    assert runtime.tools.execution_history()[-1].error == "CONFIRMATION_REQUIRED"
+
+
+def test_matching_pending_survives_other_blocked_call_in_same_batch() -> None:
+    llm = ScriptedLLMClient(
+        responses=(
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        "window", "set_driver_window", {"open": True}, '{"open": true}'
+                    ),
+                    LLMToolCall(
+                        "nav",
+                        "start_navigation",
+                        {"poi_id": "rest_area_001"},
+                        '{"poi_id": "rest_area_001"}',
+                    ),
+                ),
+            ),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+
+    answer = runtime.chat("打开车窗，并导航到服务区", debug=False)
+
+    assert "待确认" in answer
+    assert len(llm.requests) == 1
+    pending = runtime.agent.pending_actions.get()
+    assert pending is not None and pending.tool_name == "set_driver_window"
+    assert len(runtime.tools.execution_history()) == 1
+
+
+def test_sensitive_pending_cannot_be_replaced_by_later_search_in_batch() -> None:
+    llm = ScriptedLLMClient(
+        responses=(
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        "window", "set_driver_window", {"open": True}, '{"open": true}'
+                    ),
+                    LLMToolCall("search", "search_nearby_rest_area", {}, "{}"),
+                ),
+            ),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+
+    answer = runtime.chat("打开车窗并找服务区", debug=False)
+
+    assert "待确认" in answer
+    pending = runtime.agent.pending_actions.get()
+    assert pending is not None and pending.tool_name == "set_driver_window"
+    assert [item.name for item in runtime.tools.execution_history()] == [
+        "set_driver_window"
+    ]
 
 
 def test_explicit_refusal_clears_pending_without_calling_llm() -> None:

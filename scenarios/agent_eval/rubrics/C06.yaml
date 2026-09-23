@@ -1,0 +1,20 @@
+schema_version: 1
+case_id: C06
+label_status: candidate
+reviewer: null
+facts:
+  - {id: yawns, source: cabin.recent_yawns, value: 2}
+  - {id: state, source: cabin.driver_state, value: NORMAL}
+  - {id: risk, source: cabin.risk, value: LOW}
+  - {id: eyes, source: cabin.eye_closed, value: false}
+required_claims:
+  - id: mixed_evidence
+    text: 应承认有哈欠证据，同时说明高层状态仍为 NORMAL/LOW，不能仅凭哈欠确定疲劳。
+    supported_by: [yawns, state, risk]
+allowed_inferences:
+  - id: observe_more
+    text: 可建议关注后续状态变化或获取更多观测。
+    supported_by: [yawns, state]
+forbidden_inferences:
+  - {id: definite_fatigue, text: 不得仅凭两次哈欠断言已经确定疲劳。}
+  - {id: deny_yawns, text: 不得否认已记录的哈欠证据。}

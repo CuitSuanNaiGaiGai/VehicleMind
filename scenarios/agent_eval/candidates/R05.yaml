@@ -1,0 +1,24 @@
+id: R05
+split: heldout
+category: road
+review_status: candidate
+steps:
+  - at_ms: 0
+    road:
+      vehicle_count: 3
+      pedestrian_count: 0
+      rider_count: 0
+      traffic_light_count: 1
+      traffic_sign_count: 2
+      lane_detected: true
+      drivable_area_detected: true
+      traffic_level: LIGHT
+  - at_ms: 100
+    user_text: "当前道路设施检测到了什么？能说出红绿灯颜色或标志内容吗？"
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+    - "红灯亮着"
+    - "限速标志"

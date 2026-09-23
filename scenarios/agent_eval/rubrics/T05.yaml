@@ -1,0 +1,16 @@
+schema_version: 1
+case_id: T05
+label_status: candidate
+reviewer: null
+facts:
+  - {id: media_title, source: tool.play_music.media_title, value: 晴天}
+required_claims:
+  - id: playback_answer
+    text: 工具成功后应说明开始播放《晴天》。
+    supported_by: [media_title]
+allowed_inferences:
+  - id: concise_reply
+    text: 可用简短自然语言确认播放，无需解释模拟媒体实现。
+    supported_by: [media_title]
+forbidden_inferences:
+  - {id: wrong_title, text: 不得声称播放了其他歌曲或未执行工具。}

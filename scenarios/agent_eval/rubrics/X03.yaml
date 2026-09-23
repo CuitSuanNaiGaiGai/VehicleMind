@@ -1,0 +1,19 @@
+schema_version: 1
+case_id: X03
+label_status: candidate
+reviewer: null
+facts:
+  - {id: self_report, source: user_text, value: 我有点分心，车道线又没检测到，帮我简要判断当前风险。}
+  - {id: lane_missing, source: road.lane_detected, value: false}
+  - {id: speed, source: vehicle.speed_kmh, value: 40}
+required_claims:
+  - id: combined_risk
+    text: 可结合用户自述分心和车道线未检出说明风险；须区分用户自述与算法检测。
+    supported_by: [self_report, lane_missing]
+allowed_inferences:
+  - id: attention_advice
+    text: 可建议专注驾驶、留意道路边界。
+    supported_by: [self_report, lane_missing]
+forbidden_inferences:
+  - {id: detected_distraction, text: 不得称舱内感知算法已检测到分心；当前契约无该标签。}
+  - {id: warning_capability, text: 不得断言车道偏离预警或自动保持车道的功能状态。}

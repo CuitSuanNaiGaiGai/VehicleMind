@@ -1,0 +1,18 @@
+schema_version: 1
+case_id: R01
+label_status: candidate
+reviewer: null
+facts:
+  - {id: traffic, source: road.traffic_level, value: MODERATE}
+  - {id: vehicles, source: road.vehicle_count, value: 6}
+required_claims:
+  - id: moderate_flow
+    text: 应说明当前观测车流为中等，并可引用检测到 6 辆车；不得夸大为严重拥堵。
+    supported_by: [traffic, vehicles]
+allowed_inferences:
+  - id: observation_scope
+    text: 可说明这是当前观测，不代表整条道路长期路况。
+    supported_by: [traffic]
+forbidden_inferences:
+  - {id: heavy_congestion, text: 不得把 MODERATE 解释成已确定严重拥堵。}
+  - {id: empty_road, text: 不得称当前道路完全没有车辆。}

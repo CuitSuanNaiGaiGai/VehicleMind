@@ -33,6 +33,10 @@ class LLMResponse:
 
     finish_reason: str | None = None
 
+    response_model: str | None = None
+
+    usage: dict[str, int] | None = None
+
 
 class BaseLLMClient(ABC):
     """

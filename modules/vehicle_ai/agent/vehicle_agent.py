@@ -284,6 +284,16 @@ class VehicleAgent:
     # Chat
     # ========================================================
 
+    def _record_final_response(self, user_text: str, answer: str) -> str:
+        self.history.extend(
+            [
+                {"role": "user", "content": user_text},
+                {"role": "assistant", "content": answer},
+            ]
+        )
+        self.history = self.history[-12:]
+        return answer
+
     def chat(
         self,
         user_text: str,
@@ -349,23 +359,7 @@ class VehicleAgent:
                 ):
                     final_text = "未找到与新目标匹配的地点，未创建待确认导航。"
 
-                self.history.append(
-                    {
-                        "role": "user",
-                        "content": user_text,
-                    }
-                )
-
-                self.history.append(
-                    {
-                        "role": "assistant",
-                        "content": final_text,
-                    }
-                )
-
-                self.history = self.history[-12:]
-
-                return final_text
+                return self._record_final_response(user_text, final_text)
 
             # =================================================
             # Tool Calls
@@ -431,6 +425,13 @@ class VehicleAgent:
                     tool_result=(tool_result),
                     target=target,
                 )
+                staged = self.pending_actions.get()
+                pending_confirmation_matches = bool(
+                    tool_result.error == "CONFIRMATION_REQUIRED"
+                    and staged is not None
+                    and staged.tool_name == call.name
+                    and dict(staged.arguments) == grounded_arguments
+                )
 
                 if debug:
                     print("[Tool Result]")
@@ -463,6 +464,11 @@ class VehicleAgent:
                         "content": result_json,
                     }
                 )
+                if pending_confirmation_matches:
+                    return self._record_final_response(
+                        user_text,
+                        "车机操作已准备好，尚未执行，待确认后才会执行。",
+                    )
 
         return "本次请求涉及过多连续工具调用，已停止执行。"
 

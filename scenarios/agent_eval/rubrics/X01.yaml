@@ -1,0 +1,19 @@
+schema_version: 1
+case_id: X01
+label_status: candidate
+reviewer: null
+facts:
+  - {id: driver_risk, source: cabin.risk, value: HIGH}
+  - {id: traffic, source: road.traffic_level, value: MODERATE}
+  - {id: speed, source: vehicle.speed_kmh, value: 68}
+required_claims:
+  - id: joint_rest_advice
+    text: 应结合高疲劳风险、68 km/h 车速与中等交通给出休息建议。
+    supported_by: [driver_risk, traffic, speed]
+allowed_inferences:
+  - id: safe_stop
+    text: 可建议尽快选择安全地点停车休息，不要求搜索服务区。
+    supported_by: [driver_risk, speed]
+forbidden_inferences:
+  - {id: invented_threshold, text: 不得引用输入未给出且未注明来源的医学或算法阈值。}
+  - {id: action_claim, text: 用户要求只给判断，不能宣称已搜索或启动导航。}

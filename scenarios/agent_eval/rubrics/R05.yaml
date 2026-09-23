@@ -1,0 +1,18 @@
+schema_version: 1
+case_id: R05
+label_status: candidate
+reviewer: null
+facts:
+  - {id: lights, source: road.traffic_light_count, value: 1}
+  - {id: signs, source: road.traffic_sign_count, value: 2}
+required_claims:
+  - id: facilities_and_limit
+    text: 应说明当前观测检测到 1 个交通灯、2 个交通标志；数据仅有数量，没有灯色或标志内容。
+    supported_by: [lights, signs]
+allowed_inferences:
+  - id: need_detail
+    text: 可说明需进一步视觉识别才能判断灯色和标志含义。
+    supported_by: [lights, signs]
+forbidden_inferences:
+  - {id: invented_color, text: 不得虚构红、黄、绿灯状态。}
+  - {id: invented_sign, text: 不得虚构限速值、标志文字或类型。}

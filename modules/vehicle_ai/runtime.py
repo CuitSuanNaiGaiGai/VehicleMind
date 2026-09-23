@@ -50,6 +50,7 @@ class VehicleMindRuntime:
         self,
         llm: BaseLLMClient,
         event_timing: EventTimingConfig | None = None,
+        max_tool_rounds: int = 5,
     ):
         # ====================================================
         # Shared context
@@ -87,6 +88,7 @@ class VehicleMindRuntime:
             llm=llm,
             context_manager=(self.context_manager),
             tool_registry=(self.tools),
+            max_tool_rounds=max_tool_rounds,
         )
 
     # ========================================================
