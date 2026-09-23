@@ -107,12 +107,12 @@ def test_writer_creates_machine_and_human_artifacts(tmp_path: Path) -> None:
     assert paths.manifest.name == "resolved_config.yaml"
     assert paths.run_card.name == "run_card.md"
     assert document["provenance"]["git_commit"] == "a" * 40
-    assert "# VehicleMind Run Card" in run_card
-    assert "Git commit" in run_card
+    assert "# VehicleMind 运行卡" in run_card
+    assert "Git 提交" in run_card
     assert "2026-09-22T00:00:00Z" in run_card
-    assert "Driving score threshold" in run_card
+    assert "道路检测分数阈值" in run_card
     assert "0.42" in run_card
-    assert "No benchmark metrics are recorded" in run_card
+    assert "未记录基准评测指标" in run_card
 
 
 def test_shared_renderer_matches_written_artifacts(tmp_path: Path) -> None:

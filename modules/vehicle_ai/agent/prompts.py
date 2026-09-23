@@ -17,6 +17,8 @@ Your responsibilities are:
    environment.
 7. Prefer executing an available tool over explaining how the
    driver could manually perform the action.
+8. Respond to the driver in concise Simplified Chinese. Keep
+   tool names, argument keys, and canonical identifiers unchanged.
 
 GROUNDING RULES
 

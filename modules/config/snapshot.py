@@ -162,34 +162,34 @@ def _render_run_card(snapshot: Mapping[str, object]) -> str:
     lane = _require_mapping(perception.get("lane"), "lane configuration")
 
     lines = [
-        "# VehicleMind Run Card",
+        "# VehicleMind 运行卡",
         "",
-        "| Field | Value |",
+        "| 字段 | 数值 |",
         "|---|---|",
-        f"| Run ID | {provenance['run_id']} |",
-        f"| Created at (UTC) | {provenance['created_at_utc']} |",
-        f"| Git commit | {provenance['git_commit']} |",
-        f"| Dirty worktree | {'yes' if provenance['dirty'] else 'no'} |",
-        f"| Config SHA-256 | {snapshot['config_sha256']} |",
+        f"| 运行标识 | {provenance['run_id']} |",
+        f"| 创建时间（UTC） | {provenance['created_at_utc']} |",
+        f"| Git 提交 | {provenance['git_commit']} |",
+        f"| 工作树有未提交改动 | {'是' if provenance['dirty'] else '否'} |",
+        f"| 配置 SHA-256 | {snapshot['config_sha256']} |",
         "",
-        "## Key resolved parameters",
+        "## 关键解析参数",
         "",
-        "| Parameter | Value |",
+        "| 参数 | 数值 |",
         "|---|---|",
-        f"| Phone confidence threshold | {phone['confidence_threshold']} |",
-        f"| Driving score threshold | {driving['score_threshold']} |",
-        f"| Driving NMS threshold | {driving['nms_threshold']} |",
-        f"| Driving work size | {driving['work_width']} × {driving['work_height']} |",
-        f"| Lane smoothing | {lane['smoothing']} |",
-        f"| Lane Canny thresholds | {lane['canny_low']} / {lane['canny_high']} |",
+        f"| 手机检测置信度阈值 | {phone['confidence_threshold']} |",
+        f"| 道路检测分数阈值 | {driving['score_threshold']} |",
+        f"| 道路检测 NMS 阈值 | {driving['nms_threshold']} |",
+        f"| 道路处理尺寸 | {driving['work_width']} × {driving['work_height']} |",
+        f"| 车道平滑系数 | {lane['smoothing']} |",
+        f"| 车道 Canny 阈值 | {lane['canny_low']} / {lane['canny_high']} |",
         "",
-        "## Selected model assets",
+        "## 已选择的模型资产",
         "",
     ]
     if assets:
         lines.extend(
             [
-                "| Asset | SHA-256 | Expected path |",
+                "| 资产 | SHA-256 | 预期路径 |",
                 "|---|---|---|",
             ]
         )
@@ -200,33 +200,32 @@ def _render_run_card(snapshot: Mapping[str, object]) -> str:
                 f"| {asset['id']} | {asset['sha256']} | {asset['expected_path']} |"
             )
     else:
-        lines.append("_No model assets selected._")
+        lines.append("_未选择模型资产。_")
 
     if "events" in resolved:
         lines.extend(
             [
                 "",
-                "## Event timing",
+                "## 事件时序",
                 "",
-                "Event hold, cooldown, and sample-gap "
-                "settings are recorded in `resolved_config.yaml`.",
+                "事件持续时间、冷却时间与采样间隔设置均记录在 "
+                "`resolved_config.yaml` 中。",
             ]
         )
 
     lines.extend(
         [
             "",
-            "## Resolved configuration",
+            "## 解析后配置",
             "",
-            "- Cabin configuration: recorded in `resolved_config.yaml`",
-            "- Perception configuration: recorded in `resolved_config.yaml`",
-            "- CLI overrides: recorded in `resolved_config.yaml`",
+            "- 舱内配置：记录在 `resolved_config.yaml` 中",
+            "- 感知配置：记录在 `resolved_config.yaml` 中",
+            "- 命令行覆盖项：记录在 `resolved_config.yaml` 中",
             "",
-            "## Result status",
+            "## 结果状态",
             "",
-            "No benchmark metrics are recorded in this run artifact.",
-            "Accuracy, latency, and qualitative examples must come from a verified "
-            "evaluation pipeline.",
+            "本次运行制品未记录基准评测指标。",
+            "准确率、延迟和案例图必须由经过验证的评测流程产生。",
             "",
         ]
     )

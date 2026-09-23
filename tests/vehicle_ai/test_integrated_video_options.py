@@ -46,6 +46,7 @@ def test_integrated_demo_rejects_invalid_inference_rate(rate: str) -> None:
 
 def test_perception_only_exits_nonzero_when_pipeline_fails(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     class FailedPipeline:
         def health(self) -> dict[str, str]:
@@ -64,3 +65,6 @@ def test_perception_only_exits_nonzero_when_pipeline_fails(
     monkeypatch.setattr(integrated_demo.time, "sleep", lambda seconds: None)
 
     assert integrated_demo.main(["--perception-only", "--duration", "1"]) == 1
+    output = capsys.readouterr().out
+    assert "context  - 查看统一上下文" in output
+    assert "等待感知结果" in output

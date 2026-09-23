@@ -40,7 +40,7 @@ def test_replay_demo_creates_a_complete_passing_result(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert "PASS" in result.stdout
+    assert "通过:" in result.stdout
     result_dir = output_root / "drowsy-rest-stop"
     for name in (
         "summary.json",
@@ -72,7 +72,7 @@ def test_replay_demo_reports_invalid_scenario_without_traceback(
     )
 
     assert result.returncode != 0
-    assert "ERROR:" in result.stderr
+    assert "错误：" in result.stderr
     assert "Traceback (most recent call last)" not in result.stderr
 
 
@@ -99,7 +99,7 @@ def test_replay_demo_publishes_complete_failed_assertion_result(
     )
 
     assert result.returncode == 1
-    assert "FAIL" in result.stdout
+    assert "失败:" in result.stdout
     result_dir = output_root / "drowsy-rest-stop"
     summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
     assert summary["passed"] is False

@@ -73,12 +73,30 @@ def test_report_writes_complete_atomic_result_package(tmp_path: Path) -> None:
     summary = json.loads(paths.summary_json.read_text(encoding="utf-8"))
     assert summary["scenario_schema_version"] == scenario.schema_version
     html = paths.report_html.read_text(encoding="utf-8")
-    assert "VehicleMind Replay Result" in html
+    assert '<html lang="zh-CN">' in html
+    assert "离线回放结果" in html
+    assert "舱内观测" in html
+    assert "场景断言" in html
+    assert "录制的语义观测" in html
     assert "HIGH_RISK_DETECTED" in html
     assert "start_navigation" in html
     assert "recorded_cabin_perception" in html
     assert "context_update_ms" in html
     assert "Chain of thought" not in html
+    assert summary["successful_tools"] == [
+        "search_nearby_rest_area",
+        "start_navigation",
+    ]
+    assert "context_update" in paths.trace_json.read_text(encoding="utf-8")
+    script = paths.report_js.read_text(encoding="utf-8")
+    assert "未翻译字段" in script
+    assert "驾驶员" in script
+    assert "上下文更新" in script
+    assert "通过" in script
+    assert "预期：" in script
+    assert "实际：" in script
+    assert "已过期" in script
+    assert "错误码：" in script
 
 
 def test_report_refuses_to_overwrite_any_existing_directory(tmp_path: Path) -> None:

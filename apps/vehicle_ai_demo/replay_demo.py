@@ -38,7 +38,7 @@ def _resolve_scenario(path: Path) -> tuple[Path, str]:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a deterministic VehicleMind offline replay scenario"
+        description="运行可复现的 VehicleMind 离线回放场景"
     )
     parser.add_argument("--scenario", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, default=Path("runs"))
@@ -81,11 +81,11 @@ def _run(args: argparse.Namespace) -> int:
         args.output_root / run_id,
     )
 
-    status = "PASS" if result.passed else "FAIL"
+    status = "通过" if result.passed else "失败"
     print(f"{status}: {scenario.scenario_id}")
-    print(f"Semantic trace SHA-256: {result.semantic_sha256}")
-    print(f"Report: {paths.report_html.resolve()}")
-    print(f"Summary: {paths.summary_json.resolve()}")
+    print(f"语义追踪 SHA-256：{result.semantic_sha256}")
+    print(f"报告页面：{paths.report_html.resolve()}")
+    print(f"结果摘要：{paths.summary_json.resolve()}")
     return 0 if result.passed else 1
 
 
@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _run(args)
     except Exception as error:
-        print(f"ERROR: {error}", file=sys.stderr)
+        print(f"错误：{error}", file=sys.stderr)
         return 2
 
 

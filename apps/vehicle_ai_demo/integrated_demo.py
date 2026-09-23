@@ -8,7 +8,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from apps.vehicle_ai_demo.quality_display import format_age
+from apps.vehicle_ai_demo.terminal_display import (
+    format_context,
+    format_event,
+    format_freshness,
+    format_health,
+)
 from apps.vehicle_ai_demo.video_pipelines import (
     DEFAULT_CABIN_VIDEO,
     DEFAULT_ROAD_VIDEO,
@@ -36,19 +41,19 @@ from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
 def _positive_float(value: str) -> float:
     number = float(value)
     if not math.isfinite(number) or number <= 0:
-        raise argparse.ArgumentTypeError("value must be positive")
+        raise argparse.ArgumentTypeError("数值必须为正")
     return number
 
 
 def _positive_int(value: str) -> int:
     number = int(value)
     if number <= 0:
-        raise argparse.ArgumentTypeError("value must be positive")
+        raise argparse.ArgumentTypeError("数值必须为正")
     return number
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Offline-video VehicleMind demo")
+    parser = argparse.ArgumentParser(description="VehicleMind 离线视频协同演示")
     parser.add_argument("--cabin-video", type=Path, default=DEFAULT_CABIN_VIDEO)
     parser.add_argument("--road-video", type=Path, default=DEFAULT_ROAD_VIDEO)
     parser.add_argument("--cabin-model", type=Path, default=DEFAULT_CABIN_MODEL)
@@ -103,9 +108,9 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print("========================================")
 
-    print(" VehicleMind Integrated Vehicle AI")
+    print(" VehicleMind 舱内外与车机协同演示")
 
-    print(" Cabin + Driving + Context + LLM")
+    print(" 舱内感知 + 道路感知 + 统一上下文 + Agent")
 
     print("========================================")
 
@@ -130,45 +135,45 @@ def main(argv: list[str] | None = None) -> int:
     cabin_pipeline, road_pipeline = _start_pipelines(runtime, args)
 
     print()
-    print("[VehicleMind] Waiting for perception...")
+    print("[VehicleMind] 等待感知结果...")
 
     time.sleep(2.0)
 
     print()
-    print("[VehicleMind] Ready.")
+    print("[VehicleMind] 已就绪。")
 
-    print("Commands:")
+    print("可用命令：")
 
-    print("  context  - current unified context")
+    print("  context  - 查看统一上下文")
 
-    print("  fresh    - perception freshness")
+    print("  fresh    - 查看感知新鲜度")
 
-    print("  events   - recent semantic events")
+    print("  events   - 查看近期语义事件")
 
-    print("  health   - pipeline health and latency")
+    print("  health   - 查看流水线健康状态与延迟")
 
-    print("  quit     - exit")
+    print("  quit     - 退出")
 
     # Perception runs independently; the LLM is called only after user input.
     try:
         if args.perception_only:
             time.sleep(args.duration)
             for pipeline in (cabin_pipeline, road_pipeline):
-                print(pipeline.health())
+                print(format_health(pipeline.health()))
             errors = _pipeline_errors((cabin_pipeline, road_pipeline))
             if errors:
-                print("[VehicleMind ERROR]", "; ".join(errors))
+                print("[VehicleMind 错误]", "; ".join(errors))
                 return 1
             return 0
         while True:
             errors = _pipeline_errors((cabin_pipeline, road_pipeline))
             if errors:
-                print("[VehicleMind ERROR]", "; ".join(errors))
+                print("[VehicleMind 错误]", "; ".join(errors))
                 return 1
             print()
 
             try:
-                text = input("You > ").strip()
+                text = input("你 > ").strip()
 
             except (
                 EOFError,
@@ -190,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
                 break
 
             if command == "context":
-                print(runtime.context_summary())
+                print(format_context(runtime.context_manager.get_agent_context()))
 
                 continue
 
@@ -198,14 +203,7 @@ def main(argv: list[str] | None = None) -> int:
                 freshness = runtime.context_manager.freshness()
 
                 print()
-
-                for domain, info in freshness.items():
-                    print(
-                        f"{domain:<8} "
-                        f"age={format_age(info['age_seconds'])} "
-                        f"fresh="
-                        f"{info['fresh']}"
-                    )
+                print(format_freshness(freshness))
 
                 continue
 
@@ -213,17 +211,17 @@ def main(argv: list[str] | None = None) -> int:
                 events = runtime.event_bus.recent_events(limit=20)
 
                 if not events:
-                    print("No events.")
+                    print("暂无事件。")
 
                 else:
                     for event in events:
-                        print(event)
+                        print(format_event(event))
 
                 continue
 
             if command == "health":
                 for pipeline in (cabin_pipeline, road_pipeline):
-                    print(pipeline.health())
+                    print(format_health(pipeline.health()))
                 continue
 
             try:
@@ -234,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
 
             except Exception as exc:
                 print()
-                print("[VehicleMind ERROR]")
+                print("[VehicleMind 错误]")
 
                 print(
                     type(exc).__name__,
@@ -251,14 +249,14 @@ def main(argv: list[str] | None = None) -> int:
 
     finally:
         print()
-        print("[VehicleMind] Stopping perception...")
+        print("[VehicleMind] 正在停止感知流水线...")
 
         cabin_pipeline.stop()
         road_pipeline.stop()
         cabin_pipeline.join(timeout=5.0)
         road_pipeline.join(timeout=5.0)
 
-        print("[VehicleMind] Shutdown complete.")
+        print("[VehicleMind] 已完成退出。")
 
     return 0
 
