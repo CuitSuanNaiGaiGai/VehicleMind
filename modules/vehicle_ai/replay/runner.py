@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from modules.observation import ObservationMetadata
+from modules.config.events import EventTimingConfig
 from modules.vehicle_ai.context import GearState, NavigationState
 from modules.vehicle_ai.replay.models import ReplayObservation, ReplayScenario
 from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
@@ -23,6 +24,9 @@ from modules.vehicle_ai.runtime import VehicleMindRuntime
 
 class ReplayRunner:
     """Apply a validated semantic scenario to one shared VehicleMind runtime."""
+
+    def __init__(self, event_timing: EventTimingConfig | None = None) -> None:
+        self.event_timing = event_timing
 
     def _record_observation(
         self,
@@ -107,7 +111,7 @@ class ReplayRunner:
             elif domain == "road":
                 runtime.update_driving(metadata=metadata, at_ms=at_ms)
             else:
-                runtime.context_manager.mark_invalid_observation("vehicle", metadata)
+                runtime.update_vehicle(metadata=metadata)
             return
         values: dict[str, Any] = dict(observation.values)
         if domain == "cabin":
@@ -115,7 +119,9 @@ class ReplayRunner:
         elif domain == "road":
             events = runtime.update_driving(metadata=metadata, at_ms=at_ms, **values)
         else:
-            events = runtime.update_vehicle(**self._vehicle_values(values))
+            events = runtime.update_vehicle(
+                metadata=metadata, **self._vehicle_values(values)
+            )
         self._record_events(recorder, at_ms=at_ms, events=events)
 
     def _record_new_tools(
@@ -210,7 +216,7 @@ class ReplayRunner:
         agent_seconds = 0.0
         confirmation_seconds = 0.0
         llm = ScriptedLLMClient(scenario.responses)
-        runtime = VehicleMindRuntime(llm=llm)
+        runtime = VehicleMindRuntime(llm=llm, event_timing=self.event_timing)
         recorder = TraceRecorder()
         tool_index = 0
         observation_sequences = {"vehicle": 0, "cabin": 0, "road": 0}

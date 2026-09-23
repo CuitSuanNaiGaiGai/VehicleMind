@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from modules.vehicle_ai.context.models import VehicleContext
 from modules.vehicle_ai.events import EventDetector, EventType
 from modules.vehicle_ai.events.temporal_gate import TemporalGate
@@ -50,6 +52,19 @@ def test_road_loss_requires_prior_positive_observation_and_hold() -> None:
     events = detector.observe_hazards("road", context, at_ms=700)
 
     assert [event.type for event in events] == [EventType.LANE_LOST]
+
+
+def test_unknown_lane_observation_cannot_be_coerced_into_loss() -> None:
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient((ScriptedResponse(content="unused"),))
+    )
+    runtime.update_driving(at_ms=0, lane_detected=True)
+
+    with pytest.raises(TypeError):
+        runtime.update_driving(at_ms=100, lane_detected=None)
+
+    assert runtime.context_manager.get_context().road.lane_detected is True
+    assert runtime.update_driving(at_ms=700, lane_detected=True) == []
 
 
 def test_driver_high_risk_requires_second_observation() -> None:

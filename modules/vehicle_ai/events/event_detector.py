@@ -150,11 +150,11 @@ class EventDetector:
         elif domain == "road":
             lane = context.road.lane_detected
             area = context.road.drivable_area_detected
-            if lane:
+            if lane is True:
                 self._seen_lane = True
-            if area:
+            if area is True:
                 self._seen_area = True
-            if self._lane_gate.observe(self._seen_lane and not lane, at_ms=at_ms):
+            if self._lane_gate.observe(self._seen_lane and lane is False, at_ms=at_ms):
                 events.append(
                     VehicleEvent(
                         type=EventType.LANE_LOST,
@@ -164,7 +164,7 @@ class EventDetector:
                         data={"lane_detected": False},
                     )
                 )
-            if self._area_gate.observe(self._seen_area and not area, at_ms=at_ms):
+            if self._area_gate.observe(self._seen_area and area is False, at_ms=at_ms):
                 events.append(
                     VehicleEvent(
                         type=EventType.DRIVABLE_AREA_LOST,

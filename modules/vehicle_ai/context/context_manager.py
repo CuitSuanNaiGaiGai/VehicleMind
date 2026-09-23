@@ -298,6 +298,7 @@ class ContextManager:
 
     def update_vehicle(
         self,
+        observation: ObservationMetadata | None = None,
         **updates: Any,
     ) -> list[ContextChange]:
         """
@@ -307,6 +308,7 @@ class ContextManager:
         return self._update_domain(
             ContextDomain.VEHICLE,
             updates,
+            observation,
         )
 
     # ========================================================

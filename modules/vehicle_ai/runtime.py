@@ -29,6 +29,7 @@ from modules.vehicle_ai.tools import (
     build_default_tool_registry,
 )
 from modules.observation import ObservationMetadata
+from modules.config.events import EventTimingConfig
 
 
 class VehicleMindRuntime:
@@ -48,6 +49,7 @@ class VehicleMindRuntime:
     def __init__(
         self,
         llm: BaseLLMClient,
+        event_timing: EventTimingConfig | None = None,
     ):
         # ====================================================
         # Shared context
@@ -67,7 +69,7 @@ class VehicleMindRuntime:
         # Semantic event infrastructure
         # ====================================================
 
-        self.event_detector = EventDetector()
+        self.event_detector = EventDetector(timing=event_timing)
 
         self.event_bus = EventBus()
 
@@ -157,9 +159,13 @@ class VehicleMindRuntime:
 
     def update_vehicle(
         self,
+        metadata: ObservationMetadata | None = None,
         **kwargs,
     ):
-        changes = self.context_manager.update_vehicle(**kwargs)
+        if metadata is not None and not metadata.valid:
+            self.context_manager.mark_invalid_observation("vehicle", metadata)
+            return []
+        changes = self.context_manager.update_vehicle(observation=metadata, **kwargs)
 
         return self._process_changes(changes)
 

@@ -13,6 +13,7 @@ from typing import Any
 import yaml
 
 from modules.config.cabin import CabinPerceptionConfig
+from modules.config.events import EventTimingConfig
 from modules.config.perception import PerceptionConfig
 
 
@@ -82,6 +83,7 @@ def build_run_snapshot(
     *,
     cabin: CabinPerceptionConfig,
     perception: PerceptionConfig,
+    events: EventTimingConfig | None = None,
     overrides: Mapping[str, object],
     assets: Sequence[Mapping[str, object]],
     provenance: RunProvenance,
@@ -98,6 +100,8 @@ def build_run_snapshot(
         "perception": _plain(asdict(perception)),
         "overrides": _plain(dict(overrides)),
     }
+    if events is not None:
+        configuration["events"] = _plain(asdict(events))
     config_sha256 = hashlib.sha256(
         _canonical_yaml(configuration).encode("utf-8")
     ).hexdigest()
@@ -108,6 +112,7 @@ def build_run_snapshot(
         "resolved_config": {
             "cabin": configuration["cabin"],
             "perception": configuration["perception"],
+            **({"events": configuration["events"]} if events is not None else {}),
         },
         "overrides": configuration["overrides"],
         "model_assets": [_plain(dict(asset)) for asset in assets],
@@ -196,6 +201,17 @@ def _render_run_card(snapshot: Mapping[str, object]) -> str:
             )
     else:
         lines.append("_No model assets selected._")
+
+    if "events" in resolved:
+        lines.extend(
+            [
+                "",
+                "## Event timing",
+                "",
+                "Event hold, cooldown, and sample-gap "
+                "settings are recorded in `resolved_config.yaml`.",
+            ]
+        )
 
     lines.extend(
         [

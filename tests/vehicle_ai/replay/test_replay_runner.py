@@ -4,8 +4,17 @@ from dataclasses import replace
 from pathlib import Path
 
 from modules.vehicle_ai.replay import load_replay_scenario
-from modules.vehicle_ai.replay.models import ExpectedOutcome, ReplayStep, freeze_mapping
+from modules.vehicle_ai.replay.models import (
+    ExpectedOutcome,
+    ReplayObservation,
+    ReplayStep,
+    ScriptedResponse,
+    freeze_mapping,
+)
 from modules.vehicle_ai.replay.runner import ReplayRunner
+from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
+from modules.vehicle_ai.replay.trace import TraceRecorder
+from modules.vehicle_ai.runtime import VehicleMindRuntime
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -114,3 +123,28 @@ def test_invalid_replay_frame_breaks_high_risk_hold() -> None:
     result = ReplayRunner().run(modified)
 
     assert "HIGH_RISK_DETECTED" not in result.event_types
+
+
+def test_valid_vehicle_replay_observation_keeps_metadata() -> None:
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient((ScriptedResponse(content="unused"),))
+    )
+    observation = ReplayObservation(
+        source="recorded_vehicle_state",
+        confidence=1.0,
+        valid=True,
+        values=freeze_mapping({"speed_kmh": 30.0}),
+    )
+
+    ReplayRunner()._apply_observation(
+        runtime,
+        TraceRecorder(),
+        at_ms=100,
+        sequence=0,
+        domain="vehicle",
+        observation=observation,
+    )
+
+    quality = runtime.context_manager.observation_quality("vehicle")
+    assert quality["metadata"].source == "recorded_vehicle_state"
+    assert quality["status"] == "KNOWN"
