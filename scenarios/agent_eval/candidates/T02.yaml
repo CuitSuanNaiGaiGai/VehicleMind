@@ -1,0 +1,14 @@
+id: T02
+split: dev
+category: tool
+review_status: candidate
+steps:
+  - user_text: "空调现在是什么状态？"
+expected:
+  tools:
+    - name: get_climate_status
+      arguments: {}
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+    - "已打开空调"

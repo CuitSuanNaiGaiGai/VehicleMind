@@ -23,6 +23,8 @@ class QwenClient(BaseLLMClient):
         api_key: str | None = None,
         model: str | None = None,
         base_url: str | None = None,
+        timeout_seconds: float = 30.0,
+        temperature: float = 0.2,
     ):
         self.api_key = api_key or os.getenv("DASHSCOPE_API_KEY")
 
@@ -42,7 +44,11 @@ class QwenClient(BaseLLMClient):
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
+            timeout=timeout_seconds,
+            max_retries=0,
         )
+        self.temperature = temperature
+        self.timeout_seconds = timeout_seconds
 
         print("[VehicleMind] LLM provider: Qwen")
 
@@ -57,7 +63,7 @@ class QwenClient(BaseLLMClient):
         kwargs = {
             "model": self.model,
             "messages": messages,
-            "temperature": 0.2,
+            "temperature": self.temperature,
             # Function calling is easier to
             # maintain without preserved CoT.
             "extra_body": {
@@ -100,4 +106,13 @@ class QwenClient(BaseLLMClient):
             content=(message.content),
             tool_calls=(normalized_calls),
             finish_reason=(choice.finish_reason),
+            response_model=getattr(response, "model", None),
+            usage=(
+                {
+                    "input_tokens": response.usage.prompt_tokens,
+                    "output_tokens": response.usage.completion_tokens,
+                }
+                if getattr(response, "usage", None) is not None
+                else None
+            ),
         )

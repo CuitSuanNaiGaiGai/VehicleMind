@@ -176,6 +176,7 @@ class ToolRegistry:
                 confirmed=confirmed,
                 success=result.success,
                 error=result.error,
+                result_data=deepcopy(result.data),
             )
         )
         return result

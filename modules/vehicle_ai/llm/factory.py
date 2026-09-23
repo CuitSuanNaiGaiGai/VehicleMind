@@ -17,19 +17,26 @@ from modules.vehicle_ai.llm.qwen_client import (
 
 def build_llm_client(
     provider: str | None = None,
+    *,
+    model: str | None = None,
+    timeout_seconds: float = 30.0,
+    temperature: float = 0.2,
 ) -> BaseLLMClient:
 
-    provider = provider or os.getenv(
+    selected_provider = provider or os.getenv(
         "VEHICLEMIND_LLM_PROVIDER",
         "qwen",
     )
-
-    provider = provider.strip().lower()
+    provider = (selected_provider or "qwen").strip().lower()
 
     if provider == "qwen":
-        return QwenClient()
+        return QwenClient(
+            model=model, timeout_seconds=timeout_seconds, temperature=temperature
+        )
 
     if provider == "glm":
-        return GLMClient()
+        return GLMClient(
+            model=model, timeout_seconds=timeout_seconds, temperature=temperature
+        )
 
     raise ValueError(f"Unsupported LLM provider: {provider}")
