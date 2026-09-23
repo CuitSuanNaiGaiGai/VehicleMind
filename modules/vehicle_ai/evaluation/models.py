@@ -66,9 +66,14 @@ class EvaluationCase:
                 raise ValueError(f"expected.{field} must be a text list")
         for step in data["steps"]:
             if not isinstance(step, dict) or set(step) - {
-                "cabin", "road", "vehicle", "user_text", "confirm_pending", "reject_pending"
+                "at_ms", "cabin", "road", "vehicle", "user_text",
+                "confirm_pending", "reject_pending"
             }:
                 raise ValueError("invalid step")
+            if "at_ms" in step and (
+                type(step["at_ms"]) is not int or step["at_ms"] < 0
+            ):
+                raise ValueError("step.at_ms must be a non-negative integer")
             for domain in ("cabin", "road", "vehicle"):
                 if domain in step and not isinstance(step[domain], dict):
                     raise ValueError(f"step.{domain} must be a mapping")

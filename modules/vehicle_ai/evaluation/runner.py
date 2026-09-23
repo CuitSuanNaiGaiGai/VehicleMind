@@ -32,6 +32,7 @@ class TrialResult:
     requested_tools: tuple[dict[str, Any], ...]
     requests: tuple[dict[str, Any], ...]
     settings: dict[str, Any]
+    interaction_events: tuple[dict[str, Any], ...]
 
 
 class RecordingClient(BaseLLMClient):
@@ -72,14 +73,15 @@ def run_trial(
         json.dumps(runtime.tools.llm_schemas(), sort_keys=True).encode()
     ).hexdigest()
     replies: list[str] = []
+    interaction_events: list[dict[str, Any]] = []
     error = None
     started = time.perf_counter()
     try:
         for step in case.steps:
             if "cabin" in step:
-                runtime.update_cabin(**step["cabin"])
+                runtime.update_cabin(at_ms=step.get("at_ms"), **step["cabin"])
             if "road" in step:
-                runtime.update_driving(**step["road"])
+                runtime.update_driving(at_ms=step.get("at_ms"), **step["road"])
             if "vehicle" in step:
                 vehicle = dict(step["vehicle"])
                 if "gear" in vehicle:
@@ -90,15 +92,30 @@ def run_trial(
                     )
                 runtime.update_vehicle(**vehicle)
             if "user_text" in step:
-                replies.append(runtime.chat(step["user_text"], debug=False))
+                reply = runtime.chat(step["user_text"], debug=False)
+                replies.append(reply)
+                interaction_events.append({
+                    "kind": "agent_reply", "at_ms": step.get("at_ms"),
+                    "text": reply,
+                })
             if step.get("confirm_pending"):
                 pending = runtime.agent.pending_actions.get()
                 if pending is not None:
-                    runtime.agent.confirm_pending(pending.action_id)
+                    confirmation = runtime.agent.confirm_pending(pending.action_id)
+                    interaction_events.append({
+                        "kind": "confirmation", "at_ms": step.get("at_ms"),
+                        "success": confirmation.success,
+                        "error": confirmation.error,
+                        "result": plain_value(confirmation.to_dict()),
+                    })
             if step.get("reject_pending"):
                 pending = runtime.agent.pending_actions.get()
                 if pending is not None:
-                    runtime.agent.reject_pending(pending.action_id)
+                    rejection = runtime.agent.reject_pending(pending.action_id)
+                    interaction_events.append({
+                        "kind": "rejection", "at_ms": step.get("at_ms"),
+                        "success": rejection.success, "error": rejection.error,
+                    })
         if any(not reply.strip() for reply in replies):
             error = "EmptyResponse"
     except Exception as exc:
@@ -145,4 +162,5 @@ def run_trial(
             "max_tool_rounds": max_tool_rounds,
             "client_max_retries": 0,
         },
+        interaction_events=tuple(interaction_events),
     )
