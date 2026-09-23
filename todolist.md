@@ -99,7 +99,7 @@
 - [x] 在 ToolRegistry 执行层强制检查 `requires_confirmation`，不能只依赖 Prompt。
 - [x] 未获得有效确认时，导航或其他敏感动作返回 `CONFIRMATION_REQUIRED`。
 - [x] 用户确认后只能执行 PendingAction 保存的原始工具名和规范化参数。
-- [ ] 用户拒绝、修改目标或确认超时后清除 PendingAction。
+- [x] 用户明确拒绝、修改目标或确认超时后清除 PendingAction；模糊说法留待 Agent 自动化评测统计。
 - [x] 确认 action ID 一次性使用且具有过期机制，重放必须失败。
 - [x] 工具执行失败、参数错误、未知工具和确认不匹配返回稳定结构化错误。
 - [ ] 工具定义读操作、可逆写操作和敏感动作三个风险等级。

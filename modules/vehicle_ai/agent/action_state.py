@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from types import MappingProxyType
 from collections.abc import Mapping
+from threading import RLock
 from typing import Any
 
 
@@ -146,6 +147,7 @@ class PendingActionStore:
         self,
     ):
         self._pending: PendingAction | None = None
+        self._lock = RLock()
 
     # ========================================================
     # Set
@@ -156,7 +158,8 @@ class PendingActionStore:
         action: PendingAction,
     ) -> None:
 
-        self._pending = action
+        with self._lock:
+            self._pending = action
 
     # ========================================================
     # Get
@@ -166,15 +169,13 @@ class PendingActionStore:
         self,
     ) -> PendingAction | None:
 
-        if self._pending is None:
-            return None
-
-        if self._pending.is_expired():
-            self._pending = None
-
-            return None
-
-        return self._pending
+        with self._lock:
+            if self._pending is None:
+                return None
+            if self._pending.is_expired():
+                self._pending = None
+                return None
+            return self._pending
 
     # ========================================================
     # Clear
@@ -184,14 +185,16 @@ class PendingActionStore:
         self,
     ) -> None:
 
-        self._pending = None
+        with self._lock:
+            self._pending = None
 
     def reject(self, action_id: str) -> bool:
-        action = self.get()
-        if action is None or action.action_id != action_id:
-            return False
-        self.clear()
-        return True
+        with self._lock:
+            action = self.get()
+            if action is None or action.action_id != action_id:
+                return False
+            self.clear()
+            return True
 
     def consume(
         self,
@@ -199,15 +202,16 @@ class PendingActionStore:
     ) -> ConfirmedAction | None:
         """Consume one matching live action and return its exact execution grant."""
 
-        action = self.get()
-        if action is None or action.action_id != action_id:
-            return None
-        self.clear()
-        return ConfirmedAction(
-            action_id=action.action_id,
-            tool_name=action.tool_name,
-            arguments=_freeze_value(action.arguments),
-        )
+        with self._lock:
+            action = self.get()
+            if action is None or action.action_id != action_id:
+                return None
+            self.clear()
+            return ConfirmedAction(
+                action_id=action.action_id,
+                tool_name=action.tool_name,
+                arguments=_freeze_value(action.arguments),
+            )
 
     # ========================================================
     # Agent representation
