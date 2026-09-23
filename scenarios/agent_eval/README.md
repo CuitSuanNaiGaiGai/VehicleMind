@@ -21,3 +21,5 @@
 ```
 
 运行记录位于新的 `runs/agent_eval/pilot-时间戳-provider/` 目录。`pilot.json` 是逐条落盘的清单；每条的 `trial.json` 含原始模型请求、回复、工具请求/结果和交互事件。测试集目前仍是候选，不要从 `needs_review` 推算成功率。具体标注疑点见 [候选标签审查记录](candidates/REVIEW.md)。
+
+候选场景的回答依据 rubric 位于 `rubrics/`；如何导出隐藏模型身份的审查材料、记录人工决定及理解 `formal_eligible`，见[中文盲审说明](../../docs/reports/2026-09-23-agent-grounding-review-guide.md)。
