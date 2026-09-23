@@ -1,13 +1,22 @@
 from __future__ import annotations
 
-import threading
+import argparse
+import math
 import time
 
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-from apps.vehicle_ai_demo.integrated_workers import cabin_worker, driving_worker
 from apps.vehicle_ai_demo.quality_display import format_age
+from apps.vehicle_ai_demo.video_pipelines import (
+    DEFAULT_CABIN_VIDEO,
+    DEFAULT_ROAD_VIDEO,
+    DEFAULT_CABIN_MODEL,
+    DEFAULT_ROAD_MODEL,
+    build_cabin_pipeline,
+    build_road_pipeline,
+)
 
 from modules.vehicle_ai.context import (
     GearState,
@@ -20,9 +29,74 @@ from modules.vehicle_ai.llm import (
 from modules.vehicle_ai.runtime import (
     VehicleMindRuntime,
 )
+from modules.vehicle_ai.replay.models import ScriptedResponse
+from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
 
 
-def main():
+def _positive_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("value must be positive")
+    return number
+
+
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError("value must be positive")
+    return number
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Offline-video VehicleMind demo")
+    parser.add_argument("--cabin-video", type=Path, default=DEFAULT_CABIN_VIDEO)
+    parser.add_argument("--road-video", type=Path, default=DEFAULT_ROAD_VIDEO)
+    parser.add_argument("--cabin-model", type=Path, default=DEFAULT_CABIN_MODEL)
+    parser.add_argument("--road-model", type=Path, default=DEFAULT_ROAD_MODEL)
+    parser.add_argument("--cabin-hz", type=_positive_float, default=12.0)
+    parser.add_argument("--road-hz", type=_positive_float, default=8.0)
+    parser.add_argument("--frame-capacity", type=_positive_int, default=2)
+    parser.add_argument("--perception-only", action="store_true")
+    parser.add_argument("--duration", type=_positive_float, default=5.0)
+    return parser.parse_args(argv)
+
+
+def _start_pipelines(runtime: VehicleMindRuntime, args: argparse.Namespace):
+    cabin = build_cabin_pipeline(
+        runtime,
+        video_path=args.cabin_video,
+        model_path=args.cabin_model,
+        inference_hz=args.cabin_hz,
+        frame_capacity=args.frame_capacity,
+    )
+    cabin.start()
+    try:
+        road = build_road_pipeline(
+            runtime,
+            video_path=args.road_video,
+            model_path=args.road_model,
+            inference_hz=args.road_hz,
+            frame_capacity=args.frame_capacity,
+        )
+        road.start()
+    except Exception:
+        cabin.stop()
+        cabin.join(timeout=5)
+        raise
+    return cabin, road
+
+
+def _pipeline_errors(pipelines: tuple) -> list[str]:
+    return [
+        f"{health.get('name', 'pipeline')}: {health['last_error']}"
+        for pipeline in pipelines
+        if (health := pipeline.health()).get("last_error")
+    ]
+
+
+def main(argv: list[str] | None = None) -> int:
+
+    args = parse_args(argv)
 
     load_dotenv()
 
@@ -35,27 +109,15 @@ def main():
 
     print("========================================")
 
-    # ========================================================
-    # LLM
-    # ========================================================
-
-    llm = build_llm_client()
-
-    # ========================================================
-    # ONE runtime
-    # ONE ContextManager
-    # ONE Agent
-    # ========================================================
+    llm = (
+        ScriptedLLMClient((ScriptedResponse(content="unused"),))
+        if args.perception_only
+        else build_llm_client()
+    )
 
     runtime = VehicleMindRuntime(llm=llm)
 
-    # ========================================================
-    # Mock vehicle state
-    #
-    # Later this can be replaced by Android Vehicle API /
-    # CAN / simulator.
-    # ========================================================
-
+    # The vehicle state is simulated until a vehicle interface is available.
     runtime.context_manager.update_vehicle(
         speed_kmh=68.0,
         gear=GearState.D,
@@ -65,43 +127,7 @@ def main():
         volume=25,
     )
 
-    # ========================================================
-    # Stop signal shared by workers
-    # ========================================================
-
-    stop_event = threading.Event()
-
-    # ========================================================
-    # Workers
-    # ========================================================
-
-    cabin_thread = threading.Thread(
-        target=cabin_worker,
-        args=(
-            runtime,
-            stop_event,
-        ),
-        name=("CabinPerception"),
-        daemon=True,
-    )
-
-    driving_thread = threading.Thread(
-        target=driving_worker,
-        args=(
-            runtime,
-            stop_event,
-        ),
-        name=("DrivingPerception"),
-        daemon=True,
-    )
-
-    cabin_thread.start()
-
-    driving_thread.start()
-
-    # ========================================================
-    # Give perception a short startup window
-    # ========================================================
+    cabin_pipeline, road_pipeline = _start_pipelines(runtime, args)
 
     print()
     print("[VehicleMind] Waiting for perception...")
@@ -119,17 +145,26 @@ def main():
 
     print("  events   - recent semantic events")
 
+    print("  health   - pipeline health and latency")
+
     print("  quit     - exit")
 
-    # ========================================================
-    # Agent loop
-    #
-    # LLM runs ONLY when the user speaks.
-    # Perception continues independently.
-    # ========================================================
-
+    # Perception runs independently; the LLM is called only after user input.
     try:
+        if args.perception_only:
+            time.sleep(args.duration)
+            for pipeline in (cabin_pipeline, road_pipeline):
+                print(pipeline.health())
+            errors = _pipeline_errors((cabin_pipeline, road_pipeline))
+            if errors:
+                print("[VehicleMind ERROR]", "; ".join(errors))
+                return 1
+            return 0
         while True:
+            errors = _pipeline_errors((cabin_pipeline, road_pipeline))
+            if errors:
+                print("[VehicleMind ERROR]", "; ".join(errors))
+                return 1
             print()
 
             try:
@@ -147,10 +182,6 @@ def main():
 
             command = text.lower()
 
-            # --------------------------------------------
-            # Quit
-            # --------------------------------------------
-
             if command in {
                 "q",
                 "quit",
@@ -158,18 +189,10 @@ def main():
             }:
                 break
 
-            # --------------------------------------------
-            # Context
-            # --------------------------------------------
-
             if command == "context":
                 print(runtime.context_summary())
 
                 continue
-
-            # --------------------------------------------
-            # Freshness
-            # --------------------------------------------
 
             if command == "fresh":
                 freshness = runtime.context_manager.freshness()
@@ -186,10 +209,6 @@ def main():
 
                 continue
 
-            # --------------------------------------------
-            # Events
-            # --------------------------------------------
-
             if command == "events":
                 events = runtime.event_bus.recent_events(limit=20)
 
@@ -202,9 +221,10 @@ def main():
 
                 continue
 
-            # --------------------------------------------
-            # Vehicle Agent
-            # --------------------------------------------
+            if command == "health":
+                for pipeline in (cabin_pipeline, road_pipeline):
+                    print(pipeline.health())
+                continue
 
             try:
                 answer = runtime.chat(
@@ -230,21 +250,18 @@ def main():
             )
 
     finally:
-        # ====================================================
-        # Graceful shutdown
-        # ====================================================
-
         print()
         print("[VehicleMind] Stopping perception...")
 
-        stop_event.set()
-
-        cabin_thread.join(timeout=5.0)
-
-        driving_thread.join(timeout=5.0)
+        cabin_pipeline.stop()
+        road_pipeline.stop()
+        cabin_pipeline.join(timeout=5.0)
+        road_pipeline.join(timeout=5.0)
 
         print("[VehicleMind] Shutdown complete.")
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
