@@ -20,6 +20,7 @@ const labels = {
   media_title: "媒体标题", volume: "音量", processing_ms: "处理耗时",
   old_risk: "原风险等级", new_risk: "新风险等级",
   driver_state: "驾驶状态", vehicle_speed_kmh: "车速", poi_id: "地点标识",
+  applied: "已应用", expected: "预期", actual: "实际",
 };
 const values = {
   PRESENT: "在位", ABSENT: "不在位", NORMAL: "正常", DROWSY: "疲劳",
@@ -30,6 +31,8 @@ const values = {
   recorded_driving_perception: "录制的道路观测",
   recorded_vehicle_state: "录制的车辆状态",
   cabin_perception: "舱内感知", driving_perception: "道路感知",
+  MISSING: "缺失", INVALID: "无效", STALE: "已过期", KNOWN: "有效",
+  D: "前进挡（D）", P: "驻车挡（P）", R: "倒车挡（R）", N: "空挡（N）",
 };
 const events = {
   DRIVER_PRESENT: "驾驶员在位", DRIVER_STATE_CHANGED: "驾驶状态变化",
@@ -82,7 +85,7 @@ function recordText(record) {
   const item = record.data;
   switch (record.kind) {
     case "context_update":
-      return `${labels[item.domain] ?? item.domain}；${detailText(item.values ?? {})}；${item.valid ? "有效" : "无效"}`;
+      return `${labels[item.domain] ?? displayLabel(item.domain)}；${detailText(item.values ?? {})}；${detailText({source: item.source, confidence: item.confidence, valid: item.valid, applied: item.applied})}`;
     case "event":
       return `${events[item.type] ?? `未翻译事件：${item.type}`}；${detailText(item.data ?? {})}`;
     case "user_utterance": return item.text;
@@ -90,7 +93,7 @@ function recordText(record) {
     case "pending_action":
       return `${toolText(item.tool_name)}待确认；${detailText(item.arguments ?? {})}`;
     case "confirmation":
-      return `${toolText(item.tool_name)}：${item.success ? "确认成功" : "确认失败"}`;
+      return `${toolText(item.tool_name)}：${item.success ? "确认成功" : "确认失败"}${item.error ? `；错误码：${item.error}` : ""}`;
     case "tool_result":
       return `${toolText(item.name)}：${item.success ? "执行成功" : "执行失败"}${item.error ? `；错误码：${item.error}` : ""}`;
     default: return "详情见原始追踪文件";
@@ -172,8 +175,11 @@ for (const record of data.trace.filter((item) => visibleKinds.has(item.kind))) {
 const assertionRoot = document.getElementById("assertions");
 for (const assertion of summary.assertions) {
   const row = element("div", "assertion");
+  const detail = assertion.passed
+    ? ""
+    : `；预期：${valueText(assertion.expected)}；实际：${valueText(assertion.actual)}`;
   row.append(
-    element("span", "", assertionText(assertion.name)),
+    element("span", "", `${assertionText(assertion.name)}${detail}`),
     element("strong", assertion.passed ? "pass" : "fail", assertion.passed ? "通过" : "失败"),
   );
   assertionRoot.append(row);

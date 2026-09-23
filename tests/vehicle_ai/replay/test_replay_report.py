@@ -93,6 +93,10 @@ def test_report_writes_complete_atomic_result_package(tmp_path: Path) -> None:
     assert "驾驶员" in script
     assert "上下文更新" in script
     assert "通过" in script
+    assert "预期：" in script
+    assert "实际：" in script
+    assert "已过期" in script
+    assert "错误码：" in script
 
 
 def test_report_refuses_to_overwrite_any_existing_directory(tmp_path: Path) -> None:

@@ -16,7 +16,9 @@ uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
 open runs/drowsy-rest-stop/report.html
 ```
 
-场景为“驾驶员疲劳风险升高 → Agent 建议休息并搜索服务区 → 用户确认 → 启动模拟导航”。报告页面展示舱内外观测、统一上下文、风险事件、Agent 与工具时间线、断言和证据边界。结果目录还有 `summary.json`、`trace.json` 和配置快照，供自动化检查。命令参数、JSON 字段和工具名保留原协议英文；中文只用于展示层。
+场景为“驾驶员疲劳风险升高 → 驾驶员请求查找服务区 → Agent 搜索 → 用户确认 → 启动模拟导航”。报告页面展示舱内外观测、统一上下文、风险事件、Agent 与工具时间线、断言和证据边界。结果目录还有 `summary.json`、`trace.json` 和配置快照，供自动化检查。命令参数、JSON 字段和工具名保留原协议英文；中文只用于展示层。
+
+结果目录不会被覆盖。再次运行时，请改用新的 `--output-root` 或先将旧结果移至其他位置。
 
 本模式不需要摄像头、视频、模型权重、API Key 或网络。若工作树有未提交改动，调试时可增加 `--allow-dirty`；此类结果会标记为 dirty，不适合作为正式项目证据。
 

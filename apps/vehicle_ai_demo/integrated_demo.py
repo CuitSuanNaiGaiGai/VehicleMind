@@ -8,7 +8,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from apps.vehicle_ai_demo.quality_display import format_age
+from apps.vehicle_ai_demo.terminal_display import (
+    format_context,
+    format_event,
+    format_freshness,
+    format_health,
+)
 from apps.vehicle_ai_demo.video_pipelines import (
     DEFAULT_CABIN_VIDEO,
     DEFAULT_ROAD_VIDEO,
@@ -154,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.perception_only:
             time.sleep(args.duration)
             for pipeline in (cabin_pipeline, road_pipeline):
-                print(pipeline.health())
+                print(format_health(pipeline.health()))
             errors = _pipeline_errors((cabin_pipeline, road_pipeline))
             if errors:
                 print("[VehicleMind 错误]", "; ".join(errors))
@@ -190,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
                 break
 
             if command == "context":
-                print(runtime.context_summary())
+                print(format_context(runtime.context_manager.get_agent_context()))
 
                 continue
 
@@ -198,13 +203,7 @@ def main(argv: list[str] | None = None) -> int:
                 freshness = runtime.context_manager.freshness()
 
                 print()
-
-                for domain, info in freshness.items():
-                    print(
-                        f"{domain:<8} "
-                        f"距上次更新={format_age(info['age_seconds'])} "
-                        f"新鲜={'是' if info['fresh'] else '否'}"
-                    )
+                print(format_freshness(freshness))
 
                 continue
 
@@ -216,13 +215,13 @@ def main(argv: list[str] | None = None) -> int:
 
                 else:
                     for event in events:
-                        print(event)
+                        print(format_event(event))
 
                 continue
 
             if command == "health":
                 for pipeline in (cabin_pipeline, road_pipeline):
-                    print(pipeline.health())
+                    print(format_health(pipeline.health()))
                 continue
 
             try:
