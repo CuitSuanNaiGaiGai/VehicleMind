@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from modules.config.events import EventTimingConfig
 from modules.vehicle_ai.context import (
     ContextChange,
     ContextDomain,
@@ -16,6 +17,7 @@ from modules.vehicle_ai.events.events import (
     EventType,
     VehicleEvent,
 )
+from modules.vehicle_ai.events.temporal_gate import StableValueGate, TemporalGate
 
 
 # ============================================================
@@ -70,6 +72,109 @@ class EventDetector:
     The purpose is to prevent noisy high-frequency vehicle
     context updates from directly triggering the future LLM.
     """
+
+    def __init__(self, timing: EventTimingConfig | None = None) -> None:
+        policy = timing or EventTimingConfig.load()
+        self._risk_gate = TemporalGate(**vars(policy.high_driver_risk))
+        self._risk_state = StableValueGate(
+            initial=RiskLevel.UNKNOWN.value,
+            hold_ms=policy.high_driver_risk.hold_ms,
+            max_gap_ms=policy.high_driver_risk.max_gap_ms,
+        )
+        self._lane_gate = TemporalGate(**vars(policy.lane_lost))
+        self._area_gate = TemporalGate(**vars(policy.drivable_area_lost))
+        self._seen_lane = False
+        self._seen_area = False
+
+    def invalidate_observation(self, domain: str) -> None:
+        """An invalid frame breaks evidence continuity without changing context."""
+
+        if domain == "driver":
+            self._risk_gate.reset()
+            self._risk_state.reset()
+        elif domain == "road":
+            self._lane_gate.reset()
+            self._area_gate.reset()
+
+    def observe_hazards(
+        self, domain: str, context: VehicleContext, *, at_ms: int
+    ) -> list[VehicleEvent]:
+        """Evaluate alerts on every valid observation, even unchanged ones."""
+
+        events: list[VehicleEvent] = []
+        if domain == "driver":
+            risk = normalize_value(context.driver.risk)
+            transition = self._risk_state.observe(risk, at_ms=at_ms)
+            if transition is not None:
+                old_risk, new_risk = transition
+                priority = (
+                    EventPriority.HIGH
+                    if new_risk == RiskLevel.HIGH.value
+                    else EventPriority.MEDIUM
+                    if new_risk == RiskLevel.MEDIUM.value
+                    else EventPriority.LOW
+                )
+                events.append(
+                    VehicleEvent(
+                        type=EventType.DRIVER_RISK_CHANGED,
+                        priority=priority,
+                        source="cabin_perception",
+                        message=f"Driver risk changed from {old_risk} to {new_risk}.",
+                        data={
+                            "old_risk": old_risk,
+                            "new_risk": new_risk,
+                            "driver_state": normalize_value(context.driver.state),
+                        },
+                    )
+                )
+            if self._risk_gate.observe(
+                risk == RiskLevel.HIGH.value,
+                at_ms=at_ms,
+            ):
+                events.append(
+                    VehicleEvent(
+                        type=EventType.HIGH_RISK_DETECTED,
+                        priority=EventPriority.CRITICAL,
+                        source="cabin_perception",
+                        message="High driver-risk state detected.",
+                        data={
+                            "driver_state": normalize_value(context.driver.state),
+                            "risk": RiskLevel.HIGH.value,
+                            "perclos": context.driver.perclos,
+                            "eye_closure_seconds": context.driver.eye_closure_seconds,
+                            "recent_yawns": context.driver.recent_yawns,
+                            "vehicle_speed_kmh": context.vehicle.speed_kmh,
+                        },
+                    )
+                )
+        elif domain == "road":
+            lane = context.road.lane_detected
+            area = context.road.drivable_area_detected
+            if lane:
+                self._seen_lane = True
+            if area:
+                self._seen_area = True
+            if self._lane_gate.observe(self._seen_lane and not lane, at_ms=at_ms):
+                events.append(
+                    VehicleEvent(
+                        type=EventType.LANE_LOST,
+                        priority=EventPriority.HIGH,
+                        source="driving_perception",
+                        message="Lane markings are temporarily unavailable.",
+                        data={"lane_detected": False},
+                    )
+                )
+            if self._area_gate.observe(self._seen_area and not area, at_ms=at_ms):
+                events.append(
+                    VehicleEvent(
+                        type=EventType.DRIVABLE_AREA_LOST,
+                        priority=EventPriority.HIGH,
+                        source="driving_perception",
+                        message="Drivable area is temporarily unavailable.",
+                        data={"drivable_area_detected": False},
+                    )
+                )
+        return events
 
     def detect(
         self,
@@ -154,57 +259,6 @@ class EventDetector:
             )
 
         # ----------------------------------------------------
-        # Driver risk transition
-        # ----------------------------------------------------
-
-        elif change.field == "risk":
-            if new_value == RiskLevel.HIGH.value:
-                priority = EventPriority.HIGH
-
-            elif new_value == RiskLevel.MEDIUM.value:
-                priority = EventPriority.MEDIUM
-
-            else:
-                priority = EventPriority.LOW
-
-            events.append(
-                VehicleEvent(
-                    type=(EventType.DRIVER_RISK_CHANGED),
-                    priority=priority,
-                    source="cabin_perception",
-                    message=(f"Driver risk changed from {old_value} to {new_value}."),
-                    data={
-                        "old_risk": old_value,
-                        "new_risk": new_value,
-                        "driver_state": normalize_value(context.driver.state),
-                    },
-                )
-            )
-
-            # ------------------------------------------------
-            # Entering HIGH risk is promoted into a dedicated
-            # safety-relevant event.
-            # ------------------------------------------------
-
-            if new_value == RiskLevel.HIGH.value and old_value != RiskLevel.HIGH.value:
-                events.append(
-                    VehicleEvent(
-                        type=(EventType.HIGH_RISK_DETECTED),
-                        priority=(EventPriority.CRITICAL),
-                        source=("cabin_perception"),
-                        message=("High driver-risk state detected."),
-                        data={
-                            "driver_state": normalize_value(context.driver.state),
-                            "risk": new_value,
-                            "perclos": context.driver.perclos,
-                            "eye_closure_seconds": context.driver.eye_closure_seconds,
-                            "recent_yawns": context.driver.recent_yawns,
-                            "vehicle_speed_kmh": context.vehicle.speed_kmh,
-                        },
-                    )
-                )
-
-        # ----------------------------------------------------
         # Driver presence
         # ----------------------------------------------------
 
@@ -270,48 +324,6 @@ class EventDetector:
                         "old_level": old_value,
                         "new_level": new_value,
                         "vehicle_count": context.road.vehicle_count,
-                    },
-                )
-            )
-
-        # ----------------------------------------------------
-        # Lane lost
-        # ----------------------------------------------------
-
-        elif (
-            change.field == "lane_detected"
-            and change.old_value is True
-            and change.new_value is False
-        ):
-            events.append(
-                VehicleEvent(
-                    type=(EventType.LANE_LOST),
-                    priority=(EventPriority.HIGH),
-                    source=("driving_perception"),
-                    message=("Lane markings are temporarily unavailable."),
-                    data={
-                        "lane_detected": False,
-                    },
-                )
-            )
-
-        # ----------------------------------------------------
-        # Drivable area lost
-        # ----------------------------------------------------
-
-        elif (
-            change.field == "drivable_area_detected"
-            and change.old_value is True
-            and change.new_value is False
-        ):
-            events.append(
-                VehicleEvent(
-                    type=(EventType.DRIVABLE_AREA_LOST),
-                    priority=(EventPriority.HIGH),
-                    source=("driving_perception"),
-                    message=("Drivable area is temporarily unavailable."),
-                    data={
-                        "drivable_area_detected": False,
                     },
                 )
             )

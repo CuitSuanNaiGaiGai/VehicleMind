@@ -5,6 +5,7 @@ import time
 from collections.abc import Mapping
 from typing import Any
 
+from modules.observation import ObservationMetadata
 from modules.vehicle_ai.context import GearState, NavigationState
 from modules.vehicle_ai.replay.models import ReplayObservation, ReplayScenario
 from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
@@ -81,6 +82,7 @@ class ReplayRunner:
         recorder: TraceRecorder,
         *,
         at_ms: int,
+        sequence: int,
         domain: str,
         observation: ReplayObservation,
     ) -> None:
@@ -91,13 +93,27 @@ class ReplayRunner:
             observation=observation,
             applied=observation.valid,
         )
+        metadata = ObservationMetadata(
+            timestamp_ms=at_ms,
+            sequence=sequence,
+            source=observation.source,
+            confidence=observation.confidence,
+            valid=observation.valid,
+            processing_ms=0.0,
+        )
         if not observation.valid:
+            if domain == "cabin":
+                runtime.update_cabin(metadata=metadata, at_ms=at_ms)
+            elif domain == "road":
+                runtime.update_driving(metadata=metadata, at_ms=at_ms)
+            else:
+                runtime.context_manager.mark_invalid_observation("vehicle", metadata)
             return
-        values = dict(observation.values)
+        values: dict[str, Any] = dict(observation.values)
         if domain == "cabin":
-            events = runtime.update_cabin(**values)
+            events = runtime.update_cabin(metadata=metadata, at_ms=at_ms, **values)
         elif domain == "road":
-            events = runtime.update_driving(**values)
+            events = runtime.update_driving(metadata=metadata, at_ms=at_ms, **values)
         else:
             events = runtime.update_vehicle(**self._vehicle_values(values))
         self._record_events(recorder, at_ms=at_ms, events=events)
@@ -197,6 +213,7 @@ class ReplayRunner:
         runtime = VehicleMindRuntime(llm=llm)
         recorder = TraceRecorder()
         tool_index = 0
+        observation_sequences = {"vehicle": 0, "cabin": 0, "road": 0}
 
         for step in scenario.steps:
             for domain in ("vehicle", "cabin", "road"):
@@ -207,9 +224,11 @@ class ReplayRunner:
                         runtime,
                         recorder,
                         at_ms=step.at_ms,
+                        sequence=observation_sequences[domain],
                         domain=domain,
                         observation=observation,
                     )
+                    observation_sequences[domain] += 1
                     context_seconds += time.perf_counter() - stage_started
 
             if step.user_text is not None:

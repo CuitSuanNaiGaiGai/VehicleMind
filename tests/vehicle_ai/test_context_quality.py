@@ -4,6 +4,7 @@ import pytest
 
 from modules.observation import ObservationMetadata
 from modules.vehicle_ai.context import ContextManager, DriverState
+from modules.vehicle_ai.events import EventDetector
 from modules.vehicle_ai.runtime import VehicleMindRuntime
 
 
@@ -62,7 +63,7 @@ def test_invalid_perception_does_not_replace_last_semantic_value() -> None:
     runtime = VehicleMindRuntime.__new__(VehicleMindRuntime)
     runtime.context_manager = ContextManager()
     runtime.driving = None
-    runtime.event_detector = None
+    runtime.event_detector = EventDetector()
     runtime.event_bus = None
     metadata = ObservationMetadata(
         timestamp_ms=50,

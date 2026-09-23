@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from modules.vehicle_ai.replay import load_replay_scenario
-from modules.vehicle_ai.replay.models import ExpectedOutcome, freeze_mapping
+from modules.vehicle_ai.replay.models import ExpectedOutcome, ReplayStep, freeze_mapping
 from modules.vehicle_ai.replay.runner import ReplayRunner
 
 
@@ -100,3 +100,17 @@ def test_invalid_observation_is_recorded_but_not_applied() -> None:
     record = [item for item in result.trace if item.at_ms == 3200][0]
     assert record.data["valid"] is False
     assert record.data["applied"] is False
+
+
+def test_invalid_replay_frame_breaks_high_risk_hold() -> None:
+    scenario = _scenario()
+    invalid_cabin = replace(scenario.steps[2].cabin, valid=False)
+    invalid_step = ReplayStep(at_ms=1950, cabin=invalid_cabin)
+    modified = replace(
+        scenario,
+        steps=(*scenario.steps[:3], invalid_step, *scenario.steps[3:]),
+    )
+
+    result = ReplayRunner().run(modified)
+
+    assert "HIGH_RISK_DETECTED" not in result.event_types
