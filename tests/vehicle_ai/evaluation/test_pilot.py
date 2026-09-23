@@ -124,6 +124,10 @@ def test_multiturn_confirmation_is_separate_event() -> None:
     assert trial.interaction_events[-2]["kind"] == "agent_reply"
     assert trial.interaction_events[-1]["kind"] == "confirmation"
     assert trial.interaction_events[-1]["success"] is True
+    assert trial.request_count == 3
+    assert len(trial.requested_tools) == 2
+    assert "待确认" in trial.replies[-1]
+    assert "失败" not in trial.replies[-1]
 
 
 def test_pilot_cli_requires_explicit_provider_and_writes_run(tmp_path, monkeypatch) -> None:
