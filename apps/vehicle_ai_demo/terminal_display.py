@@ -41,6 +41,16 @@ LABELS = {
     "navigation_state": "导航状态",
     "navigation_destination_id": "目的地标识",
     "navigation_destination": "导航目的地",
+    "old_risk": "原风险",
+    "new_risk": "新风险",
+    "old_state": "原状态",
+    "new_state": "新状态",
+    "old_presence": "原在位状态",
+    "new_presence": "新在位状态",
+    "old_level": "原交通密度",
+    "new_level": "新交通密度",
+    "driver_state": "驾驶状态",
+    "destination": "目的地",
 }
 VALUES = {
     "PRESENT": "在位",
@@ -113,7 +123,11 @@ def format_freshness(freshness: Mapping[str, Mapping[str, Any]]) -> str:
 def format_event(event: VehicleEvent) -> str:
     label = EVENTS.get(str(event.type), f"未翻译事件：{event.type}")
     priority = _value(event.priority)
-    return f"[{priority}] {label}；来源：{_value(event.source)}"
+    detail = "；".join(
+        f"{LABELS.get(key, key)}：{_value(value)}" for key, value in event.data.items()
+    )
+    suffix = f"；{detail}" if detail else ""
+    return f"[{priority}] {label}；来源：{_value(event.source)}{suffix}"
 
 
 def format_health(health: Mapping[str, Any]) -> str:
@@ -134,6 +148,6 @@ def format_health(health: Mapping[str, Any]) -> str:
         )
     for queue, stats in health.get("queues", {}).items():
         lines.append(
-            f"  {QUEUES.get(queue, queue)}队列：深度 {stats['depth']}；丢帧数 {stats['dropped']}"
+            f"  {QUEUES.get(queue, queue)}队列：深度 {stats['depth']}；丢弃数 {stats['dropped']}"
         )
     return "\n".join(lines)

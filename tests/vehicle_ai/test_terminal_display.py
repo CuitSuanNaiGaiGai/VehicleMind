@@ -33,10 +33,14 @@ def test_event_and_health_are_chinese() -> None:
         priority=EventPriority.CRITICAL,
         source="cabin_perception",
         message="High risk detected",
+        data={"old_risk": "LOW", "new_risk": "HIGH", "custom_code": "X1"},
     )
     assert "检测到高风险" in format_event(event)
     assert "严重" in format_event(event)
     assert "High risk detected" not in format_event(event)
+    assert "原风险：低" in format_event(event)
+    assert "新风险：高" in format_event(event)
+    assert "custom_code：X1" in format_event(event)
 
     health = format_health(
         {
@@ -51,5 +55,5 @@ def test_event_and_health_are_chinese() -> None:
     )
     assert "舱内流水线" in health
     assert "事件发布 p95 延迟" in health
-    assert "丢帧数" in health
+    assert "丢弃数" in health
     assert "last_error" not in health
