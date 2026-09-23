@@ -32,7 +32,7 @@ const values = {
   recorded_vehicle_state: "录制的车辆状态",
   cabin_perception: "舱内感知", driving_perception: "道路感知",
   MISSING: "缺失", INVALID: "无效", STALE: "已过期", KNOWN: "有效",
-  D: "前进挡（D）", P: "驻车挡（P）", R: "倒车挡（R）", N: "空挡（N）",
+  D: "前进挡", P: "驻车挡", R: "倒车挡", N: "空挡",
 };
 const events = {
   DRIVER_PRESENT: "驾驶员在位", DRIVER_STATE_CHANGED: "驾驶状态变化",
@@ -58,14 +58,22 @@ function element(tag, className, text) {
   return node;
 }
 
+function bilingual(raw, translations, fallback = "未翻译字段") {
+  return `${raw}（${Object.hasOwn(translations, raw) ? translations[raw] : fallback}）`;
+}
+
 function displayLabel(key) {
-  return labels[key] ?? `未翻译字段：${key}`;
+  return bilingual(key, labels);
+}
+
+function eventText(type) {
+  return bilingual(type, events, "未翻译事件");
 }
 
 function valueText(value, key = "") {
   if (value === null) return key === "confidence" ? "未提供" : "缺失";
   if (typeof value === "boolean") return value ? "是" : "否";
-  if (typeof value === "string") return values[value] ?? value;
+  if (typeof value === "string") return Object.hasOwn(values, value) ? bilingual(value, values) : value;
   if (Array.isArray(value)) return value.map((item) => valueText(item)).join("、");
   if (typeof value === "object") return detailText(value);
   return String(value);
@@ -78,16 +86,16 @@ function detailText(object) {
 }
 
 function toolText(name) {
-  return tools[name] ?? `未翻译工具：${name}`;
+  return bilingual(name, tools, "未翻译工具");
 }
 
 function recordText(record) {
   const item = record.data;
   switch (record.kind) {
     case "context_update":
-      return `${labels[item.domain] ?? displayLabel(item.domain)}；${detailText(item.values ?? {})}；${detailText({source: item.source, confidence: item.confidence, valid: item.valid, applied: item.applied})}`;
+      return `${displayLabel(item.domain)}；${detailText(item.values ?? {})}；${detailText({source: item.source, confidence: item.confidence, valid: item.valid, applied: item.applied})}`;
     case "event":
-      return `${events[item.type] ?? `未翻译事件：${item.type}`}；${detailText(item.data ?? {})}`;
+      return `${eventText(item.type)}；${detailText(item.data ?? {})}`;
     case "user_utterance": return item.text;
     case "agent_response": return item.summary;
     case "pending_action":
@@ -101,14 +109,14 @@ function recordText(record) {
 }
 
 function assertionText(name) {
-  if (name.startsWith("event:")) return `事件：${events[name.slice(6)] ?? name.slice(6)}`;
+  if (name.startsWith("event:")) return `事件：${eventText(name.slice(6))}`;
   if (name.startsWith("tool:")) return `工具：${toolText(name.slice(5))}`;
-  if (name.startsWith("vehicle.")) return `车辆：${displayLabel(name.slice(8))}`;
+  if (name.startsWith("vehicle.")) return `${name}（车辆·${labels[name.slice(8)] ?? "未翻译字段"}）`;
   const known = {
     unauthorized_sensitive_executions: "未经确认的敏感动作执行次数",
     scripted_responses_consumed: "脚本化回复全部消耗",
   };
-  return known[name] ?? displayLabel(name);
+  return bilingual(name, known);
 }
 
 document.getElementById("scenario-description").textContent = data.description;
@@ -119,10 +127,10 @@ document.getElementById("cabin-media").src = data.media.cabin;
 document.getElementById("road-media").src = data.media.road;
 
 const metrics = [
-  ["场景标识", summary.scenario_id],
-  ["语义追踪摘要", summary.semantic_sha256.slice(0, 12)],
-  ["安全违规次数", summary.unauthorized_sensitive_executions],
-  ["运行耗时", `${summary.metrics.total_ms.toFixed(2)} 毫秒`],
+  ["Scenario（场景标识）", summary.scenario_id],
+  ["Semantic trace（语义追踪摘要）", summary.semantic_sha256.slice(0, 12)],
+  ["Safety violations（安全违规次数）", summary.unauthorized_sensitive_executions],
+  ["Runtime（运行耗时）", `${summary.metrics.total_ms.toFixed(2)} 毫秒`],
 ];
 const metricRoot = document.getElementById("headline-metrics");
 for (const [label, value] of metrics) {
@@ -135,7 +143,7 @@ const contextRoot = document.getElementById("context-grid");
 for (const [domain, values] of Object.entries(summary.final_context)) {
   const card = element("article", "context-card");
   card.append(element("span", "label", "统一上下文"));
-  card.append(element("h2", "", labels[domain] ?? displayLabel(domain)));
+  card.append(element("h2", "", displayLabel(domain)));
   const observation = data.observations[domain] || data.observations[domain === "driver" ? "cabin" : domain];
   if (observation) {
     for (const [key, value] of Object.entries(observation)) {
@@ -166,7 +174,7 @@ for (const record of data.trace.filter((item) => visibleKinds.has(item.kind))) {
   const row = element("div", "timeline-item");
   row.append(
     element("time", "", `${record.at_ms} 毫秒`),
-    element("span", "timeline-kind", kinds[record.kind]),
+    element("span", "timeline-kind", bilingual(record.kind, kinds, "未翻译记录")),
     element("span", "timeline-data", recordText(record)),
   );
   timeline.append(row);
@@ -187,9 +195,9 @@ for (const assertion of summary.assertions) {
 
 const provenanceRoot = document.getElementById("provenance");
 for (const [label, value] of Object.entries({
-  "Git 提交": data.provenance.git_commit,
-  "创建时间": data.provenance.created_at_utc,
-  "配置 SHA-256": data.config_sha256,
+  "Git commit（Git 提交）": data.provenance.git_commit,
+  "Created at（创建时间）": data.provenance.created_at_utc,
+  "Config SHA-256（配置哈希）": data.config_sha256,
 })) {
   const row = element("div", "provenance-row");
   row.append(element("span", "", label), element("code", "", valueText(value)));
