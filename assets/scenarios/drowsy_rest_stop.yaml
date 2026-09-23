@@ -1,9 +1,9 @@
 schema_version: 1
 scenario_id: drowsy-rest-stop
-title: Drowsy driver takes a safe rest stop
+title: 疲劳驾驶员前往服务区休息
 description: >-
-  Recorded semantic observations trigger a high-risk event, after which the
-  driver asks for a rest area and explicitly confirms simulated navigation.
+  录制的舱内与道路语义观测触发高风险事件；驾驶员随后请求查找附近服务区，
+  并在明确确认后启动模拟导航。
 
 media:
   cabin: assets/demo/cabin_demo.gif
@@ -16,8 +16,7 @@ agent_responses:
         name: search_nearby_rest_area
         arguments: {}
   - content: >-
-      I found West Lake Rest Area 6.8 km away. Please confirm whether to start
-      navigation.
+      找到 6.8 公里外的西湖服务区。是否确认启动导航？
     tool_calls: []
 
 steps:
@@ -103,7 +102,7 @@ steps:
         blink_count: 5
 
   - at_ms: 2200
-    user_text: I feel tired. Find a nearby rest area.
+    user_text: 我有点困，帮我找附近的服务区。
 
   - at_ms: 3000
     confirm_pending: true

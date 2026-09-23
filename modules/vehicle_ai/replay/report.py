@@ -153,9 +153,9 @@ def write_replay_report(
             "provenance": plain_value(run_snapshot.get("provenance", {})),
             "config_sha256": run_snapshot.get("config_sha256"),
             "limitations": [
-                "This replay uses recorded semantic observations.",
-                "It is integration evidence, not perception accuracy evidence.",
-                "Vehicle actions are simulated and do not control a real vehicle.",
+                "本次回放使用录制的语义观测，并未重新运行感知模型。",
+                "结果证明系统集成流程，不代表感知算法精度。",
+                "车辆动作仅为模拟执行，不会控制真实车辆。",
             ],
         }
         template = (UI_ROOT / "report.html").read_text(encoding="utf-8")
