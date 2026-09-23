@@ -44,8 +44,8 @@ def _display_every_two_seconds() -> Callable[[PerceptionCard], None]:
         now = time.monotonic()
         if now - last_print >= 2.0:
             print(
-                f"[{card.source}] {card.summary} events={card.event_count} "
-                f"capture_to_context={card.capture_to_context_ms:.1f}ms"
+                f"[{card.source}] {card.summary} 事件数={card.event_count} "
+                f"采集至上下文={card.capture_to_context_ms:.1f}毫秒"
             )
             last_print = now
 
@@ -62,7 +62,7 @@ def _cabin_service(supplied: Any, model_path: Path) -> Any:
     if supplied is not None:
         return supplied
     if not model_path.is_file():
-        raise FileNotFoundError(f"cabin model unavailable: {model_path}")
+        raise FileNotFoundError(f"舱内模型不可用：{model_path}")
     from modules.cabin.perception_service import CabinPerceptionService
 
     return CabinPerceptionService(model_path=model_path)
@@ -72,7 +72,7 @@ def _road_service(supplied: Any, model_path: Path) -> Any:
     if supplied is not None:
         return supplied
     if not model_path.is_file():
-        raise FileNotFoundError(f"road model unavailable: {model_path}")
+        raise FileNotFoundError(f"道路模型不可用：{model_path}")
     from modules.driving.perception_service import DrivingPerceptionService
 
     settings = PerceptionConfig.load_default().driving
@@ -118,10 +118,10 @@ def build_cabin_pipeline(
         )
         now = time.monotonic()
         return PerceptionCard(
-            source="Cabin",
+            source="舱内",
             summary=(
-                f"presence={snapshot.presence} state={snapshot.driver_state} "
-                f"face={snapshot.face_visible}"
+                f"驾驶员存在={snapshot.presence} 驾驶状态={snapshot.driver_state} "
+                f"面部可见={'是' if snapshot.face_visible else '否'}"
             ),
             event_count=len(events),
             capture_to_context_ms=(now - packet.captured_at) * 1000,
@@ -175,12 +175,12 @@ def build_road_pipeline(
         )
         now = time.monotonic()
         return PerceptionCard(
-            source="Road",
+            source="道路",
             summary=(
-                f"vehicles={snapshot.vehicle_count} "
-                f"pedestrians={snapshot.pedestrian_count} "
-                f"lane={snapshot.lane_detected} "
-                f"drivable={snapshot.drivable_area_detected}"
+                f"车辆数={snapshot.vehicle_count} "
+                f"行人数={snapshot.pedestrian_count} "
+                f"车道={'检测到' if snapshot.lane_detected else '未检测到'} "
+                f"可行驶区域={'检测到' if snapshot.drivable_area_detected else '未检测到'}"
             ),
             event_count=len(events),
             capture_to_context_ms=(now - packet.captured_at) * 1000,
