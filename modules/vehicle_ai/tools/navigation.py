@@ -22,12 +22,14 @@ MOCK_REST_AREAS = [
     {
         "poi_id": "rest_area_001",
         "name": "West Lake Rest Area",
+        "aliases": ["西湖服务区", "西湖休息区"],
         "distance_km": 6.8,
         "eta_minutes": 8,
     },
     {
         "poi_id": "rest_area_002",
         "name": "Riverside Service Area",
+        "aliases": ["河滨服务区"],
         "distance_km": 12.4,
         "eta_minutes": 15,
     },

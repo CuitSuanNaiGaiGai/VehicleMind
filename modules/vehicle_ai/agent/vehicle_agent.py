@@ -7,6 +7,11 @@ from modules.vehicle_ai.agent.action_state import (
     PendingActionStore,
 )
 from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
+from modules.vehicle_ai.agent.pending_intent import (
+    classify_pending_intent,
+    requested_target,
+    search_result_matches_target,
+)
 
 from modules.vehicle_ai.agent.prompts import (
     SYSTEM_PROMPT,
@@ -72,15 +77,7 @@ class VehicleAgent:
 
         self.max_tool_rounds = max_tool_rounds
 
-        # ----------------------------------------------------
-        # Natural language history
-        # ----------------------------------------------------
-
         self.history: list[dict] = []
-
-        # ----------------------------------------------------
-        # Grounded action state
-        # ----------------------------------------------------
 
         self.pending_actions = PendingActionStore()
         self.confirmations = ActionConfirmationController(
@@ -176,28 +173,16 @@ class VehicleAgent:
             ),
         }
 
-    # ========================================================
-    # Pending Action Context
-    # ========================================================
-
     def _pending_action_message(
         self,
     ) -> dict:
         return pending_action_message(self.pending_actions)
-
-    # ========================================================
-    # Tool-call assistant message
-    # ========================================================
 
     def _assistant_tool_message(
         self,
         response,
     ) -> dict:
         return assistant_tool_message(response)
-
-    # ========================================================
-    # Tool argument grounding
-    # ========================================================
 
     def _ground_tool_arguments(
         self,
@@ -228,14 +213,11 @@ class VehicleAgent:
 
         return grounded
 
-    # ========================================================
-    # Tool result -> Action State
-    # ========================================================
-
     def _update_action_state(
         self,
         tool_name: str,
         tool_result,
+        target: str | None = None,
     ) -> None:
         """
         Convert selected tool results into grounded pending
@@ -250,11 +232,11 @@ class VehicleAgent:
         if not tool_result.success:
             return
 
-        # ----------------------------------------------------
-        # Rest-area search
-        # ----------------------------------------------------
-
         if tool_name == "search_nearby_rest_area":
+            if target is not None and not search_result_matches_target(
+                target, tool_result.data
+            ):
+                return
             poi_id = tool_result.data.get("poi_id")
 
             name = tool_result.data.get("name")
@@ -277,22 +259,17 @@ class VehicleAgent:
                     )
                 )
 
-        # ----------------------------------------------------
-        # Navigation started
-        # ----------------------------------------------------
-
         elif tool_name == "start_navigation":
             self.pending_actions.clear()
-
-        # ----------------------------------------------------
-        # Navigation cancelled
-        # ----------------------------------------------------
 
         elif tool_name == "cancel_navigation":
             self.pending_actions.clear()
 
     def confirm_pending(self, action_id: str) -> ToolResult:
         return self.confirmations.confirm(action_id)
+
+    def reject_pending(self, action_id: str) -> ToolResult:
+        return self.confirmations.reject(action_id)
 
     # ========================================================
     # Debug
@@ -317,6 +294,15 @@ class VehicleAgent:
 
         if not user_text:
             return ""
+
+        pending = self.pending_actions.get()
+        intent = classify_pending_intent(user_text) if pending is not None else None
+        if pending is not None and intent in {"reject", "change_target"}:
+            if not self.confirmations.reject(pending.action_id).success:
+                return "待确认操作已变更，请重新确认当前操作。"
+        if intent == "reject":
+            return "已取消待确认操作。"
+        target = requested_target(user_text) if intent == "change_target" else None
 
         # ----------------------------------------------------
         # Rebuild dynamic system state every user turn.
@@ -357,6 +343,11 @@ class VehicleAgent:
 
             if not response.tool_calls:
                 final_text = response.content or ""
+                current = self.pending_actions.get()
+                if target is not None and (
+                    current is None or current.tool_name != "start_navigation"
+                ):
+                    final_text = "未找到与新目标匹配的地点，未创建待确认导航。"
 
                 self.history.append(
                     {
@@ -391,7 +382,11 @@ class VehicleAgent:
                     tool_name=(call.name),
                     arguments=(call.arguments),
                 )
-                self.confirmations.stage(call.name, grounded_arguments)
+                pending = self.pending_actions.get()
+                if call.name != "start_navigation" or (
+                    pending is not None and pending.tool_name == "start_navigation"
+                ):
+                    self.confirmations.stage(call.name, grounded_arguments)
 
                 if debug:
                     print()
@@ -434,6 +429,7 @@ class VehicleAgent:
                 self._update_action_state(
                     tool_name=(call.name),
                     tool_result=(tool_result),
+                    target=target,
                 )
 
                 if debug:

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import time
+from threading import Event, Thread
 
 from types import SimpleNamespace
 
 import pytest
 
-from modules.vehicle_ai.agent.action_state import PendingAction
+from modules.vehicle_ai.agent.action_state import PendingAction, PendingActionStore
 from modules.vehicle_ai.context import ContextManager, NavigationState
 from modules.vehicle_ai.llm.base import LLMToolCall
 from modules.vehicle_ai.replay.models import ScriptedResponse
@@ -88,6 +89,69 @@ def test_wrong_confirmation_id_does_not_consume_pending_action(
     assert runtime.agent.pending_actions.get() is not None
 
 
+def test_rejection_requires_matching_action_id(runtime: VehicleMindRuntime) -> None:
+    pending = _pending_navigation()
+    runtime.agent.pending_actions.set(pending)
+
+    wrong = runtime.agent.reject_pending("wrong-id")
+    assert wrong.error == "INVALID_CONFIRMATION"
+    assert runtime.agent.pending_actions.get() == pending
+
+    rejected = runtime.agent.reject_pending(pending.action_id)
+    assert rejected.success is True
+    assert runtime.agent.pending_actions.get() is None
+    assert (
+        runtime.agent.confirm_pending(pending.action_id).error == "INVALID_CONFIRMATION"
+    )
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_state
+        == NavigationState.IDLE
+    )
+
+
+def test_pending_action_expires_at_exact_ttl_boundary() -> None:
+    pending = _pending_navigation(created_at=100.0)
+
+    assert pending.is_expired(now=220.0)
+
+
+def test_rejection_cannot_erase_concurrently_staged_action() -> None:
+    store = PendingActionStore()
+    old = _pending_navigation()
+    replacement = PendingAction(
+        tool_name="set_driver_window", arguments={"open": True}, display_text="Open"
+    )
+    store.set(old)
+    entered = Event()
+    proceed = Event()
+    setter_done = Event()
+    original_get = store.get
+
+    def paused_get() -> PendingAction | None:
+        action = original_get()
+        entered.set()
+        assert proceed.wait(timeout=2)
+        return action
+
+    def set_replacement() -> None:
+        store.set(replacement)
+        setter_done.set()
+
+    store.get = paused_get  # type: ignore[method-assign]
+    rejecter = Thread(target=lambda: store.reject(old.action_id))
+    setter = Thread(target=set_replacement)
+    rejecter.start()
+    assert entered.wait(timeout=2)
+    setter.start()
+    setter_done.wait(timeout=0.1)
+    proceed.set()
+    rejecter.join(timeout=2)
+    setter.join(timeout=2)
+
+    assert not rejecter.is_alive() and not setter.is_alive()
+    assert store.get() == replacement
+
+
 def test_pending_action_arguments_are_immutable_and_defensively_exported() -> None:
     pending = _pending_navigation()
 
@@ -109,6 +173,7 @@ def test_expired_pending_action_cannot_execute(runtime: VehicleMindRuntime) -> N
 
     assert result.error == "INVALID_CONFIRMATION"
     assert runtime.agent.pending_actions.get() is None
+    assert not runtime.tools.execution_history()
 
 
 def test_confirmation_must_match_and_cannot_be_replayed() -> None:
@@ -218,3 +283,203 @@ def test_agent_stages_sensitive_tool_call_instead_of_executing() -> None:
     assert pending.tool_name == "set_driver_window"
     assert pending.arguments == {"open": True}
     assert runtime.context_manager.get_context().vehicle.driver_window_open is False
+
+
+def test_explicit_refusal_clears_pending_without_calling_llm() -> None:
+    llm = ScriptedLLMClient((ScriptedResponse(content="unused"),))
+    runtime = VehicleMindRuntime(llm=llm)
+    pending = _pending_navigation()
+    runtime.agent.pending_actions.set(pending)
+
+    answer = runtime.chat("不要了", debug=False)
+
+    assert answer
+    assert llm.remaining == 1
+    assert runtime.agent.pending_actions.get() is None
+    assert (
+        runtime.agent.confirm_pending(pending.action_id).error == "INVALID_CONFIRMATION"
+    )
+    assert not runtime.tools.execution_history()
+
+
+@pytest.mark.parametrize("user_text", ["取消", "换成西湖服务区"])
+def test_chat_does_not_claim_cancellation_of_replaced_action(user_text: str) -> None:
+    llm = ScriptedLLMClient((ScriptedResponse(content="unused"),))
+    runtime = VehicleMindRuntime(llm=llm)
+    old = _pending_navigation()
+    replacement = PendingAction(
+        tool_name="set_driver_window", arguments={"open": True}, display_text="Open"
+    )
+    runtime.agent.pending_actions.set(old)
+    original_reject = runtime.agent.confirmations.reject
+
+    def replace_before_reject(action_id: str):
+        runtime.agent.pending_actions.set(replacement)
+        return original_reject(action_id)
+
+    runtime.agent.confirmations.reject = replace_before_reject  # type: ignore[method-assign]
+
+    answer = runtime.chat(user_text, debug=False)
+
+    assert answer == "待确认操作已变更，请重新确认当前操作。"
+    assert runtime.agent.pending_actions.get() == replacement
+    assert llm.remaining == 1
+
+
+def test_target_change_does_not_ground_new_call_to_old_destination() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="new-target",
+                        name="start_navigation",
+                        arguments={"poi_id": "rest_area_002"},
+                        arguments_json='{"poi_id": "rest_area_002"}',
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Please confirm the new destination."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    old = _pending_navigation()
+    runtime.agent.pending_actions.set(old)
+
+    answer = runtime.chat("换成东湖服务区", debug=False)
+
+    assert runtime.agent.pending_actions.get() is None
+    assert answer == "未找到与新目标匹配的地点，未创建待确认导航。"
+    assert runtime.agent.confirm_pending(old.action_id).error == "INVALID_CONFIRMATION"
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_state
+        == NavigationState.IDLE
+    )
+
+
+def test_target_change_replaces_action_only_after_search_result() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="search-new",
+                        name="search_nearby_rest_area",
+                        arguments={},
+                        arguments_json="{}",
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Please confirm the new destination."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    old = PendingAction(
+        tool_name="start_navigation",
+        arguments={"poi_id": "rest_area_002"},
+        display_text="Navigate to Riverside Service Area",
+    )
+    runtime.agent.pending_actions.set(old)
+
+    runtime.chat("换成西湖服务区", debug=False)
+
+    current = runtime.agent.pending_actions.get()
+    assert current is not None
+    assert current.action_id != old.action_id
+    assert current.arguments["poi_id"] == "rest_area_001"
+    assert runtime.agent.confirm_pending(old.action_id).error == "INVALID_CONFIRMATION"
+
+
+def test_target_change_does_not_stage_search_result_for_different_destination() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="search-wrong",
+                        name="search_nearby_rest_area",
+                        arguments={},
+                        arguments_json="{}",
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Requested destination not found."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    old = _pending_navigation()
+    runtime.agent.pending_actions.set(old)
+
+    runtime.chat("换成东湖服务区", debug=False)
+
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.confirm_pending(old.action_id).error == "INVALID_CONFIRMATION"
+
+
+def test_navigation_call_cannot_replace_unrelated_pending_action() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="invented-nav",
+                        name="start_navigation",
+                        arguments={"poi_id": "rest_area_002"},
+                        arguments_json='{"poi_id": "rest_area_002"}',
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Navigation requires a search."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    window = PendingAction(
+        tool_name="set_driver_window",
+        arguments={"open": True},
+        display_text="Open driver window",
+    )
+    runtime.agent.pending_actions.set(window)
+
+    runtime.chat("导航到附近", debug=False)
+
+    assert runtime.agent.pending_actions.get() == window
+
+
+def test_hostile_tool_call_after_rejection_cannot_restore_old_navigation() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="restore-old",
+                        name="start_navigation",
+                        arguments={"poi_id": "rest_area_001"},
+                        arguments_json='{"poi_id": "rest_area_001"}',
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Navigation was not started."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    old = _pending_navigation()
+    runtime.agent.pending_actions.set(old)
+
+    runtime.chat("取消", debug=False)
+    runtime.chat("现在车况怎么样", debug=False)
+
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.confirm_pending(old.action_id).error == "INVALID_CONFIRMATION"
+    sensitive_attempts = [
+        record
+        for record in runtime.tools.execution_history()
+        if record.requires_confirmation
+    ]
+    assert len(sensitive_attempts) == 1
+    assert sensitive_attempts[0].error == "CONFIRMATION_REQUIRED"
+    assert sensitive_attempts[0].success is False
