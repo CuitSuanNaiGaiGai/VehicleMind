@@ -40,23 +40,35 @@ def load_pilot_cases(directory: Path) -> tuple[EvaluationCase, ...]:
 
 
 def _preflight_case() -> EvaluationCase:
-    return EvaluationCase.from_mapping({
-        "id": "P00", "split": "dev", "category": "preflight",
-        "review_status": "candidate",
-        "steps": [{"user_text": (
-            "这是接口预检。请先调用 get_climate_status 工具查询当前空调状态，"
-            "再根据工具结果用中文回复。"
-        )}],
-        "expected": {
-            "tools": [{"name": "get_climate_status", "arguments": {}}],
-            "final_vehicle": {}, "required_facts": [], "forbidden_phrases": [],
-        },
-    })
+    return EvaluationCase.from_mapping(
+        {
+            "id": "P00",
+            "split": "dev",
+            "category": "preflight",
+            "review_status": "candidate",
+            "steps": [
+                {
+                    "user_text": (
+                        "这是接口预检。请先调用 get_climate_status 工具查询当前空调状态，"
+                        "再根据工具结果用中文回复。"
+                    )
+                }
+            ],
+            "expected": {
+                "tools": [{"name": "get_climate_status", "arguments": {}}],
+                "final_vehicle": {},
+                "required_facts": [],
+                "forbidden_phrases": [],
+            },
+        }
+    )
 
 
 def _git_revision() -> str | None:
     result = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
         check=False,
     )
     return result.stdout.strip() if result.returncode == 0 else None
@@ -65,7 +77,9 @@ def _git_revision() -> str | None:
 def _git_dirty() -> bool | None:
     result = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=normal"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     return bool(result.stdout.strip()) if result.returncode == 0 else None
 
@@ -134,7 +148,11 @@ def run_pilot(
     _write_manifest(output_root / "pilot.json", result)
     preflight_case = _preflight_case()
     preflight_trial = run_trial(
-        preflight_case, client, provider=provider, model=model, trial_index=1,
+        preflight_case,
+        client,
+        provider=provider,
+        model=model,
+        trial_index=1,
     )
     preflight_grade = grade_trial(preflight_case, preflight_trial)
     preflight_passed = (
@@ -145,8 +163,10 @@ def run_pilot(
         and preflight_trial.tool_calls[0]["success"]
     )
     write_report(
-        output_root / "preflight", preflight_case,
-        preflight_trial, preflight_grade,
+        output_root / "preflight",
+        preflight_case,
+        preflight_trial,
+        preflight_grade,
     )
     result["preflight"] = {
         "passed": preflight_passed,
@@ -157,10 +177,10 @@ def run_pilot(
     _write_manifest(output_root / "pilot.json", result)
     if preflight_passed:
         for case in cases:
-            trial = run_trial(case, client, provider=provider, model=model, trial_index=1)
-            case_entries.append(
-                _trial_entry(case, trial, output_root / case.id)
+            trial = run_trial(
+                case, client, provider=provider, model=model, trial_index=1
             )
+            case_entries.append(_trial_entry(case, trial, output_root / case.id))
             _write_manifest(output_root / "pilot.json", result)
         result["status"] = "completed"
         _write_manifest(output_root / "pilot.json", result)

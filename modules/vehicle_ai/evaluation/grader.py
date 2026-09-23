@@ -28,7 +28,12 @@ def grade_trial(case: EvaluationCase, trial: TrialResult) -> dict[str, Any]:
         phrase in answer for phrase in case.expected["forbidden_phrases"]
     )
     mechanical_pass = (
-        trial.error is None and selection and arguments and state and facts and forbidden
+        trial.error is None
+        and selection
+        and arguments
+        and state
+        and facts
+        and forbidden
     )
     return {
         "status": "needs_review" if mechanical_pass else "fail",

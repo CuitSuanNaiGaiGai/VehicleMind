@@ -21,9 +21,16 @@ def build_blind_packet(
     if trial.case_sha256 != case.sha256:
         raise ValueError("trial case hash mismatch")
     identity = json.dumps(
-        [case.sha256, trial.provider, trial.model, trial.trial_index,
-         trial.replies, trial.requested_tools],
-        ensure_ascii=False, sort_keys=True,
+        [
+            case.sha256,
+            trial.provider,
+            trial.model,
+            trial.trial_index,
+            trial.replies,
+            trial.requested_tools,
+        ],
+        ensure_ascii=False,
+        sort_keys=True,
     )
     packet_id = hashlib.sha256(identity.encode()).hexdigest()[:20]
     return {
@@ -73,19 +80,23 @@ def validate_decision(packet: dict[str, Any], decision: dict[str, Any]) -> dict:
     if verdict not in {"pass", "fail", "needs_review"}:
         raise ValueError("invalid verdict")
     claims = _review_items(
-        decision["claims"], {item["id"] for item in packet["required_claims"]},
-        {"supported", "missing", "unclear"}, "claims",
+        decision["claims"],
+        {item["id"] for item in packet["required_claims"]},
+        {"supported", "missing", "unclear"},
+        "claims",
     )
     forbidden = _review_items(
-        decision["forbidden"], {item["id"] for item in packet["forbidden_inferences"]},
-        {"absent", "present", "unclear"}, "forbidden",
+        decision["forbidden"],
+        {item["id"] for item in packet["forbidden_inferences"]},
+        {"absent", "present", "unclear"},
+        "forbidden",
     )
     has_failure = any(item["status"] == "missing" for item in claims.values()) or any(
         item["status"] == "present" for item in forbidden.values()
     )
-    has_unclear = any(item["status"] == "unclear" for item in (
-        *claims.values(), *forbidden.values()
-    ))
+    has_unclear = any(
+        item["status"] == "unclear" for item in (*claims.values(), *forbidden.values())
+    )
     if verdict == "pass" and (has_failure or has_unclear):
         raise ValueError("pass conflicts with claim-level review")
     if verdict == "pass" and packet["mechanical_status"] == "fail":

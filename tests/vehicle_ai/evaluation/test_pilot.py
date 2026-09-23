@@ -23,9 +23,7 @@ class ToolChoosingClient(BaseLLMClient):
         if last["role"] == "tool":
             return LLMResponse("已查询。", [])
         if last["role"] == "user" and "get_climate_status" in last["content"]:
-            return LLMResponse(
-                None, [LLMToolCall("1", "get_climate_status", {}, "{}")]
-            )
+            return LLMResponse(None, [LLMToolCall("1", "get_climate_status", {}, "{}")])
         return LLMResponse("已收到。", [])
 
 
@@ -46,8 +44,11 @@ def test_pilot_preflight_records_tool_call_before_cases(tmp_path) -> None:
     cases = load_pilot_cases(CASE_DIR)
     output = tmp_path / "pilot"
     result = run_pilot(
-        "fake", ToolChoosingClient(), cases,
-        output_root=output, model="fake-1",
+        "fake",
+        ToolChoosingClient(),
+        cases,
+        output_root=output,
+        model="fake-1",
     )
     assert result["preflight"]["passed"] is True
     assert isinstance(result["git_dirty"], bool)
@@ -66,8 +67,11 @@ def test_failed_preflight_does_not_run_pilot_cases(tmp_path) -> None:
             return LLMResponse("没有调用工具。", [])
 
     result = run_pilot(
-        "fake", NoTools(), load_pilot_cases(CASE_DIR),
-        output_root=tmp_path / "pilot", model="fake-1",
+        "fake",
+        NoTools(),
+        load_pilot_cases(CASE_DIR),
+        output_root=tmp_path / "pilot",
+        model="fake-1",
     )
     assert result["preflight"]["passed"] is False
     assert result["cases"] == []
@@ -87,8 +91,11 @@ def test_interrupted_pilot_keeps_preflight_manifest(tmp_path) -> None:
     output = tmp_path / "interrupted"
     with pytest.raises(KeyboardInterrupt):
         run_pilot(
-            "fake", Interrupted(), load_pilot_cases(CASE_DIR),
-            output_root=output, model="fake-1",
+            "fake",
+            Interrupted(),
+            load_pilot_cases(CASE_DIR),
+            output_root=output,
+            model="fake-1",
         )
     payload = json.loads((output / "pilot.json").read_text(encoding="utf-8"))
     assert payload["preflight"]["passed"] is True
@@ -111,9 +118,14 @@ def test_multiturn_confirmation_is_separate_event() -> None:
             if self.calls == 3:
                 return LLMResponse(
                     None,
-                    [LLMToolCall("n", "start_navigation",
-                                 {"poi_id": "rest_area_001"},
-                                 '{"poi_id":"rest_area_001"}')],
+                    [
+                        LLMToolCall(
+                            "n",
+                            "start_navigation",
+                            {"poi_id": "rest_area_001"},
+                            '{"poi_id":"rest_area_001"}',
+                        )
+                    ],
                 )
             return LLMResponse("请确认导航。", [])
 
@@ -130,14 +142,23 @@ def test_multiturn_confirmation_is_separate_event() -> None:
     assert "失败" not in trial.replies[-1]
 
 
-def test_pilot_cli_requires_explicit_provider_and_writes_run(tmp_path, monkeypatch) -> None:
+def test_pilot_cli_requires_explicit_provider_and_writes_run(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(
-        pilot_cli, "build_llm_client",
+        pilot_cli,
+        "build_llm_client",
         lambda provider, **kwargs: ToolChoosingClient(),
     )
-    result = pilot_cli.main([
-        "--provider", "qwen", "--cases", str(CASE_DIR),
-        "--output-root", str(tmp_path),
-    ])
+    result = pilot_cli.main(
+        [
+            "--provider",
+            "qwen",
+            "--cases",
+            str(CASE_DIR),
+            "--output-root",
+            str(tmp_path),
+        ]
+    )
     assert result == 0
     assert len(list(tmp_path.glob("*/pilot.json"))) == 1

@@ -43,11 +43,13 @@ class RecordingClient(BaseLLMClient):
         self.latencies_ms: list[float] = []
 
     def chat(self, messages, tools=None) -> LLMResponse:
-        self.requests.append({
-            "at_ms": int(time.time() * 1000),
-            "messages": plain_value(messages),
-            "tools": plain_value(tools or []),
-        })
+        self.requests.append(
+            {
+                "at_ms": int(time.time() * 1000),
+                "messages": plain_value(messages),
+                "tools": plain_value(tools or []),
+            }
+        )
         started = time.perf_counter()
         try:
             response = self.inner.chat(messages, tools)
@@ -94,28 +96,38 @@ def run_trial(
             if "user_text" in step:
                 reply = runtime.chat(step["user_text"], debug=False)
                 replies.append(reply)
-                interaction_events.append({
-                    "kind": "agent_reply", "at_ms": step.get("at_ms"),
-                    "text": reply,
-                })
+                interaction_events.append(
+                    {
+                        "kind": "agent_reply",
+                        "at_ms": step.get("at_ms"),
+                        "text": reply,
+                    }
+                )
             if step.get("confirm_pending"):
                 pending = runtime.agent.pending_actions.get()
                 if pending is not None:
                     confirmation = runtime.agent.confirm_pending(pending.action_id)
-                    interaction_events.append({
-                        "kind": "confirmation", "at_ms": step.get("at_ms"),
-                        "success": confirmation.success,
-                        "error": confirmation.error,
-                        "result": plain_value(confirmation.to_dict()),
-                    })
+                    interaction_events.append(
+                        {
+                            "kind": "confirmation",
+                            "at_ms": step.get("at_ms"),
+                            "success": confirmation.success,
+                            "error": confirmation.error,
+                            "result": plain_value(confirmation.to_dict()),
+                        }
+                    )
             if step.get("reject_pending"):
                 pending = runtime.agent.pending_actions.get()
                 if pending is not None:
                     rejection = runtime.agent.reject_pending(pending.action_id)
-                    interaction_events.append({
-                        "kind": "rejection", "at_ms": step.get("at_ms"),
-                        "success": rejection.success, "error": rejection.error,
-                    })
+                    interaction_events.append(
+                        {
+                            "kind": "rejection",
+                            "at_ms": step.get("at_ms"),
+                            "success": rejection.success,
+                            "error": rejection.error,
+                        }
+                    )
         if any(not reply.strip() for reply in replies):
             error = "EmptyResponse"
     except Exception as exc:
@@ -123,18 +135,26 @@ def run_trial(
     elapsed = (time.perf_counter() - started) * 1000
     tools = tuple(
         {
-            "name": item.name, "arguments": plain_value(item.arguments),
-            "success": item.success, "error": item.error,
+            "name": item.name,
+            "arguments": plain_value(item.arguments),
+            "success": item.success,
+            "error": item.error,
             "confirmed": item.confirmed,
             "result_data": plain_value(item.result_data),
         }
         for item in runtime.tools.execution_history()
     )
     return TrialResult(
-        case_id=case.id, provider=provider, model=model, trial_index=trial_index,
-        replies=tuple(replies), tool_calls=tools,
+        case_id=case.id,
+        provider=provider,
+        model=model,
+        trial_index=trial_index,
+        replies=tuple(replies),
+        tool_calls=tools,
         final_context=plain_value(runtime.context_manager.get_agent_context()),
-        request_count=len(recording.requests), latency_ms=elapsed, error=error,
+        request_count=len(recording.requests),
+        latency_ms=elapsed,
+        error=error,
         model_responses=tuple(
             {
                 "response_model": response.response_model,
@@ -153,7 +173,8 @@ def run_trial(
         request_latencies_ms=tuple(recording.latencies_ms),
         requested_tools=tuple(
             {"name": call.name, "arguments": plain_value(call.arguments)}
-            for response in recording.responses for call in response.tool_calls
+            for response in recording.responses
+            for call in response.tool_calls
         ),
         requests=tuple(recording.requests),
         settings={

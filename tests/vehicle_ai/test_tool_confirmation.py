@@ -319,11 +319,15 @@ def test_matching_pending_survives_other_blocked_call_in_same_batch() -> None:
             ScriptedResponse(
                 content=None,
                 tool_calls=(
-                    LLMToolCall("window", "set_driver_window", {"open": True},
-                                '{"open": true}'),
-                    LLMToolCall("nav", "start_navigation",
-                                {"poi_id": "rest_area_001"},
-                                '{"poi_id": "rest_area_001"}'),
+                    LLMToolCall(
+                        "window", "set_driver_window", {"open": True}, '{"open": true}'
+                    ),
+                    LLMToolCall(
+                        "nav",
+                        "start_navigation",
+                        {"poi_id": "rest_area_001"},
+                        '{"poi_id": "rest_area_001"}',
+                    ),
                 ),
             ),
         )
@@ -345,8 +349,9 @@ def test_sensitive_pending_cannot_be_replaced_by_later_search_in_batch() -> None
             ScriptedResponse(
                 content=None,
                 tool_calls=(
-                    LLMToolCall("window", "set_driver_window", {"open": True},
-                                '{"open": true}'),
+                    LLMToolCall(
+                        "window", "set_driver_window", {"open": True}, '{"open": true}'
+                    ),
                     LLMToolCall("search", "search_nearby_rest_area", {}, "{}"),
                 ),
             ),

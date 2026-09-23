@@ -32,17 +32,25 @@ def main() -> int:
     document = yaml.safe_load(args.case.read_text(encoding="utf-8"))
     case = EvaluationCase.from_mapping(document)
     default_model = (
-        os.getenv("QWEN_MODEL", "qwen3.8-max") if args.provider == "qwen"
+        os.getenv("QWEN_MODEL", "qwen3.8-max")
+        if args.provider == "qwen"
         else os.getenv("GLM_MODEL", "glm-5.1")
     )
     client = build_llm_client(
-        args.provider, model=args.model or default_model,
-        timeout_seconds=args.timeout_seconds, temperature=args.temperature,
+        args.provider,
+        model=args.model or default_model,
+        timeout_seconds=args.timeout_seconds,
+        temperature=args.temperature,
     )
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    destination = args.output_dir / f"{stamp}-{args.provider}-{case.id}-t{args.trial_index}"
+    destination = (
+        args.output_dir / f"{stamp}-{args.provider}-{case.id}-t{args.trial_index}"
+    )
     trial = run_trial(
-        case, client, provider=args.provider, model=str(getattr(client, "model")),
+        case,
+        client,
+        provider=args.provider,
+        model=str(getattr(client, "model")),
         trial_index=args.trial_index,
         max_tool_rounds=args.max_tool_rounds,
     )

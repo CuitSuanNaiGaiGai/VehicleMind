@@ -19,16 +19,23 @@ class FactReply(BaseLLMClient):
 
 def test_road_candidate_cases_are_grounded_and_runnable() -> None:
     for case_id in IDS:
-        case = EvaluationCase.from_mapping(yaml.safe_load(
-            (ROOT / "candidates" / f"{case_id}.yaml").read_text(encoding="utf-8")
-        ))
+        case = EvaluationCase.from_mapping(
+            yaml.safe_load(
+                (ROOT / "candidates" / f"{case_id}.yaml").read_text(encoding="utf-8")
+            )
+        )
         rubric = load_rubric(ROOT / "rubrics" / f"{case_id}.yaml", case)
         assert case.id == case_id
         assert case.category == "road"
         assert case.split == ("heldout" if case_id == "R05" else "dev")
         assert case.review_status == rubric.label_status == "candidate"
         assert rubric.facts and rubric.required_claims and rubric.forbidden_inferences
-        assert run_trial(case, FactReply(), provider="test", model="stub", trial_index=1).error is None
+        assert (
+            run_trial(
+                case, FactReply(), provider="test", model="stub", trial_index=1
+            ).error
+            is None
+        )
 
 
 def test_road_missing_area_and_detected_objects_remain_distinct() -> None:

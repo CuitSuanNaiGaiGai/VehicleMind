@@ -93,8 +93,12 @@ def _supported_claims(
         if set(item) != {"id", "text", "supported_by"}:
             raise ValueError(f"{name} fields mismatch")
         support = item["supported_by"]
-        if not isinstance(support, list) or not support or not all(
-            isinstance(value, str) and value in fact_ids for value in support
+        if (
+            not isinstance(support, list)
+            or not support
+            or not all(
+                isinstance(value, str) and value in fact_ids for value in support
+            )
         ):
             raise ValueError(f"{name} has unknown support fact")
         claims.append(
@@ -111,8 +115,14 @@ def load_rubric(path: Path, case: EvaluationCase) -> GroundingRubric:
     """Load candidate rules without promoting labels or judging a model answer."""
     document = _mapping(yaml.safe_load(path.read_text(encoding="utf-8")), "rubric")
     fields = {
-        "schema_version", "case_id", "label_status", "reviewer", "facts",
-        "required_claims", "allowed_inferences", "forbidden_inferences",
+        "schema_version",
+        "case_id",
+        "label_status",
+        "reviewer",
+        "facts",
+        "required_claims",
+        "allowed_inferences",
+        "forbidden_inferences",
     }
     if set(document) != fields or document["schema_version"] != 1:
         raise ValueError("rubric schema mismatch")
@@ -137,21 +147,24 @@ def load_rubric(path: Path, case: EvaluationCase) -> GroundingRubric:
         grounded, actual = _source_value(case, source)
         if grounded and actual != item["value"]:
             raise ValueError(f"source fact mismatch: {source}")
-        facts.append(
-            SourceFact(_text(item["id"], "fact.id"), source, item["value"])
-        )
+        facts.append(SourceFact(_text(item["id"], "fact.id"), source, item["value"]))
     fact_ids = {fact.id for fact in facts}
     if len(fact_ids) != len(facts):
         raise ValueError("duplicate fact id")
-    required = _supported_claims(document["required_claims"], "required_claims", fact_ids)
-    allowed = _supported_claims(document["allowed_inferences"], "allowed_inferences", fact_ids)
+    required = _supported_claims(
+        document["required_claims"], "required_claims", fact_ids
+    )
+    allowed = _supported_claims(
+        document["allowed_inferences"], "allowed_inferences", fact_ids
+    )
     forbidden: list[ReviewRule] = []
     for item in _items(document["forbidden_inferences"], "forbidden_inferences"):
         if set(item) != {"id", "text"}:
             raise ValueError("forbidden inference fields mismatch")
         forbidden.append(
-            ReviewRule(_text(item["id"], "forbidden.id"),
-                       _text(item["text"], "forbidden.text"))
+            ReviewRule(
+                _text(item["id"], "forbidden.id"), _text(item["text"], "forbidden.text")
+            )
         )
     all_ids = [fact.id for fact in facts]
     all_ids.extend(claim.id for claim in (*required, *allowed))
@@ -159,7 +172,11 @@ def load_rubric(path: Path, case: EvaluationCase) -> GroundingRubric:
     if len(all_ids) != len(set(all_ids)):
         raise ValueError("duplicate rubric id")
     return GroundingRubric(
-        case_id=case.id, label_status=status, reviewer=reviewer,
-        facts=tuple(facts), required_claims=required,
-        allowed_inferences=allowed, forbidden_inferences=tuple(forbidden),
+        case_id=case.id,
+        label_status=status,
+        reviewer=reviewer,
+        facts=tuple(facts),
+        required_claims=required,
+        allowed_inferences=allowed,
+        forbidden_inferences=tuple(forbidden),
     )

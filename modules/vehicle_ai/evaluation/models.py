@@ -18,8 +18,11 @@ class EvaluationCase:
     @property
     def sha256(self) -> str:
         payload = {
-            "id": self.id, "split": self.split, "category": self.category,
-            "review_status": self.review_status, "steps": self.steps,
+            "id": self.id,
+            "split": self.split,
+            "category": self.category,
+            "review_status": self.review_status,
+            "steps": self.steps,
             "expected": self.expected,
         }
         return hashlib.sha256(
@@ -45,7 +48,10 @@ class EvaluationCase:
         if not isinstance(expected, dict):
             raise ValueError("expected must be a mapping")
         if set(expected) != {
-            "tools", "final_vehicle", "required_facts", "forbidden_phrases"
+            "tools",
+            "final_vehicle",
+            "required_facts",
+            "forbidden_phrases",
         }:
             raise ValueError("expected fields mismatch")
         if not isinstance(expected["tools"], list):
@@ -66,8 +72,13 @@ class EvaluationCase:
                 raise ValueError(f"expected.{field} must be a text list")
         for step in data["steps"]:
             if not isinstance(step, dict) or set(step) - {
-                "at_ms", "cabin", "road", "vehicle", "user_text",
-                "confirm_pending", "reject_pending"
+                "at_ms",
+                "cabin",
+                "road",
+                "vehicle",
+                "user_text",
+                "confirm_pending",
+                "reject_pending",
             }:
                 raise ValueError("invalid step")
             if "at_ms" in step and (
@@ -85,8 +96,10 @@ class EvaluationCase:
         if not any("user_text" in step for step in data["steps"]):
             raise ValueError("at least one user_text is required")
         return cls(
-            id=str(data["id"]), split=data["split"],
-            category=str(data["category"]), review_status=data["review_status"],
+            id=str(data["id"]),
+            split=data["split"],
+            category=str(data["category"]),
+            review_status=data["review_status"],
             steps=tuple(dict(step) for step in data["steps"]),
             expected=dict(expected),
         )

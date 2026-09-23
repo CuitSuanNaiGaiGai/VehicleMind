@@ -17,9 +17,14 @@ def write_report(
     """Write one trace and a deliberately provisional Chinese result summary."""
     destination.mkdir(parents=True, exist_ok=False)
     payload = {
-        "case": {"id": case.id, "split": case.split,
-                 "category": case.category, "review_status": case.review_status,
-                 "steps": case.steps, "expected": case.expected},
+        "case": {
+            "id": case.id,
+            "split": case.split,
+            "category": case.category,
+            "review_status": case.review_status,
+            "steps": case.steps,
+            "expected": case.expected,
+        },
         "trial": asdict(trial),
         "grade": grade,
     }

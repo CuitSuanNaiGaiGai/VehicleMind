@@ -17,7 +17,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="双模型在线 Agent 候选集 pilot")
     parser.add_argument("--provider", choices=("qwen", "glm"), required=True)
     parser.add_argument(
-        "--cases", type=Path,
+        "--cases",
+        type=Path,
         default=Path("scenarios/agent_eval/candidates"),
     )
     parser.add_argument("--output-root", type=Path, default=Path("runs/agent_eval"))
@@ -29,18 +30,25 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("请求超时必须为正数")
     load_dotenv()
     model = args.model or (
-        os.getenv("QWEN_MODEL", "qwen3.8-max") if args.provider == "qwen"
+        os.getenv("QWEN_MODEL", "qwen3.8-max")
+        if args.provider == "qwen"
         else os.getenv("GLM_MODEL", "glm-5.1")
     )
     client = build_llm_client(
-        args.provider, model=model, temperature=args.temperature,
+        args.provider,
+        model=model,
+        temperature=args.temperature,
         timeout_seconds=args.timeout_seconds,
     )
     cases = load_pilot_cases(args.cases)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     output = args.output_root / f"pilot-{stamp}-{args.provider}"
     result = run_pilot(
-        args.provider, client, cases, output_root=output, model=model,
+        args.provider,
+        client,
+        cases,
+        output_root=output,
+        model=model,
     )
     print(f"预检：{'通过' if result['preflight']['passed'] else '失败'}")
     print(f"已运行候选场景：{len(result['cases'])} / {len(cases)}")

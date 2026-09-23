@@ -50,12 +50,15 @@ def test_real_agent_decision_is_recorded_and_graded() -> None:
 def test_wrong_tool_and_forbidden_claim_fail() -> None:
     case = EvaluationCase.from_mapping(
         {
-            "id": "T02", "split": "dev", "category": "tool",
+            "id": "T02",
+            "split": "dev",
+            "category": "tool",
             "review_status": "candidate",
             "steps": [{"user_text": "空调现在是什么状态？"}],
             "expected": {
                 "tools": [{"name": "get_climate_status", "arguments": {}}],
-                "final_vehicle": {}, "required_facts": [],
+                "final_vehicle": {},
+                "required_facts": [],
                 "forbidden_phrases": ["已打开空调"],
             },
         }
@@ -70,21 +73,34 @@ def test_wrong_tool_and_forbidden_claim_fail() -> None:
 def test_argument_grade_uses_model_request_not_grounded_execution() -> None:
     case = EvaluationCase.from_mapping(
         {
-            "id": "T03", "split": "dev", "category": "tool",
-            "review_status": "candidate", "steps": [{"user_text": "设为24度"}],
-            "expected": {"tools": [{"name": "set_temperature",
-                                    "arguments": {"temperature_c": 24}}],
-                         "final_vehicle": {}, "required_facts": [],
-                         "forbidden_phrases": []},
+            "id": "T03",
+            "split": "dev",
+            "category": "tool",
+            "review_status": "candidate",
+            "steps": [{"user_text": "设为24度"}],
+            "expected": {
+                "tools": [
+                    {"name": "set_temperature", "arguments": {"temperature_c": 24}}
+                ],
+                "final_vehicle": {},
+                "required_facts": [],
+                "forbidden_phrases": [],
+            },
         }
     )
-    trial = run_trial(case, FakeClient([LLMResponse("好", [])]),
-                      provider="fake", model="fake-1", trial_index=1)
+    trial = run_trial(
+        case,
+        FakeClient([LLMResponse("好", [])]),
+        provider="fake",
+        model="fake-1",
+        trial_index=1,
+    )
     altered = replace(
         trial,
         tool_calls=({"name": "set_temperature", "arguments": {"temperature_c": 24}},),
-        requested_tools=({"name": "set_temperature",
-                          "arguments": {"temperature_c": 25}},),
+        requested_tools=(
+            {"name": "set_temperature", "arguments": {"temperature_c": 25}},
+        ),
     )
     grade = grade_trial(case, altered)
     assert grade["tool_selection"] is True
@@ -93,10 +109,17 @@ def test_argument_grade_uses_model_request_not_grounded_execution() -> None:
 
 def test_case_rejects_unreviewed_heldout_and_unknown_fields() -> None:
     data = {
-        "id": "X07", "split": "heldout", "category": "cross_domain",
-        "review_status": "candidate", "steps": [{"user_text": "路况？"}],
-        "expected": {"tools": [], "final_vehicle": {}, "required_facts": [],
-                     "forbidden_phrases": []},
+        "id": "X07",
+        "split": "heldout",
+        "category": "cross_domain",
+        "review_status": "candidate",
+        "steps": [{"user_text": "路况？"}],
+        "expected": {
+            "tools": [],
+            "final_vehicle": {},
+            "required_facts": [],
+            "forbidden_phrases": [],
+        },
     }
     case = EvaluationCase.from_mapping(data)
     assert case.review_status == "candidate"
@@ -111,16 +134,25 @@ def test_case_rejects_unreviewed_heldout_and_unknown_fields() -> None:
 def test_report_is_chinese_and_does_not_promote_candidate(tmp_path) -> None:
     case = EvaluationCase.from_mapping(
         {
-            "id": "C01", "split": "dev", "category": "cabin",
+            "id": "C01",
+            "split": "dev",
+            "category": "cabin",
             "review_status": "candidate",
             "steps": [{"user_text": "驾驶状态如何？"}],
-            "expected": {"tools": [], "final_vehicle": {},
-                         "required_facts": [], "forbidden_phrases": []},
+            "expected": {
+                "tools": [],
+                "final_vehicle": {},
+                "required_facts": [],
+                "forbidden_phrases": [],
+            },
         }
     )
     trial = run_trial(
-        case, FakeClient([LLMResponse("暂时不确定。", [])]),
-        provider="fake", model="fake-1", trial_index=1,
+        case,
+        FakeClient([LLMResponse("暂时不确定。", [])]),
+        provider="fake",
+        model="fake-1",
+        trial_index=1,
     )
     output = tmp_path / "trial-1"
     write_report(output, case, trial, grade_trial(case, trial))
@@ -133,17 +165,35 @@ def test_report_is_chinese_and_does_not_promote_candidate(tmp_path) -> None:
 def test_trials_do_not_share_context_or_history() -> None:
     case = EvaluationCase.from_mapping(
         {
-            "id": "T03", "split": "dev", "category": "tool",
+            "id": "T03",
+            "split": "dev",
+            "category": "tool",
             "review_status": "candidate",
-            "steps": [{"vehicle": {"target_temperature_c": 24.0}},
-                      {"user_text": "当前温度？"}],
-            "expected": {"tools": [], "final_vehicle": {},
-                         "required_facts": [], "forbidden_phrases": []},
+            "steps": [
+                {"vehicle": {"target_temperature_c": 24.0}},
+                {"user_text": "当前温度？"},
+            ],
+            "expected": {
+                "tools": [],
+                "final_vehicle": {},
+                "required_facts": [],
+                "forbidden_phrases": [],
+            },
         }
     )
-    first = run_trial(case, FakeClient([LLMResponse("24度", [])]),
-                      provider="fake", model="fake-1", trial_index=1)
-    second = run_trial(case, FakeClient([LLMResponse("24度", [])]),
-                       provider="fake", model="fake-1", trial_index=2)
+    first = run_trial(
+        case,
+        FakeClient([LLMResponse("24度", [])]),
+        provider="fake",
+        model="fake-1",
+        trial_index=1,
+    )
+    second = run_trial(
+        case,
+        FakeClient([LLMResponse("24度", [])]),
+        provider="fake",
+        model="fake-1",
+        trial_index=2,
+    )
     assert first.final_context["vehicle"] == second.final_context["vehicle"]
     assert first.request_count == second.request_count == 1
