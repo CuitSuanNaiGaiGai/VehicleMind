@@ -96,7 +96,7 @@ class PendingAction:
         now: float | None = None,
     ) -> bool:
 
-        return self.age_seconds(now) > self.expires_after_seconds
+        return self.age_seconds(now) >= self.expires_after_seconds
 
     # ========================================================
     # Serialization
@@ -185,6 +185,13 @@ class PendingActionStore:
     ) -> None:
 
         self._pending = None
+
+    def reject(self, action_id: str) -> bool:
+        action = self.get()
+        if action is None or action.action_id != action_id:
+            return False
+        self.clear()
+        return True
 
     def consume(
         self,

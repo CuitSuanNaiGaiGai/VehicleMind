@@ -60,3 +60,12 @@ class ActionConfirmationController:
             dict(confirmation.arguments),
             confirmation=grant,
         )
+
+    def reject(self, action_id: str) -> ToolResult:
+        if not self.pending_actions.reject(action_id):
+            return ToolResult(
+                success=False,
+                message="No matching live pending action was found.",
+                error="INVALID_CONFIRMATION",
+            )
+        return ToolResult(success=True, message="Pending action cancelled.")

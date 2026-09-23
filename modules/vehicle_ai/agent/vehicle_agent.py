@@ -294,6 +294,9 @@ class VehicleAgent:
     def confirm_pending(self, action_id: str) -> ToolResult:
         return self.confirmations.confirm(action_id)
 
+    def reject_pending(self, action_id: str) -> ToolResult:
+        return self.confirmations.reject(action_id)
+
     # ========================================================
     # Debug
     # ========================================================

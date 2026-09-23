@@ -88,6 +88,27 @@ def test_wrong_confirmation_id_does_not_consume_pending_action(
     assert runtime.agent.pending_actions.get() is not None
 
 
+def test_rejection_requires_matching_action_id(runtime: VehicleMindRuntime) -> None:
+    pending = _pending_navigation()
+    runtime.agent.pending_actions.set(pending)
+
+    wrong = runtime.agent.reject_pending("wrong-id")
+    assert wrong.error == "INVALID_CONFIRMATION"
+    assert runtime.agent.pending_actions.get() == pending
+
+    rejected = runtime.agent.reject_pending(pending.action_id)
+    assert rejected.success is True
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.confirm_pending(pending.action_id).error == "INVALID_CONFIRMATION"
+    assert runtime.context_manager.get_context().vehicle.navigation_state == NavigationState.IDLE
+
+
+def test_pending_action_expires_at_exact_ttl_boundary() -> None:
+    pending = _pending_navigation(created_at=100.0)
+
+    assert pending.is_expired(now=220.0)
+
+
 def test_pending_action_arguments_are_immutable_and_defensively_exported() -> None:
     pending = _pending_navigation()
 
