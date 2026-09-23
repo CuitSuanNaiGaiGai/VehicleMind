@@ -99,8 +99,13 @@ def test_rejection_requires_matching_action_id(runtime: VehicleMindRuntime) -> N
     rejected = runtime.agent.reject_pending(pending.action_id)
     assert rejected.success is True
     assert runtime.agent.pending_actions.get() is None
-    assert runtime.agent.confirm_pending(pending.action_id).error == "INVALID_CONFIRMATION"
-    assert runtime.context_manager.get_context().vehicle.navigation_state == NavigationState.IDLE
+    assert (
+        runtime.agent.confirm_pending(pending.action_id).error == "INVALID_CONFIRMATION"
+    )
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_state
+        == NavigationState.IDLE
+    )
 
 
 def test_pending_action_expires_at_exact_ttl_boundary() -> None:
@@ -239,3 +244,115 @@ def test_agent_stages_sensitive_tool_call_instead_of_executing() -> None:
     assert pending.tool_name == "set_driver_window"
     assert pending.arguments == {"open": True}
     assert runtime.context_manager.get_context().vehicle.driver_window_open is False
+
+
+def test_explicit_refusal_clears_pending_without_calling_llm() -> None:
+    llm = ScriptedLLMClient((ScriptedResponse(content="unused"),))
+    runtime = VehicleMindRuntime(llm=llm)
+    pending = _pending_navigation()
+    runtime.agent.pending_actions.set(pending)
+
+    answer = runtime.chat("不要了", debug=False)
+
+    assert answer
+    assert llm.remaining == 1
+    assert runtime.agent.pending_actions.get() is None
+    assert (
+        runtime.agent.confirm_pending(pending.action_id).error == "INVALID_CONFIRMATION"
+    )
+    assert not runtime.tools.execution_history()
+
+
+def test_target_change_does_not_ground_new_call_to_old_destination() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="new-target",
+                        name="start_navigation",
+                        arguments={"poi_id": "rest_area_002"},
+                        arguments_json='{"poi_id": "rest_area_002"}',
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Please confirm the new destination."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    old = _pending_navigation()
+    runtime.agent.pending_actions.set(old)
+
+    runtime.chat("换成东湖服务区", debug=False)
+
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.confirm_pending(old.action_id).error == "INVALID_CONFIRMATION"
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_state
+        == NavigationState.IDLE
+    )
+
+
+def test_target_change_replaces_action_only_after_search_result() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="search-new",
+                        name="search_nearby_rest_area",
+                        arguments={},
+                        arguments_json="{}",
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Please confirm the new destination."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    old = PendingAction(
+        tool_name="start_navigation",
+        arguments={"poi_id": "rest_area_002"},
+        display_text="Navigate to Riverside Service Area",
+    )
+    runtime.agent.pending_actions.set(old)
+
+    runtime.chat("换成西湖服务区", debug=False)
+
+    current = runtime.agent.pending_actions.get()
+    assert current is not None
+    assert current.action_id != old.action_id
+    assert current.arguments["poi_id"] == "rest_area_001"
+    assert runtime.agent.confirm_pending(old.action_id).error == "INVALID_CONFIRMATION"
+
+
+def test_navigation_call_cannot_replace_unrelated_pending_action() -> None:
+    llm = ScriptedLLMClient(
+        (
+            ScriptedResponse(
+                content=None,
+                tool_calls=(
+                    LLMToolCall(
+                        id="invented-nav",
+                        name="start_navigation",
+                        arguments={"poi_id": "rest_area_002"},
+                        arguments_json='{"poi_id": "rest_area_002"}',
+                    ),
+                ),
+            ),
+            ScriptedResponse(content="Navigation requires a search."),
+        )
+    )
+    runtime = VehicleMindRuntime(llm=llm)
+    window = PendingAction(
+        tool_name="set_driver_window",
+        arguments={"open": True},
+        display_text="Open driver window",
+    )
+    runtime.agent.pending_actions.set(window)
+
+    runtime.chat("导航到附近", debug=False)
+
+    assert runtime.agent.pending_actions.get() == window

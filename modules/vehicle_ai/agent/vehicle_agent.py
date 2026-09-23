@@ -7,6 +7,7 @@ from modules.vehicle_ai.agent.action_state import (
     PendingActionStore,
 )
 from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
+from modules.vehicle_ai.agent.pending_intent import classify_pending_intent
 
 from modules.vehicle_ai.agent.prompts import (
     SYSTEM_PROMPT,
@@ -321,6 +322,14 @@ class VehicleAgent:
         if not user_text:
             return ""
 
+        pending = self.pending_actions.get()
+        intent = classify_pending_intent(user_text) if pending is not None else None
+        if pending is not None and intent == "reject":
+            self.confirmations.reject(pending.action_id)
+            return "已取消待确认操作。"
+        if pending is not None and intent == "change_target":
+            self.confirmations.reject(pending.action_id)
+
         # ----------------------------------------------------
         # Rebuild dynamic system state every user turn.
         # ----------------------------------------------------
@@ -394,7 +403,11 @@ class VehicleAgent:
                     tool_name=(call.name),
                     arguments=(call.arguments),
                 )
-                self.confirmations.stage(call.name, grounded_arguments)
+                pending = self.pending_actions.get()
+                if call.name != "start_navigation" or (
+                    pending is not None and pending.tool_name == "start_navigation"
+                ):
+                    self.confirmations.stage(call.name, grounded_arguments)
 
                 if debug:
                     print()
