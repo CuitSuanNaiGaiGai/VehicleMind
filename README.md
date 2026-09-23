@@ -37,6 +37,8 @@ uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
 
 项目提供三种用途不同的运行模式：
 
+当前可用本地舱内与道路视频运行[离线视频协同演示](docs/offline_video_pipeline.md)；不要求实时采集，视频和模型权重需自行放置在本地。
+
 - **Replay 模式**：使用已录制的语义观测，确定性验证上下文、事件、Agent 编排、确认门禁和工具执行；不需要摄像头、模型权重、API Key 或网络。
 - **Perception 模式**：单独运行舱内或舱外模型，验证真实视频输入与感知输出，需要相应依赖和模型资产。
 - **Live 模式**：面向后续车机联调，将实时感知接入统一上下文和 Agent；当前不作为离线 Demo 的完成条件。
