@@ -1,0 +1,24 @@
+id: R03
+split: dev
+category: road
+review_status: candidate
+steps:
+  - at_ms: 0
+    road:
+      vehicle_count: 2
+      pedestrian_count: 0
+      rider_count: 0
+      traffic_light_count: 0
+      traffic_sign_count: 0
+      lane_detected: true
+      drivable_area_detected: false
+      traffic_level: LIGHT
+  - at_ms: 100
+    user_text: "当前可行驶区域检测到了吗？道路观测该怎么理解？"
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+    - "可行驶区域已检测到"
+    - "道路无法通行"

@@ -1,0 +1,24 @@
+id: R01
+split: dev
+category: road
+review_status: candidate
+steps:
+  - at_ms: 0
+    road:
+      vehicle_count: 6
+      pedestrian_count: 0
+      rider_count: 0
+      traffic_light_count: 0
+      traffic_sign_count: 0
+      lane_detected: true
+      drivable_area_detected: true
+      traffic_level: MODERATE
+  - at_ms: 100
+    user_text: "根据当前道路观测，前方车流情况怎么样？"
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+    - "严重拥堵"
+    - "道路完全空旷"
