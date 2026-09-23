@@ -1,0 +1,77 @@
+# 回放报告技术指标双语展示实施计划
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** 让新生成的回放报告中全部技术指标显示为“英文（中文含义）”，并明确旧报告不会自动更新。
+
+**Architecture:** 只在 `report.js` 的可见文本层集中组合双语标签；`report.html` 保持中文叙述，`summary.json` 与 `trace.json` 保持原协议。使用现有 Node DOM 模拟测试验证实际渲染，再用新的运行标识生成报告；不覆盖旧结果。
+
+**Tech Stack:** 原生 JavaScript、Python 3.13、pytest、Node.js（可用时运行 DOM 测试）。
+
+## Global Constraints
+
+- `summary.json`、`trace.json` 的键、枚举值、工具名、事件类型、文件路径和哈希不改。
+- 旧 `runs/drowsy-rest-stop/` 不覆盖、不删除；新结果使用独立运行标识。
+- 页面说明、状态、失败原因和证据限制保留中文；技术标签统一为 `English（中文含义）`。
+- 未知技术字段显示 `raw_key（未翻译字段）`；`STALE`、`INVALID` 等可见枚举保留原值并附中文释义。
+- 录制观测回放不被描述为真实视频推理。
+
+---
+
+### Task 1: 双语报告展示层
+
+**Files:**
+- Modify: `apps/vehicle_ai_demo/replay_ui/report.js`
+- Modify: `tests/vehicle_ai/replay/test_report_ui.py`
+- Test: `tests/vehicle_ai/replay/test_replay_report.py`
+
+**Interfaces:** `report.js` 继续读取 `vehiclemind-data` 中的现有数据；`displayLabel(key)` 返回 `raw_key（中文释义）` 或 `raw_key（未翻译字段）`，`valueText(value)` 不修改原数据。
+
+- [ ] **Step 1: 扩展失败的 DOM 渲染测试。** 在 `test_report_ui.py` 的 Node 模拟数据中加入观测 `confidence`、上下文未知字段、`HIGH_RISK_DETECTED` 事件与 `start_navigation` 工具断言；检查顶部 `Runtime（运行耗时）`、字段 `risk（风险等级）`、状态 `STALE（已过期）`、事件和工具的双语名称，以及未知字段回退。
+
+```javascript
+assert.match(allText(roots['headline-metrics']), /Runtime（运行耗时）/);
+assert.match(allText(roots['context-grid']), /risk（风险等级）/);
+assert.match(allText(roots['context-grid']), /STALE（已过期）/);
+assert.match(allText(roots['timeline']), /HIGH_RISK_DETECTED（检测到高风险）/);
+assert.match(allText(roots['assertions']), /start_navigation（启动导航）/);
+```
+
+- [ ] **Step 2: 运行红灯。** `uv run --group dev pytest -q tests/vehicle_ai/replay/test_report_ui.py`；预期因现有纯中文标签失败。
+- [ ] **Step 3: 实现集中映射。** 保留 `labels`、`events`、`tools`、`values` 的中文释义；新增格式化函数，所有技术字段由原始标识与释义拼接，不把双语字符串写入数据对象。
+
+```javascript
+function bilingual(raw, translations, fallback = '未翻译字段') {
+  return `${raw}（${translations[raw] ?? fallback}）`;
+}
+function displayLabel(key) { return bilingual(key, labels); }
+function eventText(type) { return bilingual(type, events, '未翻译事件'); }
+function toolText(name) { return bilingual(name, tools, '未翻译工具'); }
+```
+
+顶部四项固定标签、上下文域名、时间线技术字段、事件类型、工具名、断言名称和可见状态枚举均调用同一规则；普通中文句子、用户输入、哈希、路径与 ID 保持原义。避免 `D（前进挡（D））` 等重复释义，挡位释义改为“前进挡”等。
+- [ ] **Step 4: 运行绿灯与语法检查。** `uv run --group dev pytest -q tests/vehicle_ai/replay/test_report_ui.py tests/vehicle_ai/replay/test_replay_report.py`、`node --check apps/vehicle_ai_demo/replay_ui/report.js`；预期全部通过。
+- [ ] **Step 5: 提交。** `git add apps/vehicle_ai_demo/replay_ui/report.js tests/vehicle_ai/replay/test_report_ui.py tests/vehicle_ai/replay/test_replay_report.py && git commit -m 'Render replay metrics with bilingual labels'`。
+
+### Task 2: 文档、真实报告与交付验收
+
+**Files:**
+- Modify: `README.md`
+- Modify: `todolist.md`
+- Generate: `runs/drowsy-rest-stop-bilingual/`（运行产物，不提交到 Git）
+
+**Interfaces:** 回放命令保留 `--scenario`、`--output-root`、`--run-id`；新报告路径为 `runs/drowsy-rest-stop-bilingual/report.html`。
+
+- [ ] **Step 1: 更新 README 与任务清单。** 在快速启动段明确“旧报告不会随模板更新；新运行使用新的 `--run-id`”，提供下列命令，并在 `todolist.md` 记录双语报告完成情况但不勾选尚无真实指标的作品集目标。
+
+```bash
+uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
+  --scenario assets/scenarios/drowsy_rest_stop.yaml \
+  --output-root runs --run-id drowsy-rest-stop-bilingual
+open runs/drowsy-rest-stop-bilingual/report.html
+```
+
+- [ ] **Step 2: 运行完整门禁。** `uv run --group dev pytest -q`、`uv run --group dev ruff check apps modules scripts tests`、`uv run --group dev ruff format --check apps modules scripts tests`、`uv run --group dev mypy modules/config modules/vehicle_ai/context/enums.py modules/vehicle_ai/integration/cabin_adapter.py scripts/verify_assets.py`、`uv run --group dev python scripts/check_source_size.py`；预期全部成功。
+- [ ] **Step 3: 提交代码与文档。** `git add README.md todolist.md && git commit -m 'Explain regenerated bilingual report and progress'`。
+- [ ] **Step 4: 生成新报告并核对。** 运行上面的回放命令，不使用 `--allow-dirty`；确认新 `report.html` 为 `lang="zh-CN"`、新 `report.js` 包含双语映射、`summary.json` 仍保留原始键和工具名，旧 `runs/drowsy-rest-stop/report.js` 仍是历史版本。
+- [ ] **Step 5: 审查与 GitHub 同步。** 独立代码审查后推送功能分支、创建并附加 PR，等待 CI 通过，合并后快进同步本地 `main`；向用户提供新报告路径与打开命令，并按 `todolist.md` 告知完成项和下一步。
