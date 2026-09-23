@@ -1,0 +1,13 @@
+schema_version: 1
+high_driver_risk:
+  hold_ms: 300
+  cooldown_ms: 30000
+  max_gap_ms: 1000
+lane_lost:
+  hold_ms: 500
+  cooldown_ms: 10000
+  max_gap_ms: 1000
+drivable_area_lost:
+  hold_ms: 500
+  cooldown_ms: 10000
+  max_gap_ms: 1000

@@ -87,6 +87,21 @@ steps:
         recent_yawns: 2
         blink_count: 5
 
+  - at_ms: 2100
+    cabin:
+      source: recorded_cabin_perception
+      confidence: 0.88
+      valid: true
+      values:
+        presence: PRESENT
+        driver_state: DROWSY
+        risk: HIGH
+        perclos: 0.43
+        eye_closed: true
+        eye_closure_seconds: 2.7
+        recent_yawns: 2
+        blink_count: 5
+
   - at_ms: 2200
     user_text: I feel tired. Find a nearby rest area.
 

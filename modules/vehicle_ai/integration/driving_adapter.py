@@ -77,7 +77,7 @@ class DrivingContextAdapter:
             traffic_light_count=int(traffic_light_count),
             traffic_sign_count=int(traffic_sign_count),
             total_objects=(total_objects),
-            lane_detected=bool(lane_detected),
-            drivable_area_detected=bool(drivable_area_detected),
+            lane_detected=lane_detected,
+            drivable_area_detected=drivable_area_detected,
             traffic_level=(traffic_level),
         )

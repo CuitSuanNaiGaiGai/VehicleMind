@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from modules.config import CabinPerceptionConfig, PerceptionConfig
+from modules.config.events import EventTimingConfig
 from modules.config.snapshot import RunProvenance, build_run_snapshot
 from modules.vehicle_ai.replay import ReplayRunner, load_replay_scenario
 from modules.vehicle_ai.replay.report import write_replay_report
@@ -62,15 +63,17 @@ def _run(args: argparse.Namespace) -> int:
         git_commit=_git("rev-parse", "HEAD"),
         dirty=bool(_git("status", "--porcelain")),
     )
+    event_timing = EventTimingConfig.load()
     snapshot = build_run_snapshot(
         cabin=CabinPerceptionConfig.load_default(),
         perception=PerceptionConfig.load_default(),
+        events=event_timing,
         overrides={"scenario": scenario_reference},
         assets=[],
         provenance=provenance,
         allow_dirty=args.allow_dirty,
     )
-    result = ReplayRunner().run(scenario)
+    result = ReplayRunner(event_timing=event_timing).run(scenario)
     paths = write_replay_report(
         result,
         scenario,

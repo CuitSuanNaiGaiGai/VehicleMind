@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from modules.config import CabinPerceptionConfig, PerceptionConfig
+from modules.config.events import EventTimingConfig, HazardTiming
 from modules.config.overrides import resolve_overrides
 from modules.config.snapshot import (
     RunProvenance,
@@ -48,6 +49,29 @@ def test_snapshot_digest_is_deterministic() -> None:
 
     assert first["config_sha256"] == second["config_sha256"]
     assert len(str(first["config_sha256"])) == 64
+
+
+def test_event_timing_is_recorded_and_changes_config_digest() -> None:
+    base = _snapshot()
+    events = EventTimingConfig.load()
+    changed = EventTimingConfig(
+        high_driver_risk=HazardTiming(400, 30000, 1000),
+        lane_lost=events.lane_lost,
+        drivable_area_lost=events.drivable_area_lost,
+    )
+    with_events = build_run_snapshot(
+        cabin=CabinPerceptionConfig.load_default(),
+        perception=PerceptionConfig.load_default(),
+        events=changed,
+        overrides={},
+        assets=[],
+        provenance=_provenance(),
+    )
+
+    assert (
+        with_events["resolved_config"]["events"]["high_driver_risk"]["hold_ms"] == 400
+    )
+    assert with_events["config_sha256"] != base["config_sha256"]
 
 
 def test_dirty_formal_run_is_rejected() -> None:

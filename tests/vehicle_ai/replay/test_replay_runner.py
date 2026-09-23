@@ -4,8 +4,17 @@ from dataclasses import replace
 from pathlib import Path
 
 from modules.vehicle_ai.replay import load_replay_scenario
-from modules.vehicle_ai.replay.models import ExpectedOutcome, freeze_mapping
+from modules.vehicle_ai.replay.models import (
+    ExpectedOutcome,
+    ReplayObservation,
+    ReplayStep,
+    ScriptedResponse,
+    freeze_mapping,
+)
 from modules.vehicle_ai.replay.runner import ReplayRunner
+from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
+from modules.vehicle_ai.replay.trace import TraceRecorder
+from modules.vehicle_ai.runtime import VehicleMindRuntime
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -100,3 +109,42 @@ def test_invalid_observation_is_recorded_but_not_applied() -> None:
     record = [item for item in result.trace if item.at_ms == 3200][0]
     assert record.data["valid"] is False
     assert record.data["applied"] is False
+
+
+def test_invalid_replay_frame_breaks_high_risk_hold() -> None:
+    scenario = _scenario()
+    invalid_cabin = replace(scenario.steps[2].cabin, valid=False)
+    invalid_step = ReplayStep(at_ms=1950, cabin=invalid_cabin)
+    modified = replace(
+        scenario,
+        steps=(*scenario.steps[:3], invalid_step, *scenario.steps[3:]),
+    )
+
+    result = ReplayRunner().run(modified)
+
+    assert "HIGH_RISK_DETECTED" not in result.event_types
+
+
+def test_valid_vehicle_replay_observation_keeps_metadata() -> None:
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient((ScriptedResponse(content="unused"),))
+    )
+    observation = ReplayObservation(
+        source="recorded_vehicle_state",
+        confidence=1.0,
+        valid=True,
+        values=freeze_mapping({"speed_kmh": 30.0}),
+    )
+
+    ReplayRunner()._apply_observation(
+        runtime,
+        TraceRecorder(),
+        at_ms=100,
+        sequence=0,
+        domain="vehicle",
+        observation=observation,
+    )
+
+    quality = runtime.context_manager.observation_quality("vehicle")
+    assert quality["metadata"].source == "recorded_vehicle_state"
+    assert quality["status"] == "KNOWN"
