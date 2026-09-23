@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 
 from modules.vehicle_ai.agent import (
     VehicleAgent,
@@ -51,12 +52,13 @@ class VehicleMindRuntime:
         llm: BaseLLMClient,
         event_timing: EventTimingConfig | None = None,
         max_tool_rounds: int = 5,
+        quality_clock: Callable[[], float] = time.monotonic,
     ):
         # ====================================================
         # Shared context
         # ====================================================
 
-        self.context_manager = ContextManager()
+        self.context_manager = ContextManager(quality_clock=quality_clock)
 
         # ====================================================
         # Perception adapters

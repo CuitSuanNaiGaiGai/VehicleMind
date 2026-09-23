@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
+from collections.abc import Callable
 
 from modules.observation import ObservationMetadata
 
@@ -29,9 +30,10 @@ class ObservationQualityTracker:
 
     _MAX_AGE = {"driver": 2.0, "road": 1.0, "vehicle": 2.0}
 
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._receipts: dict[str, Receipt] = {}
         self._field_receipts: dict[tuple[str, str], Receipt] = {}
+        self._clock = clock
 
     def record(
         self,
@@ -43,7 +45,7 @@ class ObservationQualityTracker:
     ) -> None:
         if domain not in self._MAX_AGE:
             raise ValueError(f"unknown context domain: {domain}")
-        receipt = Receipt(time.monotonic(), valid, metadata)
+        receipt = Receipt(self._clock(), valid, metadata)
         self._receipts[domain] = receipt
         if valid:
             for field in fields:
@@ -60,7 +62,7 @@ class ObservationQualityTracker:
                 "age_seconds": None,
                 "metadata": None,
             }
-        current = time.monotonic() if now is None else now
+        current = self._clock() if now is None else now
         age = max(0.0, current - receipt.received_at)
         if not receipt.valid:
             status = QualityStatus.INVALID
@@ -84,7 +86,7 @@ class ObservationQualityTracker:
         receipt = self._field_receipts.get((domain, field))
         if receipt is None:
             return QualityStatus.MISSING
-        current = time.monotonic() if now is None else now
+        current = self._clock() if now is None else now
         if current - receipt.received_at > self._MAX_AGE[domain]:
             return QualityStatus.STALE
         if value is None or value == "UNKNOWN":

@@ -7,6 +7,7 @@ from typing import Any
 from modules.vehicle_ai.context.models import (
     VehicleContext,
 )
+from modules.vehicle_ai.context.quality import QualityStatus
 
 
 # ============================================================
@@ -278,6 +279,7 @@ class ContextSelector:
         self,
         user_text: str,
         vehicle_context: VehicleContext,
+        road_quality: QualityStatus | None = None,
     ) -> ContextSelection:
 
         topics, matched = self.detect_topics(user_text)
@@ -342,16 +344,22 @@ class ContextSelector:
         # ----------------------------------------------------
 
         if ContextTopic.ROAD in topics:
-            selected["road"] = {
-                "vehicle_count": vehicle_context.road.vehicle_count,
-                "pedestrian_count": vehicle_context.road.pedestrian_count,
-                "rider_count": vehicle_context.road.rider_count,
-                "traffic_light_count": vehicle_context.road.traffic_light_count,
-                "traffic_sign_count": vehicle_context.road.traffic_sign_count,
-                "lane_detected": vehicle_context.road.lane_detected,
-                "drivable_area_detected": vehicle_context.road.drivable_area_detected,
-                "traffic_level": vehicle_context.road.traffic_level,
-            }
+            selected["road"] = {}
+            if road_quality is not None:
+                selected["road"]["quality_status"] = road_quality
+            if road_quality is None or road_quality is QualityStatus.KNOWN:
+                selected["road"].update(
+                    {
+                        "vehicle_count": vehicle_context.road.vehicle_count,
+                        "pedestrian_count": vehicle_context.road.pedestrian_count,
+                        "rider_count": vehicle_context.road.rider_count,
+                        "traffic_light_count": vehicle_context.road.traffic_light_count,
+                        "traffic_sign_count": vehicle_context.road.traffic_sign_count,
+                        "lane_detected": vehicle_context.road.lane_detected,
+                        "drivable_area_detected": vehicle_context.road.drivable_area_detected,
+                        "traffic_level": vehicle_context.road.traffic_level,
+                    }
+                )
 
         # ----------------------------------------------------
         # Vehicle

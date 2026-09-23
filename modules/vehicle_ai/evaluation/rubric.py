@@ -61,6 +61,17 @@ def _items(value: Any, name: str) -> list[dict[str, Any]]:
 
 
 def _source_value(case: EvaluationCase, source: str) -> tuple[bool, Any]:
+    if source == "timeline.road_age_at_first_question_ms":
+        road_at_ms: int | None = None
+        for step in case.steps:
+            if "road" in step:
+                road_at_ms = step.get("at_ms")
+            if "user_text" in step:
+                question_at_ms = step.get("at_ms")
+                if road_at_ms is None or question_at_ms is None:
+                    raise ValueError("road age requires timed road and question steps")
+                return True, question_at_ms - road_at_ms
+        raise ValueError("road age requires a question")
     if source == "user_text":
         for step in reversed(case.steps):
             if "user_text" in step:
@@ -76,7 +87,7 @@ def _source_value(case: EvaluationCase, source: str) -> tuple[bool, Any]:
         }:
             raise ValueError(f"tool source not expected: {source}")
         return False, None
-    if domain not in {"cabin", "road", "vehicle"} or "." in field:
+    if domain not in {"cabin", "road", "road_quality", "vehicle"} or "." in field:
         raise ValueError(f"invalid fact source: {source}")
     for step in reversed(case.steps):
         values = step.get(domain)

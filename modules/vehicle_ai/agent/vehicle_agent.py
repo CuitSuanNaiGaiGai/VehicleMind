@@ -110,6 +110,7 @@ class VehicleAgent:
         selection = self.context_selector.select(
             user_text=(user_text),
             vehicle_context=(full_context),
+            road_quality=self.context_manager.observation_quality("road")["status"],
         )
 
         selected_context = selection.context
@@ -169,7 +170,9 @@ class VehicleAgent:
                 f"{context_json}\n\n"
                 "Only use this context when "
                 "it is relevant to the "
-                "current user request."
+                "current user request. "
+                "If road quality is STALE, INVALID or MISSING, "
+                "prior turns and stored road values do not establish current road facts."
             ),
         }
 

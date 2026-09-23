@@ -4,7 +4,7 @@
 
 8 条 pilot 均配有 `scenarios/agent_eval/rubrics/<ID>.yaml`。每份 rubric 列出输入或工具的可追溯事实、回答必须覆盖的结论、允许的推断和禁止的无依据推断。它们全部保持 `candidate`；本次新增的是**审查规则与工具**，不是人工审定结果。C01/R02/X01/X03 的禁项尤其针对 pilot 中出现的“驻车导致未检出”、无来源阈值、虚构车道偏离预警能力等说法。
 
-事实来源使用 `cabin.<field>`、`road.<field>`、`vehicle.<field>`、`user_text` 或 `tool.<name>.<field>`。加载器会校验输入事实的值与场景一致，并拒绝未列为预期工具的工具来源。工具输出事实的值仍需依据 trial 结果人工核验，不能只凭 rubric 声明。
+事实来源使用 `cabin.<field>`、`road.<field>`、`road_quality.<field>`、`vehicle.<field>`、`user_text`、`timeline.road_age_at_first_question_ms` 或 `tool.<name>.<field>`。加载器会校验输入事实的值与场景一致，并拒绝未列为预期工具的工具来源。工具输出事实的值仍需依据 trial 结果人工核验，不能只凭 rubric 声明。
 
 ## 生成盲审材料
 
