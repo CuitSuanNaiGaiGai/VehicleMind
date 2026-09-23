@@ -38,6 +38,8 @@ def test_eight_pilot_cases_are_distinct_development_candidates() -> None:
     assert all(case.steps and case.expected for case in cases)
     assert all(all("at_ms" in step for step in case.steps) for case in cases)
     assert cases[-1].steps[-1] == {"at_ms": 1100, "confirm_pending": True}
+    t03 = next(case for case in cases if case.id == "T03")
+    assert t03.steps[0]["vehicle"]["target_temperature_c"] == 22
 
 
 def test_pilot_preflight_records_tool_call_before_cases(tmp_path) -> None:

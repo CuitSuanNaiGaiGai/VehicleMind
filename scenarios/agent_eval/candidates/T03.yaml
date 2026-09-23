@@ -4,6 +4,9 @@ category: tool
 review_status: candidate
 steps:
   - at_ms: 0
+    vehicle:
+      target_temperature_c: 22
+  - at_ms: 100
     user_text: "把车内目标温度设为 24 摄氏度。"
 expected:
   tools:
