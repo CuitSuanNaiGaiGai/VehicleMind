@@ -1,0 +1,24 @@
+id: C06
+split: heldout
+category: cabin
+review_status: candidate
+steps:
+  - at_ms: 0
+    cabin:
+      presence: PRESENT
+      driver_state: NORMAL
+      risk: LOW
+      perclos: 0.04
+      eye_closed: false
+      eye_closure_seconds: 0
+      recent_yawns: 2
+      blink_count: 7
+  - at_ms: 100
+    user_text: "我刚才有打哈欠，但系统状态是正常；现在可以确定我疲劳了吗？"
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+    - "已确定你疲劳"
+    - "没有任何哈欠"
