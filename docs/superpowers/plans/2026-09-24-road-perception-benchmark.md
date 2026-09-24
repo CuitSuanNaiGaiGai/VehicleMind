@@ -25,7 +25,7 @@
 
 **Interfaces:** `summarize_ms(values: Sequence[float]) -> dict[str, float | int]` 返回 `count/mean/p50/p95/min/max`；`throughput_fps(frames: int, elapsed_seconds: float) -> float` 使用墙钟。输入为空、非有限或负值均抛 `ValueError`。
 
-- [ ] **Step 1: 写失败测试。** 在 `tests/driving/benchmark/test_stats.py` 写：
+- [x] **Step 1: 写失败测试。** 在 `tests/driving/benchmark/test_stats.py` 写：
 
 ```python
 import pytest
@@ -44,9 +44,9 @@ def test_invalid_samples_are_rejected(values: list[float]) -> None:
         summarize_ms(values)
 ```
 
-- [ ] **Step 2: 验证红灯。** `uv run --group dev python -m pytest -q tests/driving/benchmark/test_stats.py`；预期模块不存在导致失败。
-- [ ] **Step 3: 实现。** 在 `stats.py` 用 `sorted(values)`、`statistics.fmean` 和位置 `(n-1)*q` 的线性插值求 `p50/p95`；`throughput_fps` 拒绝非正帧数或时间，不取各帧 FPS 的平均值。保留上述公开函数签名。
-- [ ] **Step 4: 验证绿灯并提交。** 目标测试、Ruff、`git diff --check` 均通过；提交 `Add road benchmark statistics` 并推送。
+- [x] **Step 2: 验证红灯。** `uv run --group dev python -m pytest -q tests/driving/benchmark/test_stats.py`；预期模块不存在导致失败。
+- [x] **Step 3: 实现。** 在 `stats.py` 用 `sorted(values)`、`statistics.fmean` 和位置 `(n-1)*q` 的线性插值求 `p50/p95`；`throughput_fps` 拒绝非正帧数或时间，不取各帧 FPS 的平均值。保留上述公开函数签名。
+- [x] **Step 4: 验证绿灯并提交。** 目标测试、Ruff、`git diff --check` 均通过；提交 `Add road benchmark statistics` 并推送。
 
 ### Task 2: 无视频编码的道路测量与原子产物
 
