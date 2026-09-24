@@ -67,4 +67,4 @@
 
 - [x] 先写 `tests/test_interview_story.py`：检查卡片包含业务场景、架构取舍、个人模块、一次真实失败修复、可信数字、局限和 60–90 秒提纲，所有相对链接均存在；运行红灯。
 - [x] 从现有报告和提交记录选一项可核验的 Agent 失败定位/修复，写入一页卡片；不得把模拟车机称为真实控制，不把内部 AI 自审称为人工金标。README 增加清晰入口。
-- [ ] 运行 `uv run --group dev python -m pytest -m 'not hardware and not online' -q`、Ruff check/format、`python scripts/check_source_size.py`、`git diff --check`；从 README 逐项人工核对五条展示验收。更新 `todolist.md` 后提交推送，创建 PR 并等待必需 CI，再考虑合并 main。
+- [x] 运行 `uv run --group dev python -m pytest -m 'not hardware and not online' -q`、Ruff check/format、`python scripts/check_source_size.py`、`git diff --check`；从 README 逐项人工核对五条展示验收。更新 `todolist.md` 后提交推送，创建 PR 并等待必需 CI，再考虑合并 main。
