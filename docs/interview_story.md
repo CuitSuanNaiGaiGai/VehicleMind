@@ -1,0 +1,28 @@
+# VehicleMind｜一页面试讲述卡
+
+## 业务场景
+
+驾驶员出现疲劳迹象时，系统把舱内状态与舱外道路观测转成统一语义上下文，触发风险提醒；用户要求找服务区后，Agent 可以搜索，但模拟导航必须等用户确认。[成功场景](../assets/scenarios/drowsy_rest_stop.yaml)与[取消场景](../assets/scenarios/drowsy_rest_stop_cancel.yaml)可用[README 命令](../README.md#quickstart)回放并打开中文报告。
+
+## 架构取舍与个人负责
+
+- 感知层用离线视频、OpenCV、MediaPipe 和第三方预训练 YOLOPv2/ONNX Runtime；项目内实现[舱内状态证据](../modules/cabin/perception_service.py)、[道路输出整理](../modules/driving/perception_service.py)及[双路适配](../modules/vehicle_ai/integration/)。不把预训练权重说成自研模型。
+- Agent 不直接读取原始帧：[上下文管理](../modules/vehicle_ai/context/context_manager.py)处理语义状态和观测质量，[事件检测](../modules/vehicle_ai/events/event_detector.py)隔离高频噪声，[Agent](../modules/vehicle_ai/agent/vehicle_agent.py)选择上下文与工具。Qwen/GLM 是可替换的第三方在线服务。
+- [ToolRegistry](../modules/vehicle_ai/tools/registry.py)与 PendingAction 在执行层拦截敏感动作；[确定性回放](../modules/vehicle_ai/replay/runner.py)和中文报告让无密钥展示可复现。录制观测回放只验证下游协同，不代表本次真实视频推理。
+
+## 一次失败定位与修复
+
+M01 在线候选 pilot 中，`CONFIRMATION_REQUIRED` 曾被当成普通工具失败继续喂给模型：Qwen 误称“导航启动失败”，GLM 重复请求导航。修复后，有匹配待确认动作便停止工具循环，明确告诉用户“尚未执行，待确认”；两模型的单例复测均在显式确认后到达 `ACTIVE`。具体前后请求数及边界见[M01 技术复盘](reports/2026-09-23-agent-pilot-followup-review.md)；这只是单例改进，不推断稳定成功率。
+
+## 可信数字与局限
+
+| 可说的数字 | 证据与含义 |
+|---|---|
+| 无密钥成功回放 9/9 断言；取消回放 7/7 断言，未确认敏感动作执行 0 次 | [两个场景](../assets/scenarios/)与[自动化 smoke test](../tests/smoke/test_replay_demo.py)；证明录制观测下的流程与确认门，不是感知准确率 |
+| Qwen 82/120、GLM 85/120 端到端成功 | [在线内部评测报告](reports/2026-09-24-online-agent-internal-evaluation.md)：40 条 AI 自审冻结场景，每模型每条重复 3 次，在线 AI 辅助语义审核后作证据纠错；80 条开发变体不计入分母 |
+
+当前是**离线视频/录制观测输入 + 模拟车机**原型，没有实时采集或真实车辆控制；舱内外小样本精度尚未测得，在线数字也不是独立人工 Golden Set 或量产可靠性。原始在线请求轨迹未随仓库公开，不能将汇总说成完全公开可复算的外部基准。[完整限制](project_limits.md)。
+
+## 60–90 秒口述提纲
+
+“我做的是舱内外感知与车机 Agent 的协同原型。比如司机疲劳时，系统先把视频感知结果整理成带质量状态的上下文，再生成风险事件；用户要找服务区，Agent 可以调用搜索，但导航必须经过执行层确认。我把视频推理与无密钥录制观测回放分开：前者展示算法接入，后者可稳定复现决策、确认和报告。一个真实问题是模型把待确认导航说成失败，甚至重复请求；我调整工具循环后做了双模型单例复测，并保留了限制。现在内部 AI 自审的 40 条场景各跑三次，Qwen 82/120、GLM 85/120；这些是合成观测和模拟车机结果，不是感知精度，也不是独立人工金标。”

@@ -21,7 +21,7 @@
 
 [项目简介](#overview) · [演示效果](#demo) · [核心能力](#capabilities) ·
 [系统架构](#architecture) · [技术栈](#stack) · [结果与证据](#evidence) ·
-[快速开始](#quickstart) · [项目结构](#structure) · [当前限制](#limitations)
+[快速开始](#quickstart) · [面试讲述卡](docs/interview_story.md) · [项目结构](#structure) · [当前限制](#limitations)
 
 </div>
 
@@ -106,6 +106,8 @@ flowchart LR
 | **回放与验证** | YAML 场景 → 语义 trace、自动断言和中文 HTML 报告；复现成功/失败链路 | 项目内实现确定性回放、配置快照、报告；pytest、Ruff、mypy 与 GitHub Actions 承担工程检查 | [回放运行器](modules/vehicle_ai/replay/runner.py) · [报告生成](modules/vehicle_ai/replay/report.py) · [CI](.github/workflows/ci.yml) |
 
 项目内贡献的重点是把第三方感知与模型能力接入统一语义上下文，再用 Agent 编排、执行层确认门和可复现回放组成可解释的业务链路；**不把预训练权重、通用库能力或模拟车辆动作包装成自研算法与真实车控**。
+
+面试时可从[面试讲述卡](docs/interview_story.md)快速查看业务场景、架构取舍、一次真实问题修复、可信数字和边界。
 
 <a id="evidence"></a>
 ## 📊 结果与证据
