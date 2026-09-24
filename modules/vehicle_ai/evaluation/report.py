@@ -6,6 +6,7 @@ from pathlib import Path
 
 from modules.vehicle_ai.evaluation.models import EvaluationCase
 from modules.vehicle_ai.evaluation.runner import TrialResult
+from modules.vehicle_ai.evaluation.showcase import render_showcase
 
 
 def write_report(
@@ -30,6 +31,9 @@ def write_report(
     }
     (destination / "trial.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    (destination / "report.html").write_text(
+        render_showcase(case, trial, grade), encoding="utf-8"
     )
     (destination / "report.md").write_text(
         f"# Agent 评估单次报告：{case.id}\n\n"

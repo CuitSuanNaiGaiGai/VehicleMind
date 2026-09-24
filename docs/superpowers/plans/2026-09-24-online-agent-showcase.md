@@ -22,10 +22,10 @@
 
 **Interface:** `render_showcase(case: EvaluationCase, trial: TrialResult, grade: dict) -> str` 输出完整 HTML。
 
-- [ ] 写测试：断言真实首轮上下文、闭眼/哈欠/道路字段、回复、工具、导航状态和来源声明出现；恶意文本被转义；缺失观测显示未提供。
-- [ ] 运行 `uv run --group dev pytest tests/vehicle_ai/evaluation/test_showcase.py -q`，确认因缺少接口失败。
-- [ ] 实现只读投影和可访问的卡片式 HTML，原始证据放折叠区。
-- [ ] 重跑定向测试并通过 Ruff。
+- [x] 写测试：断言真实首轮上下文、闭眼/哈欠/道路字段、回复、工具、导航状态和来源声明出现；恶意文本被转义；缺失观测显示未提供。
+- [x] 运行 `uv run --group dev pytest tests/vehicle_ai/evaluation/test_showcase.py -q`，确认因缺少接口失败。
+- [x] 实现只读投影和可访问的卡片式 HTML，原始证据放折叠区。
+- [x] 重跑定向测试并通过 Ruff。
 
 ### Task 2: 接入单次报告与使用说明
 
@@ -33,7 +33,7 @@
 
 **Interface:** 每个单次运行目录新增 `report.html`，终端打印路径。
 
-- [ ] 先扩展测试断言 HTML 文件存在并含正确标识，确认失败。
-- [ ] 接入 `render_showcase`，保留 `trial.json` 和 `report.md`。
-- [ ] 更新 README 的在线 Agent 命令和来源说明。
-- [ ] 运行在线评测测试、全套离线测试、Ruff 与格式检查。
+- [x] 先扩展测试断言 HTML 文件存在并含正确标识，确认失败。
+- [x] 接入 `render_showcase`，保留 `trial.json` 和 `report.md`。
+- [x] 更新 README 的在线 Agent 命令和来源说明。
+- [x] 运行在线评测测试、全套离线测试、Ruff 与格式检查。

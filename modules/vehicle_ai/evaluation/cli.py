@@ -57,6 +57,7 @@ def main() -> int:
     grade = grade_trial(case, trial)
     write_report(destination, case, trial, grade)
     print(f"评估报告：{destination / 'report.md'}")
+    print(f"决策展示：{destination / 'report.html'}")
     print(f"判定：{grade['status']}（候选数据，不计正式成功率）")
     return 0
 

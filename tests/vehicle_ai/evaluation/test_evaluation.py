@@ -160,6 +160,9 @@ def test_report_is_chinese_and_does_not_promote_candidate(tmp_path) -> None:
     assert "候选数据不可称为正式金标" in report
     assert "needs_review" in report
     assert (output / "trial.json").is_file()
+    html = (output / "report.html").read_text(encoding="utf-8")
+    assert "在线 Agent 决策展示" in html
+    assert "暂时不确定。" in html
 
 
 def test_trials_do_not_share_context_or_history() -> None:

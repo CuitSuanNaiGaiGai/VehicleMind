@@ -163,11 +163,11 @@ uv run --extra perception --group dev python -m scripts.audit_perception_videos 
 ```
 
   每侧最多 50 条视频，按文件名排序冻结；正式运行逐帧推理，可能需要较长时间。模型路径为 `models/mediapipe/face_landmarker.task` 和 `models/driving/YOLOPv2_512.onnx`。`manifest.json` 记录哈希、依赖、配置及 Git 状态，`videos/` 保留本地逐视频结构化结果；旧运行不会覆盖，只有完整写入后才出现 `.complete`。来源与许可未知时保持 `unknown`；没有对齐真值标签时精度为 `not_evaluated`，输出变化不能称为误报或漏报。`runs/` 与本地视频均被 Git 忽略，请勿公开原视频或逐视频记录。macOS 上 MediaPipe 初始化可能需要可用的图形上下文；若进程在初始化时直接退出，请在本机终端运行。
-- 可选的在线 Agent 决策可先复制[配置示例](.env.example)为本地 `.env`，填写 `DASHSCOPE_API_KEY` 或 `GLM_API_KEY` 与对应模型配置，然后运行下面的一条候选场景。**API 调用会产生费用**；将 `--provider qwen` 改为 `--provider glm` 可切换提供方。命令会在 `runs/agent_eval/` 生成 `report.md` 和 `trial.json`，这是在线 Agent 的单例调试，不等于上面的无密钥 HTML 演示，也不计正式成功率。不要把 `.env` 或 `runs/` 上传到 Git。
+- 可选的在线 Agent 决策可先复制[配置示例](.env.example)为本地 `.env`，填写 `DASHSCOPE_API_KEY` 或 `GLM_API_KEY` 与对应模型配置，然后运行下面的一条跨域场景。**API 调用会产生费用**；将 `--provider qwen` 改为 `--provider glm` 可切换提供方。命令会在 `runs/agent_eval/` 生成中文 `report.html`、`report.md` 和 `trial.json`；终端打印 HTML 路径，可直接用浏览器打开。HTML 按“录制舱内外观测 → 实际发送的上下文 → 在线模型回复/工具 → 模拟车机结果”展示，原始消息折叠保留。这是在线 Agent 的单例调试，**观测仍是录制场景、非当次视频推理**，不计正式成功率。不要把 `.env` 或 `runs/` 上传到 Git。
 
 ```bash
 uv run --group dev python -m modules.vehicle_ai.evaluation.cli \
-  scenarios/agent_eval/candidates/T02.yaml --provider qwen
+  scenarios/agent_eval/candidates/SHOWCASE01.yaml --provider qwen
 ```
 
 40 条冻结内部场景的重复运行、AI 辅助审核与纠错命令见[评估说明](scenarios/agent_eval/README.md)。
