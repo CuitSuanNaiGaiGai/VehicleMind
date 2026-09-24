@@ -19,6 +19,7 @@ def review_batch(
     reviewer: str = REVIEWER,
     output_stem: str = "reviewed",
     audit_overrides: list[dict] | None = None,
+    source_sha256: str | None = None,
 ) -> dict:
     if output_stem not in {"reviewed", "audited"}:
         raise ValueError("unsupported review output stem")
@@ -30,6 +31,8 @@ def review_batch(
         raise ValueError("cannot review an incomplete run")
     trials = run["trials"]
     keys = {(item["case_id"], item["trial_index"]) for item in trials}
+    if len(keys) != len(trials):
+        raise ValueError("duplicate trial identity in run")
     decision_keys = {
         (item.get("case_id"), item.get("trial_index")) for item in decisions
     }
@@ -54,7 +57,14 @@ def review_batch(
         if hashlib.sha256(trace_bytes).hexdigest() != trial.get("trace_sha256"):
             raise ValueError(f"trial trace hash mismatch: {key}")
         payload = json.loads(trace_bytes)
-        if payload["trial"]["case_sha256"] != trial["case_sha256"]:
+        if (
+            payload["case"]["id"] != trial["case_id"]
+            or payload["trial"]["case_id"] != trial["case_id"]
+            or payload["trial"]["trial_index"] != trial["trial_index"]
+            or payload["trial"]["provider"] != run["provider"]
+            or payload["trial"]["model"] != run["model"]
+            or payload["trial"]["case_sha256"] != trial["case_sha256"]
+        ):
             raise ValueError(f"trial trace identity mismatch: {key}")
         if trial.get("mechanical_status") not in {"fail", "needs_review"}:
             raise ValueError(f"invalid mechanical status: {key}")
@@ -92,6 +102,7 @@ def review_batch(
         "reviewed_at_utc": datetime.now(timezone.utc).isoformat(),
         "reviewer": reviewer,
         "independent_human_review": False,
+        "source_sha256": source_sha256,
         "audit_overrides": audit_overrides or [],
         "provider": run["provider"],
         "model": run["model"],

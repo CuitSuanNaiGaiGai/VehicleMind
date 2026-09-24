@@ -111,6 +111,7 @@ flowchart LR
 | [离线完整场景](assets/scenarios/drowsy_rest_stop.yaml) | 本地回放可生成报告；本次截图对应的运行中 **9/9 场景断言通过、未确认敏感动作执行 0 次** | 确定性录制观测与模拟车机，不是感知精度或在线模型成功率 |
 | [双模型候选 pilot](docs/reports/2026-09-23-online-agent-pilot.md) | Qwen 与 GLM 均通过真实工具调用预检，并各完成 8 条候选 trial；保存请求与工具轨迹 | **候选 pilot**，回答语义仍需人工复核，不计算正式成功率 |
 | [M01 确认流程复测](docs/reports/2026-09-23-agent-pilot-followup-review.md) | 修复前后单例显示重复导航请求与误导回复得到纠正；确认前不执行模拟导航 | 每模型仅一次修复后采样，不能推断稳定成功率 |
+| [40 条内部基准双模型重复评测](docs/reports/2026-09-24-online-agent-internal-evaluation.md) | 40 条冻结场景 × 各 3 次：Qwen **82/120**、GLM **85/120** 端到端成功；分层、波动、token、延迟和失败案例均可查 | Codex AI 自审场景 + 在线 AI 辅助语义审核及证据纠错；**非独立人工标注，不是感知精度** |
 
 详细评测边界与失败案例见上述技术报告。原始在线轨迹保存在本地被 Git 忽略的 `runs/` 中，仓库公开的是场景、运行入口和审查记录，而非那次运行的全部原始请求。现有 40 条 **Codex AI 自审内部基准**与 80 条开发回归变体，但**尚无独立人工冻结的 Golden Set 或舱内外小样本精度**；不会借用其他项目的结果填入本页。
 
@@ -135,7 +136,7 @@ open "runs/$VM_RUN_ID/report.html"
 ### 真实视频与在线 Agent
 
 - 真实离线视频需要自备视频和第三方模型权重，按[视频运行指南](docs/offline_video_pipeline.md)准备并校验资产；不要求实时采集。
-- Qwen / GLM 候选评估需要自备 API Key；命令、模型配置与结果解释见[评估候选集说明](scenarios/agent_eval/README.md)。不要把本地 `.env` 或 `runs/` 上传到 Git。
+- Qwen / GLM 在线内部评估需要自备 API Key；40 条冻结集的重复运行、AI 辅助审核与纠错命令见[评估说明](scenarios/agent_eval/README.md)。不要把本地 `.env` 或 `runs/` 上传到 Git。
 - 回归检查：
 
 ```bash
@@ -155,7 +156,7 @@ VehicleMind/
 ├── modules/vehicle_ai/    # 上下文、事件、Agent、工具与评测
 ├── assets/demo/           # 首页演示素材
 ├── assets/scenarios/      # 可复现离线场景
-├── scenarios/agent_eval/  # 在线 Agent 候选评测场景
+├── scenarios/agent_eval/  # 候选场景、冻结内部基准和开发回归变体
 ├── docs/                  # 算法、设计、证据与限制
 └── tests/                 # 单元、集成与回归测试
 ```

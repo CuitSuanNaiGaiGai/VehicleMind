@@ -118,3 +118,63 @@ def test_review_rejects_tampered_mechanical_status(tmp_path: Path) -> None:
                 }
             ],
         )
+
+
+def test_review_rejects_duplicate_trial_identity(tmp_path: Path) -> None:
+    output = tmp_path / "run"
+    run_batch(
+        load_frozen_cases(ROOT)[:1],
+        provider="test",
+        model="stub",
+        client_factory=ReplyClient,
+        repetitions=1,
+        output=output,
+    )
+    path = output / "run.json"
+    run = json.loads(path.read_text(encoding="utf-8"))
+    run["trials"].append(dict(run["trials"][0]))
+    path.write_text(json.dumps(run), encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate trial"):
+        review_batch(
+            output,
+            [
+                {
+                    "case_id": "C01",
+                    "trial_index": 1,
+                    "verdict": "pass",
+                    "evidence": "已检查回答语义。",
+                }
+            ],
+        )
+
+
+def test_review_rejects_swapped_trace_identity(tmp_path: Path) -> None:
+    output = tmp_path / "run"
+    run_batch(
+        load_frozen_cases(ROOT)[:1],
+        provider="test",
+        model="stub",
+        client_factory=ReplyClient,
+        repetitions=2,
+        output=output,
+    )
+    path = output / "run.json"
+    run = json.loads(path.read_text(encoding="utf-8"))
+    first, second = run["trials"]
+    first["trace"], second["trace"] = second["trace"], first["trace"]
+    first["trace_sha256"], second["trace_sha256"] = (
+        second["trace_sha256"],
+        first["trace_sha256"],
+    )
+    path.write_text(json.dumps(run), encoding="utf-8")
+    decisions = [
+        {
+            "case_id": "C01",
+            "trial_index": index,
+            "verdict": "pass",
+            "evidence": "已核对原始回答。",
+        }
+        for index in (1, 2)
+    ]
+    with pytest.raises(ValueError, match="identity"):
+        review_batch(output, decisions)

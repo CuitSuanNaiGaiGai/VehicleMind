@@ -6,6 +6,7 @@ This is a convenience reviewer, not independent human adjudication.
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 
 from modules.vehicle_ai.evaluation.batch import load_frozen_cases
@@ -14,7 +15,32 @@ from modules.vehicle_ai.llm.base import BaseLLMClient
 
 
 JUDGE = "Online AI model-assisted semantic review"
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
+
+
+def _source_sha256(run: dict, golden_root: Path) -> str:
+    """Bind reviewer progress to one run's traces and frozen case/rubric set."""
+    manifest_hash = hashlib.sha256(
+        (golden_root / "manifest.yaml").read_bytes()
+    ).hexdigest()
+    source = {
+        "provider": run["provider"],
+        "model": run["model"],
+        "started_at_utc": run["started_at_utc"],
+        "golden_manifest_sha256": manifest_hash,
+        "trials": sorted(
+            (
+                {
+                    key: item[key]
+                    for key in ("case_id", "case_sha256", "trial_index", "trace_sha256")
+                }
+                for item in run["trials"]
+            ),
+            key=lambda item: (item["case_id"], item["trial_index"]),
+        ),
+    }
+    encoded = json.dumps(source, ensure_ascii=False, sort_keys=True).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _parse_decisions(content: str, indices: set[int]) -> list[dict]:
@@ -45,6 +71,7 @@ def judge_batch(
     if run.get("status") != "completed":
         raise ValueError("cannot judge an incomplete run")
     frozen = {case.id: case for case in load_frozen_cases(golden_root)}
+    source_sha256 = _source_sha256(run, golden_root)
     progress_path = run_root / "judge_progress.json"
     progress = (
         json.loads(progress_path.read_text(encoding="utf-8"))
@@ -52,6 +79,7 @@ def judge_batch(
         else {
             "judge": JUDGE,
             "protocol_version": PROTOCOL_VERSION,
+            "source_sha256": source_sha256,
             "decisions": [],
             "raw_responses": {},
         }
@@ -62,6 +90,8 @@ def judge_batch(
         raise ValueError("judge model mismatch")
     if progress.get("protocol_version") not in {None, PROTOCOL_VERSION}:
         raise ValueError("judge protocol version mismatch")
+    if progress.get("source_sha256") != source_sha256:
+        raise ValueError("judge progress source mismatch")
     progress["judge"] = JUDGE
     progress["judge_model"] = judge_model
     progress["protocol_version"] = PROTOCOL_VERSION
@@ -139,6 +169,12 @@ def judge_batch(
             json.dumps(progress, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         temporary.replace(progress_path)
+    latest_run = json.loads((run_root / "run.json").read_text(encoding="utf-8"))
+    if _source_sha256(latest_run, golden_root) != source_sha256:
+        raise ValueError("judge source changed during review")
     return review_batch(
-        run_root, progress["decisions"], reviewer=f"{judge_model} AI-assisted review"
+        run_root,
+        progress["decisions"],
+        reviewer=f"{judge_model} AI-assisted review",
+        source_sha256=source_sha256,
     )

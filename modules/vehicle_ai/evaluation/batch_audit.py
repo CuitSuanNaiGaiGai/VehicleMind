@@ -15,6 +15,8 @@ def audit_batch(run_root: Path, override_path: Path) -> dict:
     progress = json.loads(
         (run_root / "judge_progress.json").read_text(encoding="utf-8")
     )
+    if progress.get("source_sha256") != judged.get("source_sha256"):
+        raise ValueError("judge and reviewed source mismatch")
     overrides = yaml.safe_load(override_path.read_text(encoding="utf-8"))
     if not isinstance(overrides, list):
         raise ValueError("audit overrides must be a list")
@@ -50,4 +52,5 @@ def audit_batch(run_root: Path, override_path: Path) -> dict:
         reviewer=f"Codex audit of {judged['reviewer']}",
         output_stem="audited",
         audit_overrides=audit_log,
+        source_sha256=judged.get("source_sha256"),
     )

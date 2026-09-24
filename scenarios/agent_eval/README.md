@@ -44,3 +44,5 @@
 ```
 
 审核按场景分组、逐 trial 给出结论和中文依据，保存原始审核模型回复，并可从进度文件恢复。`reviewed_summary.md` 才包含 Task Success（端到端任务成功）；必须注明审核是在线 AI 辅助，不是独立人工评测。审核结论仍应抽查，尤其注意模型将未观测的车机默认值说成事实、把用户自述归于感知算法、或过度断言舱内外状态。
+
+如复查发现审核模型误判，将每条修正写成 `case_id`、`trial_index`、`verdict`、`evidence` 四字段的 YAML 列表，再运行 `python -m modules.vehicle_ai.evaluation.batch_audit_cli 批次目录 修正.yaml`。它会保留原始 `reviewed.json`，另生成带修正来源的 `audited.json`；两份数字不应混用。

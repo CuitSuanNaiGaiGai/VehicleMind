@@ -133,25 +133,25 @@
 - [x] 在评测运行器中注入道路无效/过期观测并向 Agent 传递质量状态，补齐 R06 候选场景；仍待人工审定，不能当作冻结金标。
 - [x] 按用户 2026-09-24 授权完成 40 条场景的 Codex AI 自审，冻结 24 条开发集和 16 条保留集，保存逐条说明与哈希；明确不是独立人工标注。
 - [x] 从冻结开发集生成 80 条独立编号的候选回归变体，完成 10 条分层 AI 抽检；不把变体当作新增金标。
-- [ ] 两模型在冻结 40 条上各重复 3 次，并完成逐 trial 语义复核后发布内部 Task Success；未复核的 `needs_review` 不计成功。
+- [x] 两模型在冻结 40 条上各重复 3 次，并完成逐 trial 在线 AI 辅助语义复核与证据纠错，发布**内部** Task Success；`needs_review` 不计成功。结果与局限见 [中文报告](docs/reports/2026-09-24-online-agent-internal-evaluation.md)。
 
 ### 需要完成
 
-- [ ] Agent 自动化评测任务不少于 120 条。
+- [x] 建立 120 条不同编号的 Agent 任务：40 条 AI 自审冻结内部场景、80 条仅用于开发回归的候选变体；后者不混入金标成绩。
 - [ ] 每个任务记录输入上下文、用户消息、期望工具、规范参数、期望状态变化和禁止行为。
 - [ ] 覆盖状态问答、上下文问答、读工具、可逆动作、敏感动作、确认、拒绝、超时、UNKNOWN、stale、非法参数、工具失败和 Prompt Injection。
-- [ ] 非确定性在线模型任务至少运行 3 次，并保存每次 trial trace。
-- [ ] 实现工具选择、参数匹配、状态变化和禁止动作的确定性 grader。
-- [ ] 实现回答基于上下文、正确表达不确定性和不虚构执行结果的语义 grader。
-- [ ] 固定模型版本、温度、重试策略和最大工具轮次。
+- [x] 冻结集的非确定性在线模型任务每模型至少运行 3 次，并保存每次 trial trace。
+- [x] 实现工具选择、参数匹配、状态变化和禁止动作的确定性 grader。
+- [x] 实现在线 AI 辅助逐 trial 回答语义审核、原始决定留存与 Codex 证据纠错；**不是独立人工语义 grader**。
+- [x] 固定本次评测的模型版本、温度、重试策略和最大工具轮次。
 - [ ] 统计输入/输出 token、模型延迟、工具延迟、重试次数和估算成本。
 - [ ] 对失败案例进行根因分类，并保存修复前后证据。
 
 ### 量化指标
 
-- [ ] 报告端到端 Task Success Rate。
-- [ ] 报告 Tool Selection Accuracy。
-- [ ] 报告规范化 Tool Argument Exact Match。
+- [x] 报告内部端到端 Task Success Rate，并注明 AI 自审边界。
+- [x] 报告 Tool Selection Accuracy。
+- [x] 报告规范化 Tool Argument Exact Match。
 - [ ] 报告 Context Grounding Correctness。
 - [ ] 报告 Confirmation Compliance Rate。
 - [ ] 报告 stale/UNKNOWN 正确处理率。
