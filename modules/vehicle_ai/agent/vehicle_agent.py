@@ -9,7 +9,11 @@ from modules.vehicle_ai.agent.action_state import (
     PendingActionStore,
 )
 from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
-from modules.vehicle_ai.agent.decision_context import GROUNDING_NOTE, attach_field_evidence
+from modules.vehicle_ai.agent.task_state import AgentTask, TaskStatus
+from modules.vehicle_ai.agent.decision_context import (
+    GROUNDING_NOTE,
+    attach_field_evidence,
+)
 from modules.vehicle_ai.agent.pending_intent import (
     classify_pending_intent,
     requested_target,
@@ -41,29 +45,7 @@ from modules.vehicle_ai.tools import (
 
 
 class VehicleAgent:
-    """
-    Context-aware VehicleMind Agent.
-
-    Core flow:
-
-        User
-          ↓
-        Vehicle Context
-          +
-        Pending Action
-          ↓
-        LLM
-          ↓
-        Function Call
-          ↓
-        ToolRegistry
-          ↓
-        Tool Result
-          ↓
-        Action State Update
-          ↓
-        LLM Final Response
-    """
+    """Context-aware agent with grounded tools and an observable task lifecycle."""
 
     def __init__(
         self,
@@ -82,6 +64,7 @@ class VehicleAgent:
         self.max_tool_rounds = max_tool_rounds
 
         self.history: list[dict] = []
+        self.task = AgentTask()
 
         self.pending_actions = PendingActionStore(clock=action_clock)
         self.confirmations = ActionConfirmationController(
@@ -90,10 +73,6 @@ class VehicleAgent:
             self.tool_registry.take_confirmation_issuer(),
         )
         self.context_selector = ContextSelector()
-
-    # ========================================================
-    # Vehicle Context
-    # ========================================================
 
     def _context_message(
         self,
@@ -122,7 +101,9 @@ class VehicleAgent:
             field_quality=self.context_manager.field_quality,
         )
 
-        selected_context = attach_field_evidence(selection.context, self.context_manager)
+        selected_context = attach_field_evidence(
+            selection.context, self.context_manager
+        )
 
         if debug:
             print()
@@ -202,16 +183,7 @@ class VehicleAgent:
         tool_name: str,
         arguments: dict,
     ) -> dict:
-        """
-        Apply deterministic grounding before tool execution.
-
-        For start_navigation:
-
-        if a valid pending navigation action exists, the
-        canonical poi_id from the pending action is authoritative.
-
-        This prevents entity drift caused by LLM paraphrasing.
-        """
+        """Use the pending navigation's canonical POI to prevent entity drift."""
 
         grounded = dict(arguments)
 
@@ -232,15 +204,7 @@ class VehicleAgent:
         tool_result,
         target: str | None = None,
     ) -> None:
-        """
-        Convert selected tool results into grounded pending
-        actions.
-
-        Search results are observations.
-
-        Actions derived from those observations are stored
-        separately until confirmed by the driver.
-        """
+        """Convert search observations into actions awaiting driver confirmation."""
 
         if not tool_result.success:
             return
@@ -280,14 +244,20 @@ class VehicleAgent:
             self.pending_actions.clear()
 
     def confirm_pending(self, action_id: str) -> ToolResult:
-        return self.confirmations.confirm(action_id)
+        result = self.confirmations.confirm(action_id)
+        if result.error != "INVALID_CONFIRMATION":
+            self.task.last_tool_result = result.to_dict()
+            self.task.transition(
+                TaskStatus.COMPLETED if result.success else TaskStatus.FAILED,
+                result.error,
+            )
+        return result
 
     def reject_pending(self, action_id: str) -> ToolResult:
-        return self.confirmations.reject(action_id)
-
-    # ========================================================
-    # Debug
-    # ========================================================
+        result = self.confirmations.reject(action_id)
+        if result.success:
+            self.task.transition(TaskStatus.CANCELLED, "USER_CANCELLED")
+        return result
 
     def _print_pending_action(
         self,
@@ -320,13 +290,20 @@ class VehicleAgent:
             return ""
 
         pending = self.pending_actions.get()
+        if pending is None:
+            self.task = AgentTask(goal=user_text)
+        self.task.transition(TaskStatus.RUNNING)
         intent = classify_pending_intent(user_text) if pending is not None else None
         if pending is not None and intent in {"reject", "change_target"}:
             if not self.confirmations.reject(pending.action_id).success:
                 return "待确认操作已变更，请重新确认当前操作。"
         if intent == "reject":
-            return "已取消待确认操作。"
+            self.task.transition(TaskStatus.CANCELLED, "USER_CANCELLED")
+            return self._record_final_response(user_text, "已取消待确认操作。")
         target = requested_target(user_text) if intent == "change_target" else None
+        if intent == "change_target":
+            self.task.goal = user_text
+            self.task.transition(TaskStatus.RUNNING, "TARGET_CHANGED")
 
         # ----------------------------------------------------
         # Rebuild dynamic system state every user turn.
@@ -356,10 +333,16 @@ class VehicleAgent:
         # ====================================================
 
         for _ in range(self.max_tool_rounds):
-            response = self.llm.chat(
-                messages=messages,
-                tools=tools,
-            )
+            try:
+                response = self.llm.chat(messages=messages, tools=tools)
+            except Exception as exc:
+                reason = (
+                    "MODEL_TIMEOUT" if isinstance(exc, TimeoutError) else "MODEL_ERROR"
+                )
+                self.task.transition(TaskStatus.FAILED, reason)
+                return self._record_final_response(
+                    user_text, "模型请求失败，本轮已停止；已执行的操作不会自动撤销。"
+                )
 
             # =================================================
             # Final natural-language response
@@ -367,12 +350,17 @@ class VehicleAgent:
 
             if not response.tool_calls:
                 final_text = response.content or ""
+                if not final_text.strip():
+                    self.task.transition(TaskStatus.FAILED, "EMPTY_RESPONSE")
+                    final_text = "模型未返回有效回复，本轮已停止。"
                 current = self.pending_actions.get()
                 if target is not None and (
                     current is None or current.tool_name != "start_navigation"
                 ):
+                    self.task.transition(TaskStatus.FAILED, "TARGET_NOT_FOUND")
                     final_text = "未找到与新目标匹配的地点，未创建待确认导航。"
 
+                self.task.finish(current is not None)
                 return self._record_final_response(user_text, final_text)
 
             # =================================================
@@ -429,6 +417,7 @@ class VehicleAgent:
                     name=(call.name),
                     arguments=(grounded_arguments),
                 )
+                self.task.last_tool_result = tool_result.to_dict()
 
                 # --------------------------------------------
                 # Update deterministic action state
@@ -479,12 +468,16 @@ class VehicleAgent:
                     }
                 )
                 if pending_confirmation_matches:
+                    self.task.transition(TaskStatus.AWAITING_CONFIRMATION)
                     return self._record_final_response(
                         user_text,
                         "车机操作已准备好，尚未执行，待确认后才会执行。",
                     )
 
-        return "本次请求涉及过多连续工具调用，已停止执行。"
+        self.task.transition(TaskStatus.FAILED, "ROUND_LIMIT")
+        return self._record_final_response(
+            user_text, "本次请求涉及过多连续工具调用，已停止执行。"
+        )
 
     # ========================================================
     # Reset
@@ -497,3 +490,4 @@ class VehicleAgent:
         self.history.clear()
 
         self.pending_actions.clear()
+        self.task = AgentTask()
