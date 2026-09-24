@@ -121,6 +121,7 @@ flowchart LR
 | [M01 确认流程复测](docs/reports/2026-09-23-agent-pilot-followup-review.md) | 修复前后单例显示重复导航请求与误导回复得到纠正；确认前不执行模拟导航 | 每模型仅一次修复后采样，不能推断稳定成功率 |
 | [40 条内部基准双模型重复评测](docs/reports/2026-09-24-online-agent-internal-evaluation.md) | 40 条冻结场景 × 各 3 次：Qwen **82/120**、GLM **85/120** 端到端成功；分层、波动、token、延迟和失败案例均可查 | Codex AI 自审场景 + 在线 AI 辅助语义审核及证据纠错；**非独立人工标注，不是感知精度** |
 | [道路感知本机性能实测](docs/reports/2026-09-24-road-performance.md) | Apple M5、1280×720、YOLOPv2 ONNX：各 3 个独立进程 × 30 测量帧；CPU **8.87–8.89 FPS**，CoreML 优先 **27.24–27.48 FPS**；推理与完整帧 p50/p95、环境和哈希见报告 | 同一离线短视频、无绘制/编码；CoreML session 含 CPU 回退；**非感知精度或上车实时保证** |
+| [舱内外零标注自动核验](docs/reports/2026-09-24-perception-auto-audit.md) | 本机真实模型逐帧处理舱内 **26/26**、舱外 **26/26** 条视频；共 **52,872/52,872** 帧有结构化输出，运行条件与哈希可追溯 | **仅证明可处理与输出分布，不是准确率**；舱外目标类别全部落在 `truck`，需排查类别映射/后处理；来源许可未确认，逐视频记录不公开 |
 
 复现取消链路：把快速开始命令中的场景改为 `assets/scenarios/drowsy_rest_stop_cancel.yaml`，并使用新的 `VM_RUN_ID`；报告、`summary.json` 和 `trace.json` 会显示待确认、取消回复及未执行导航。上述两条回放都使用**合成语义观测**和**模拟车机**，不能证明真实视频感知准确率。
 
