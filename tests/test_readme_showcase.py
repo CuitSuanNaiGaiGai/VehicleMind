@@ -23,6 +23,26 @@ def test_showcase_has_scannable_chinese_sections() -> None:
     assert "正式成功率" in text
 
 
+def test_showcase_first_screen_tells_a_verifiable_business_story() -> None:
+    text = README.read_text(encoding="utf-8")
+    first_screen = text.split('<a id="demo"></a>', 1)[0]
+    for detail in (
+        "疲劳驾驶",
+        "搜索服务区",
+        "用户确认",
+        "模拟导航",
+        "真实视频感知",
+        "录制语义观测回放",
+        "assets/scenarios/drowsy_rest_stop.yaml",
+        'href="#demo"',
+        'href="#architecture"',
+        'href="#evidence"',
+    ):
+        assert detail in first_screen, detail
+    assert "截图来自录制语义观测回放" in text
+    assert "GIF 来自独立的真实视频感知演示" in text
+
+
 def test_showcase_images_exist_and_keep_cabin_road_gifs() -> None:
     text = README.read_text(encoding="utf-8")
     images = re.findall(r'<img\s+[^>]*src="([^"]+)"', text)

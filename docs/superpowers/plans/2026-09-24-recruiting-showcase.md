@@ -24,9 +24,9 @@
 
 **Interfaces:** README 首屏链接到 `assets/scenarios/drowsy_rest_stop.yaml`、演示截图、架构与证据；图片仍引用 `assets/demo/` 的现有资产。
 
-- [ ] 先在 `tests/test_readme_showcase.py` 增加断言：首屏包含具体疲劳驾驶场景、两种输入路径及“模拟导航”边界，截图/GIF 的不同来源有明确文字。执行 `uv run --group dev python -m pytest -q tests/test_readme_showcase.py`，确认因缺少新内容而失败。
-- [ ] 精简并调整 `README.md` 首屏顺序：具体场景 → 录制观测回放与真实视频感知的分叉 → 风险事件/Agent/确认/模拟导航 → 可点击演示、架构和结果。不要增加未经核验的数值。
-- [ ] 重跑目标测试、`git diff --check`；人工检查 GitHub Markdown 锚点和图片路径；满足清单的首项验收后更新 `todolist.md`，提交并推送。
+- [x] 先在 `tests/test_readme_showcase.py` 增加断言：首屏包含具体疲劳驾驶场景、两种输入路径及“模拟导航”边界，截图/GIF 的不同来源有明确文字。执行 `uv run --group dev python -m pytest -q tests/test_readme_showcase.py`，确认因缺少新内容而失败。
+- [x] 精简并调整 `README.md` 首屏顺序：具体场景 → 录制观测回放与真实视频感知的分叉 → 风险事件/Agent/确认/模拟导航 → 可点击演示、架构和结果。不要增加未经核验的数值。
+- [x] 重跑目标测试、`git diff --check`；人工检查 GitHub Markdown 锚点和图片路径；满足清单的首项验收后更新 `todolist.md`，提交并推送。
 
 ### Task 2: 从零运行的中文演示说明
 
