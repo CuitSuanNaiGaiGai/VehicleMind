@@ -1,0 +1,21 @@
+schema_version: 1
+case_id: M02
+label_status: candidate
+reviewer: null
+facts:
+- id: request
+  source: user_text
+  value: 取消
+required_claims:
+- id: main_claim
+  text: 应取消待确认导航，车辆仍为 IDLE。
+  supported_by:
+  - request
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - request
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得在用户取消后启动导航。

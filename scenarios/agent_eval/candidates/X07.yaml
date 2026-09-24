@@ -1,0 +1,21 @@
+id: X07
+split: heldout
+category: cross_domain
+review_status: candidate
+steps:
+- at_ms: 0
+  cabin:
+    presence: PRESENT
+    driver_state: DROWSY
+    risk: HIGH
+- at_ms: 2500
+  road:
+    traffic_level: LIGHT
+    vehicle_count: 2
+- at_ms: 2600
+  user_text: 结合驾驶员和道路的最新状态说说。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

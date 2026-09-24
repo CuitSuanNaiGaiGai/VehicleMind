@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import time
+from collections.abc import Callable
 
 from modules.vehicle_ai.agent.action_state import (
     PendingAction,
@@ -68,6 +70,7 @@ class VehicleAgent:
         context_manager: ContextManager,
         tool_registry: ToolRegistry,
         max_tool_rounds: int = 5,
+        action_clock: Callable[[], float] = time.time,
     ):
         self.llm = llm
 
@@ -79,7 +82,7 @@ class VehicleAgent:
 
         self.history: list[dict] = []
 
-        self.pending_actions = PendingActionStore()
+        self.pending_actions = PendingActionStore(clock=action_clock)
         self.confirmations = ActionConfirmationController(
             self.pending_actions,
             self.tool_registry,
@@ -111,6 +114,11 @@ class VehicleAgent:
             user_text=(user_text),
             vehicle_context=(full_context),
             road_quality=self.context_manager.observation_quality("road")["status"],
+            driver_quality=self.context_manager.observation_quality("driver")["status"],
+            vehicle_quality=self.context_manager.observation_quality("vehicle")[
+                "status"
+            ],
+            field_quality=self.context_manager.field_quality,
         )
 
         selected_context = selection.context
@@ -171,8 +179,8 @@ class VehicleAgent:
                 "Only use this context when "
                 "it is relevant to the "
                 "current user request. "
-                "If road quality is STALE, INVALID or MISSING, "
-                "prior turns and stored road values do not establish current road facts."
+                "If a domain quality is STALE, INVALID or MISSING, "
+                "prior turns and stored values do not establish current facts for that domain."
             ),
         }
 
@@ -259,6 +267,7 @@ class VehicleAgent:
                             "eta_minutes": tool_result.data.get("eta_minutes"),
                         },
                         expires_after_seconds=(120.0),
+                        created_at=self.pending_actions.now(),
                     )
                 )
 

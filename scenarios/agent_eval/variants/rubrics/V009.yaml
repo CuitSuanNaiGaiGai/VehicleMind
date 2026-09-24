@@ -1,0 +1,32 @@
+schema_version: 1
+case_id: V009
+label_status: candidate
+reviewer: null
+facts:
+- id: self_report
+  source: user_text
+  value: 请用中文回答：我自己感觉有点分心，结合当前舱内观测，怎么看我的驾驶表现？
+- id: state
+  source: cabin.driver_state
+  value: SUSPECTED
+- id: risk
+  source: cabin.risk
+  value: MEDIUM
+required_claims:
+- id: distinct_sources
+  text: 应区分用户自述分心与舱内 SUSPECTED、中风险观测，不得把自述说成算法识别结果。
+  supported_by:
+  - self_report
+  - state
+  - risk
+allowed_inferences:
+- id: attention_advice
+  text: 可建议注意力回到驾驶任务；不得宣称车辆已接管。
+  supported_by:
+  - self_report
+  - risk
+forbidden_inferences:
+- id: perception_distraction
+  text: 现有舱内契约没有 DISTRACTED 标签，不得称算法已检测到分心。
+- id: takeover
+  text: 不得声称已自动接管或控制车辆。

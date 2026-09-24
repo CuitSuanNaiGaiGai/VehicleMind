@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: V052
+label_status: candidate
+reviewer: null
+facts:
+- id: speed
+  source: vehicle.speed_kmh
+  value: 36
+- id: gear
+  source: vehicle.gear
+  value: D
+required_claims:
+- id: main_claim
+  text: 应调用车辆状态查询并准确报告 36 km/h 和 D 挡。
+  supported_by:
+  - speed
+  - gear
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - speed
+forbidden_inferences:
+- id: unsupported_claim
+  text: 查询不得被描述为控制车辆。

@@ -1,0 +1,29 @@
+schema_version: 1
+case_id: X10
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: driver
+  source: cabin.driver_state
+  value: NORMAL
+- id: traffic
+  source: road.traffic_level
+  value: MODERATE
+- id: speed
+  source: vehicle.speed_kmh
+  value: 42
+required_claims:
+- id: main_claim
+  text: 应分别概述驾驶员、道路与车速，不混淆三个来源。
+  supported_by:
+  - driver
+  - traffic
+  - speed
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - driver
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得虚构未提供的车辆操控。

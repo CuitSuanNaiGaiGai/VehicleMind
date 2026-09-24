@@ -1,0 +1,31 @@
+schema_version: 1
+case_id: V008
+label_status: candidate
+reviewer: null
+facts:
+- id: presence
+  source: cabin.presence
+  value: PRESENT
+- id: state
+  source: cabin.driver_state
+  value: NORMAL
+- id: risk
+  source: cabin.risk
+  value: LOW
+required_claims:
+- id: normal_low
+  text: 应将当前舱内观测描述为正常、低风险；不把一次观测外推为长期健康保证。
+  supported_by:
+  - state
+  - risk
+allowed_inferences:
+- id: observation_scope
+  text: 可以说明结论仅适用于当前观测。
+  supported_by:
+  - state
+  - risk
+forbidden_inferences:
+- id: invented_fatigue
+  text: 不得声称当前已检测到疲劳高风险。
+- id: control_claim
+  text: 不得声称已经执行车辆控制。

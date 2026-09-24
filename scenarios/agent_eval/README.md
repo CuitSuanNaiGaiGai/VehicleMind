@@ -23,3 +23,16 @@
 运行记录位于新的 `runs/agent_eval/pilot-时间戳-provider/` 目录。`pilot.json` 是逐条落盘的清单；每条的 `trial.json` 含原始模型请求、回复、工具请求/结果和交互事件。测试集目前仍是候选，不要从 `needs_review` 推算成功率。具体标注疑点见 [候选标签审查记录](candidates/REVIEW.md)。
 
 候选场景的回答依据 rubric 位于 `rubrics/`；如何导出隐藏模型身份的审查材料、记录人工决定及理解 `formal_eligible`，见[中文盲审说明](../../docs/reports/2026-09-23-agent-grounding-review-guide.md)。
+
+## 冻结内部评测集与开发回归变体
+
+`golden/` 保存 40 条按用户授权由 Codex **AI 自审**的内部基准（24 开发、16 保留），`manifest.yaml` 绑定场景与 rubric 哈希并逐条记录审核依据；这不是独立人工标注。`variants/` 保存从开发集生成的 80 条独立编号变体，属于候选回归集，不计入 40 条金标或保留集成绩。变体抽检见 `variants/AI_SPOT_CHECK.md`。
+
+检查并重复运行真实在线模型：
+
+```bash
+.venv/bin/python -m modules.vehicle_ai.evaluation.batch_cli --provider qwen --repetitions 3
+.venv/bin/python -m modules.vehicle_ai.evaluation.batch_cli --provider glm --repetitions 3
+```
+
+命令会产生真实 API 调用和费用；开发集预检可加 `--split dev --repetitions 1`。每个 trial 保存完整 trace 与机械评分。`needs_review` 表示回答语义尚未复核，不能直接算作 Task Success。

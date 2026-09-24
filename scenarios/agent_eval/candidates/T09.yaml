@@ -1,0 +1,19 @@
+id: T09
+split: heldout
+category: tool
+review_status: candidate
+steps:
+- at_ms: 0
+  vehicle:
+    driver_window_open: false
+- at_ms: 100
+  user_text: 打开驾驶员侧车窗。
+expected:
+  tools:
+  - name: set_driver_window
+    arguments:
+      open: true
+  final_vehicle:
+    driver_window_open: false
+  required_facts: []
+  forbidden_phrases: []

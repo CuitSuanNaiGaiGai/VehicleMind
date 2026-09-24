@@ -1,0 +1,15 @@
+id: T02
+split: dev
+category: tool
+review_status: ai_reviewed
+steps:
+- at_ms: 0
+  user_text: 请通过车机查询工具读取当前空调状态，再告诉我。
+expected:
+  tools:
+  - name: get_climate_status
+    arguments: {}
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+  - 已打开空调

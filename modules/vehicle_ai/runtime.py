@@ -53,6 +53,7 @@ class VehicleMindRuntime:
         event_timing: EventTimingConfig | None = None,
         max_tool_rounds: int = 5,
         quality_clock: Callable[[], float] = time.monotonic,
+        action_clock: Callable[[], float] = time.time,
     ):
         # ====================================================
         # Shared context
@@ -91,6 +92,7 @@ class VehicleMindRuntime:
             context_manager=(self.context_manager),
             tool_registry=(self.tools),
             max_tool_rounds=max_tool_rounds,
+            action_clock=action_clock,
         )
 
     # ========================================================

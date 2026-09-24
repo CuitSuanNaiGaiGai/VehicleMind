@@ -1,0 +1,29 @@
+schema_version: 1
+case_id: X08
+label_status: candidate
+reviewer: null
+facts:
+- id: old_traffic
+  source: road.traffic_level
+  value: HEAVY
+- id: driver
+  source: cabin.risk
+  value: HIGH
+- id: road_age
+  source: timeline.road_age_at_first_question_ms
+  value: 1600
+required_claims:
+- id: main_claim
+  text: 应肯定当前有效舱内高风险，并说明道路观测过期。
+  supported_by:
+  - old_traffic
+  - driver
+  - road_age
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - old_traffic
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得把旧的 HEAVY 说成当前确定路况。

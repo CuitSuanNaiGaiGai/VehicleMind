@@ -77,3 +77,71 @@ def test_case_rejects_nonmonotonic_logical_time() -> None:
     data["steps"][2]["at_ms"] = 100
     with pytest.raises(ValueError, match="monotonic"):
         EvaluationCase.from_mapping(data)
+
+
+def test_stale_cabin_context_does_not_expose_old_driver_state() -> None:
+    case = EvaluationCase.from_mapping(
+        {
+            "id": "X07",
+            "split": "heldout",
+            "category": "cross_domain",
+            "review_status": "candidate",
+            "steps": [
+                {
+                    "at_ms": 0,
+                    "cabin": {
+                        "presence": "PRESENT",
+                        "driver_state": "DROWSY",
+                        "risk": "HIGH",
+                    },
+                },
+                {"at_ms": 2500, "road": {"traffic_level": "LIGHT"}},
+                {"at_ms": 2600, "user_text": "结合驾驶员状态和当前路况回答。"},
+            ],
+            "expected": {
+                "tools": [],
+                "final_vehicle": {},
+                "required_facts": [],
+                "forbidden_phrases": [],
+            },
+        }
+    )
+    client = CaptureClient()
+    result = run_trial(case, client, provider="test", model="stub", trial_index=1)
+    assert result.error is None
+    assert '"quality_status": "STALE"' in client.contexts[0]
+    assert '"state": "DROWSY"' not in client.contexts[0]
+    assert '"traffic_level": "LIGHT"' in client.contexts[0]
+
+
+def test_unobserved_vehicle_defaults_are_not_sent_as_facts() -> None:
+    case = EvaluationCase.from_mapping(
+        {
+            "id": "C01",
+            "split": "dev",
+            "category": "cabin",
+            "review_status": "candidate",
+            "steps": [
+                {
+                    "at_ms": 0,
+                    "cabin": {
+                        "presence": "PRESENT",
+                        "driver_state": "DROWSY",
+                        "risk": "HIGH",
+                    },
+                },
+                {"at_ms": 100, "user_text": "我的驾驶状态如何？"},
+            ],
+            "expected": {
+                "tools": [],
+                "final_vehicle": {},
+                "required_facts": [],
+                "forbidden_phrases": [],
+            },
+        }
+    )
+    client = CaptureClient()
+    run_trial(case, client, provider="test", model="stub", trial_index=1)
+    assert '"quality_status": "MISSING"' in client.contexts[0]
+    assert '"gear": "P"' not in client.contexts[0]
+    assert '"speed_kmh": 0' not in client.contexts[0]

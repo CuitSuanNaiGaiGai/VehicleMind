@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 
 from modules.observation import ObservationMetadata
-from modules.vehicle_ai.context import ContextManager, DriverState
+from modules.vehicle_ai.context import ContextManager, DriverState, RiskLevel
+from modules.vehicle_ai.context.context_selector import ContextSelector
 from modules.vehicle_ai.events import EventDetector
 from modules.vehicle_ai.runtime import VehicleMindRuntime
 
@@ -34,6 +35,26 @@ def test_partial_update_does_not_mark_untouched_defaults_as_observed() -> None:
 
     assert manager.field_quality("road", "vehicle_count") == "KNOWN"
     assert manager.field_quality("road", "lane_detected") == "MISSING"
+
+
+def test_selector_excludes_unobserved_fields_after_partial_update() -> None:
+    manager = ContextManager()
+    manager.update_vehicle(speed_kmh=37)
+    manager.update_driver(risk=RiskLevel.HIGH)
+    selected = (
+        ContextSelector()
+        .select(
+            "驾驶员状态和车速如何？",
+            manager.get_context(),
+            driver_quality=manager.observation_quality("driver")["status"],
+            vehicle_quality=manager.observation_quality("vehicle")["status"],
+            field_quality=manager.field_quality,
+        )
+        .context
+    )
+    assert selected["vehicle"]["speed_kmh"] == 37
+    assert "gear" not in selected["vehicle"]
+    assert "state" not in selected["driver"]
 
 
 def test_stale_uses_receipt_clock_and_domain_ttl() -> None:

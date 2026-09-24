@@ -36,7 +36,7 @@ class EvaluationCase:
             raise ValueError(f"case fields mismatch: {sorted(set(data) ^ allowed)}")
         if data["split"] not in {"dev", "heldout"}:
             raise ValueError("split must be dev or heldout")
-        if data["review_status"] not in {"candidate", "reviewed"}:
+        if data["review_status"] not in {"candidate", "ai_reviewed", "reviewed"}:
             raise ValueError("invalid review_status")
         if not isinstance(data["steps"], list) or not data["steps"]:
             raise ValueError("steps must be a non-empty list")
@@ -77,6 +77,7 @@ class EvaluationCase:
                 "cabin",
                 "road",
                 "road_quality",
+                "tool_failure",
                 "vehicle",
                 "user_text",
                 "confirm_pending",
@@ -96,6 +97,16 @@ class EvaluationCase:
                     raise ValueError(f"step.{domain} must be a mapping")
             if "road_quality" in step and step["road_quality"] != {"valid": False}:
                 raise ValueError("step.road_quality must be {valid: false}")
+            if "tool_failure" in step:
+                failure = step["tool_failure"]
+                if (
+                    not isinstance(failure, dict)
+                    or set(failure) != {"name", "error"}
+                    or not all(
+                        isinstance(value, str) and value for value in failure.values()
+                    )
+                ):
+                    raise ValueError("step.tool_failure requires name and error")
             if "user_text" in step and not isinstance(step["user_text"], str):
                 raise ValueError("step.user_text must be text")
             for field in ("confirm_pending", "reject_pending"):

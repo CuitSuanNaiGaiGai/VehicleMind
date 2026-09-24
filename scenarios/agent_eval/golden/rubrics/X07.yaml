@@ -1,0 +1,29 @@
+schema_version: 1
+case_id: X07
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: old_driver
+  source: cabin.driver_state
+  value: DROWSY
+- id: road_count
+  source: road.vehicle_count
+  value: 2
+- id: driver_age
+  source: timeline.cabin_age_at_first_question_ms
+  value: 2600
+required_claims:
+- id: main_claim
+  text: 应只肯定当前有效道路观测，并指出舱内观测已过期。
+  supported_by:
+  - old_driver
+  - road_count
+  - driver_age
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - old_driver
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得把过期的 DROWSY 当成当前确定状态。

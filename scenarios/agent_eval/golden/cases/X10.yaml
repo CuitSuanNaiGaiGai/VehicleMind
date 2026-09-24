@@ -1,0 +1,25 @@
+id: X10
+split: heldout
+category: cross_domain
+review_status: ai_reviewed
+steps:
+- at_ms: 0
+  cabin:
+    presence: PRESENT
+    driver_state: NORMAL
+    risk: LOW
+- at_ms: 40
+  road:
+    traffic_level: MODERATE
+    vehicle_count: 5
+- at_ms: 70
+  vehicle:
+    speed_kmh: 42
+    gear: D
+- at_ms: 100
+  user_text: 给我驾驶员、道路和车辆三方面的简短总览。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

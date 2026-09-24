@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: V038
+label_status: candidate
+reviewer: null
+facts:
+- id: fatigue
+  source: cabin.risk
+  value: HIGH
+- id: gear
+  source: vehicle.gear
+  value: P
+required_claims:
+- id: main_claim
+  text: 应区分疲劳观测和车辆已驻车，不称当前正在行驶。
+  supported_by:
+  - fatigue
+  - gear
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - fatigue
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得声称车辆正在高速行驶。

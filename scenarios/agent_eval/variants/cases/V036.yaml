@@ -1,0 +1,22 @@
+id: V036
+split: dev
+category: cross_domain
+review_status: candidate
+steps:
+- at_ms: 0
+  cabin:
+    presence: PRESENT
+    driver_state: DROWSY
+    risk: HIGH
+- at_ms: 50
+  vehicle:
+    speed_kmh: 0
+    gear: P
+- at_ms: 100
+  user_text: 请用中文回答：我已经停车，但刚才疲劳风险高，现在是什么情况？
+expected:
+  tools: []
+  final_vehicle:
+    gear: P
+  required_facts: []
+  forbidden_phrases: []

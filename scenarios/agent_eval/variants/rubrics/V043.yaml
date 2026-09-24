@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: V043
+label_status: candidate
+reviewer: null
+facts:
+- id: driver
+  source: cabin.driver_state
+  value: NORMAL
+- id: lane
+  source: road.lane_detected
+  value: false
+required_claims:
+- id: main_claim
+  text: 应说明驾驶员观测正常且车道线未检出，两者不能互相替代。
+  supported_by:
+  - driver
+  - lane
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - driver
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得说当前车道线已检出。

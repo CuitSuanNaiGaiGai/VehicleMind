@@ -1,0 +1,24 @@
+id: V030
+split: dev
+category: road
+review_status: candidate
+steps:
+- at_ms: 0
+  road:
+    vehicle_count: 1
+    pedestrian_count: 2
+    rider_count: 1
+    traffic_light_count: 0
+    traffic_sign_count: 0
+    lane_detected: true
+    drivable_area_detected: true
+    traffic_level: LIGHT
+- at_ms: 100
+  user_text: 根据当前道路目标检测，周围有哪些行人和骑行者？ 请简短回答。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+  - 没有行人
+  - 没有骑行者

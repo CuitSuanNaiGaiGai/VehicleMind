@@ -1,0 +1,19 @@
+id: V060
+split: dev
+category: tool
+review_status: candidate
+steps:
+- at_ms: 0
+  vehicle:
+    ac_enabled: false
+- at_ms: 100
+  user_text: 请用中文回答：请打开空调。
+expected:
+  tools:
+  - name: set_ac
+    arguments:
+      enabled: true
+  final_vehicle:
+    ac_enabled: true
+  required_facts: []
+  forbidden_phrases: []

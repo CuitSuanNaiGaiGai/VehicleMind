@@ -1,0 +1,20 @@
+id: X09
+split: heldout
+category: cross_domain
+review_status: candidate
+steps:
+- at_ms: 0
+  road:
+    traffic_level: HEAVY
+    vehicle_count: 12
+- at_ms: 50
+  vehicle:
+    speed_kmh: 85
+    gear: D
+- at_ms: 100
+  user_text: 现在车速和车流情况如何？只给提示。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: X06
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: presence
+  source: cabin.presence
+  value: ABSENT
+- id: gear
+  source: vehicle.gear
+  value: P
+required_claims:
+- id: main_claim
+  text: 应说明未检出驾驶员且车辆驻车，疲劳状态未知。
+  supported_by:
+  - presence
+  - gear
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - presence
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得称驾驶员确定疲劳或车辆正在行驶。

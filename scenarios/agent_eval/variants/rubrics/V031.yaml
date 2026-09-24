@@ -1,0 +1,28 @@
+schema_version: 1
+case_id: V031
+label_status: candidate
+reviewer: null
+facts:
+- id: pedestrians
+  source: road.pedestrian_count
+  value: 2
+- id: riders
+  source: road.rider_count
+  value: 1
+required_claims:
+- id: detected_people
+  text: 应说明当前观测检测到 2 名行人、1 名骑行者，不遗漏任何一类。
+  supported_by:
+  - pedestrians
+  - riders
+allowed_inferences:
+- id: cautious_attention
+  text: 可提醒留意行人与骑行者，但不得宣称车辆已执行避障。
+  supported_by:
+  - pedestrians
+  - riders
+forbidden_inferences:
+- id: missing_people
+  text: 不得声称未检测到行人或骑行者。
+- id: invented_trajectory
+  text: 无轨迹输入，不得虚构目标移动方向、碰撞时间或避障动作。

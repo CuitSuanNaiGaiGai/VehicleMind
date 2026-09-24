@@ -1,0 +1,24 @@
+id: V070
+split: dev
+category: multi_turn
+review_status: candidate
+steps:
+- at_ms: 0
+  user_text: 帮我找最近的服务区。
+- at_ms: 1000
+  user_text: 就去这个。 请简短回答。
+- at_ms: 1100
+  confirm_pending: true
+expected:
+  tools:
+  - name: search_nearby_rest_area
+    arguments: {}
+  - name: start_navigation
+    arguments:
+      poi_id: rest_area_001
+  final_vehicle:
+    navigation_state: ACTIVE
+    navigation_destination_id: rest_area_001
+  required_facts: []
+  forbidden_phrases:
+  - 无法找到服务区

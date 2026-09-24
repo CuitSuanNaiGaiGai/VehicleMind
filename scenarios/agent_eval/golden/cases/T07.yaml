@@ -1,0 +1,19 @@
+id: T07
+split: heldout
+category: tool
+review_status: ai_reviewed
+steps:
+- at_ms: 0
+  vehicle:
+    volume: 30
+- at_ms: 100
+  user_text: 把媒体音量调到 45。
+expected:
+  tools:
+  - name: set_volume
+    arguments:
+      volume: 45
+  final_vehicle:
+    volume: 45
+  required_facts: []
+  forbidden_phrases: []

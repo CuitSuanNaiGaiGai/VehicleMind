@@ -10,6 +10,7 @@ from types import MappingProxyType
 from collections.abc import Mapping
 from threading import RLock
 from typing import Any
+from collections.abc import Callable
 
 
 def _freeze_value(value: Any) -> Any:
@@ -145,9 +146,14 @@ class PendingActionStore:
 
     def __init__(
         self,
+        clock: Callable[[], float] = time.time,
     ):
         self._pending: PendingAction | None = None
         self._lock = RLock()
+        self._clock = clock
+
+    def now(self) -> float:
+        return self._clock()
 
     # ========================================================
     # Set
@@ -172,7 +178,7 @@ class PendingActionStore:
         with self._lock:
             if self._pending is None:
                 return None
-            if self._pending.is_expired():
+            if self._pending.is_expired(now=self._clock()):
                 self._pending = None
                 return None
             return self._pending

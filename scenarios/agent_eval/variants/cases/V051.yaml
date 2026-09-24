@@ -1,0 +1,18 @@
+id: V051
+split: dev
+category: tool
+review_status: candidate
+steps:
+- at_ms: 0
+  vehicle:
+    speed_kmh: 36
+    gear: D
+- at_ms: 100
+  user_text: 请用中文回答：请通过车机查询工具读取当前车辆状态。
+expected:
+  tools:
+  - name: get_vehicle_status
+    arguments: {}
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

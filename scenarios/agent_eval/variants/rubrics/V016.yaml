@@ -1,0 +1,32 @@
+schema_version: 1
+case_id: V016
+label_status: candidate
+reviewer: null
+facts:
+- id: presence
+  source: cabin.presence
+  value: ABSENT
+- id: state
+  source: cabin.driver_state
+  value: UNKNOWN
+- id: risk
+  source: cabin.risk
+  value: UNKNOWN
+required_claims:
+- id: absent_unknown
+  text: 应说明当前未检测到驾驶员，驾驶状态和风险未知，不能据此判断正常或疲劳。
+  supported_by:
+  - presence
+  - state
+  - risk
+allowed_inferences:
+- id: observation_limit
+  text: 可说明需要新的有效观测后再判断驾驶状态。
+  supported_by:
+  - presence
+  - state
+forbidden_inferences:
+- id: invented_state
+  text: 不得对缺席驾驶员断言正常、疲劳或分心。
+- id: physical_absence
+  text: ABSENT 是观测状态，不得断言现实中绝对没有人。

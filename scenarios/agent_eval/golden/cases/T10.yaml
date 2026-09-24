@@ -1,0 +1,20 @@
+id: T10
+split: heldout
+category: tool
+review_status: ai_reviewed
+steps:
+- at_ms: 0
+  vehicle:
+    navigation_state: ACTIVE
+    navigation_destination_id: rest_area_001
+    navigation_destination: West Lake Rest Area
+- at_ms: 100
+  user_text: 取消当前导航。
+expected:
+  tools:
+  - name: cancel_navigation
+    arguments: {}
+  final_vehicle:
+    navigation_state: IDLE
+  required_facts: []
+  forbidden_phrases: []

@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: M05
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: question
+  source: user_text
+  value: 刚才的导航开始了吗？
+- id: confirmation_age
+  source: timeline.confirmation_since_previous_request_ms
+  value: 121000
+required_claims:
+- id: main_claim
+  text: 确认发生在上轮请求 121 秒后，已超时；回答不得称导航完成。
+  supported_by:
+  - question
+  - confirmation_age
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - question
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得把超时的确认当作成功。

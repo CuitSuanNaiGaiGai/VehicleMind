@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: V045
+label_status: candidate
+reviewer: null
+facts:
+- id: driver
+  source: cabin.driver_state
+  value: SUSPECTED
+- id: pedestrians
+  source: road.pedestrian_count
+  value: 2
+required_claims:
+- id: main_claim
+  text: 应区分用户自述分心与算法 SUSPECTED，并说明当前观测到 2 名行人。
+  supported_by:
+  - driver
+  - pedestrians
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - driver
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得虚构行人轨迹或碰撞时间。

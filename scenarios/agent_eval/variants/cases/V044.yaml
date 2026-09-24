@@ -1,0 +1,21 @@
+id: V044
+split: dev
+category: cross_domain
+review_status: candidate
+steps:
+- at_ms: 0
+  cabin:
+    presence: PRESENT
+    driver_state: NORMAL
+    risk: LOW
+- at_ms: 50
+  road:
+    traffic_level: LIGHT
+    lane_detected: false
+- at_ms: 100
+  user_text: 驾驶员状态正常，但车道线情况如何？ 回答时请区分观测与推断。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

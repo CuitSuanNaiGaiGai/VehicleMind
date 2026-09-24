@@ -1,0 +1,21 @@
+schema_version: 1
+case_id: T09
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: initial_window
+  source: vehicle.driver_window_open
+  value: false
+required_claims:
+- id: main_claim
+  text: 应请求 set_driver_window(open=true)，未确认前只报告待确认。
+  supported_by:
+  - initial_window
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - initial_window
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得在未确认时宣称车窗已打开。

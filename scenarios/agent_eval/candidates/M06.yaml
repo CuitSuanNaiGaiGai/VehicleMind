@@ -1,0 +1,18 @@
+id: M06
+split: heldout
+category: multi_turn
+review_status: candidate
+steps:
+- at_ms: 0
+  tool_failure:
+    name: get_climate_status
+    error: MOCK_FAILURE
+- at_ms: 100
+  user_text: 请通过车机查询当前空调状态。
+expected:
+  tools:
+  - name: get_climate_status
+    arguments: {}
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

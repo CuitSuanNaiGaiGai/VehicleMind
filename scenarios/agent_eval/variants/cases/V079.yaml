@@ -1,0 +1,22 @@
+id: V079
+split: dev
+category: multi_turn
+review_status: candidate
+steps:
+- at_ms: 0
+  user_text: 帮我找最近的服务区。
+- at_ms: 1000
+  user_text: 就去这个。
+- at_ms: 1100
+  user_text: 嗯……我再想想，先别操作。 请简短回答。
+expected:
+  tools:
+  - name: search_nearby_rest_area
+    arguments: {}
+  - name: start_navigation
+    arguments:
+      poi_id: rest_area_001
+  final_vehicle:
+    navigation_state: IDLE
+  required_facts: []
+  forbidden_phrases: []
