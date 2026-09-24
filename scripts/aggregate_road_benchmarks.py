@@ -13,9 +13,24 @@ from collections.abc import Sequence
 def _identity(result: dict[str, Any]) -> tuple[object, ...]:
     config = result["config"]
     provenance = result["provenance"]
+    environment = result["environment"]
     return (
         provenance["video"]["sha256"],
         provenance["model"]["sha256"],
+        provenance["git_commit"],
+        provenance["dirty"],
+        *(
+            environment[key]
+            for key in (
+                "system",
+                "release",
+                "machine",
+                "python",
+                "onnxruntime",
+                "opencv",
+                "numpy",
+            )
+        ),
         *(
             config[key]
             for key in (
@@ -40,6 +55,13 @@ def aggregate_runs(paths: Sequence[Path]) -> str:
         if path.name != "result.json" or not (path.parent / ".complete").is_file():
             raise ValueError("运行结果未完成")
         runs.append(json.loads(path.read_text(encoding="utf-8")))
+    try:
+        run_ids = [run["run_id"] for run in runs]
+        process_ids = [run["process_id"] for run in runs]
+    except KeyError as error:
+        raise ValueError("缺少独立进程标识") from error
+    if len(set(run_ids)) != 3 or len(set(process_ids)) != 3:
+        raise ValueError("三份结果必须来自三个独立进程")
     if any(_identity(run) != _identity(runs[0]) for run in runs[1:]):
         raise ValueError("三次运行的输入、模型或配置不一致")
 

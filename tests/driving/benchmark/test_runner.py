@@ -88,6 +88,8 @@ def test_warmup_is_excluded_and_paths_are_redacted(tmp_path: Path) -> None:
     assert result["provenance"]["video"]["name"] == "sample.mp4"
     assert result["provenance"]["model"]["name"] == "model.onnx"
     assert result["active_providers"] == ["CPUExecutionProvider"]
+    assert isinstance(result["run_id"], str) and result["run_id"]
+    assert isinstance(result["process_id"], int) and result["process_id"] > 0
     assert factory_kwargs["coreml_cache_dir"] == tmp_path / ".coreml_cache"
     assert not (tmp_path / ".coreml_cache").exists()
     assert (tmp_path / "result" / ".complete").is_file()

@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -224,6 +225,8 @@ def run_benchmark(
     }
     result: dict[str, object] = {
         "schema_version": 1,
+        "run_id": uuid.uuid4().hex,
+        "process_id": os.getpid(),
         "config": {
             "provider": config.provider,
             "work_width": config.work_width,

@@ -69,7 +69,7 @@ def test_invalid_samples_are_rejected(values: list[float]) -> None:
 
 - [x] **Step 1: 写失败测试。** 三个同配置结果可聚合；模型哈希或 provider 不同必须拒绝；报告明确包含“三次独立进程”“同一视频帧”“非感知精度”。运行目标测试确认红灯。
 - [x] **Step 2: 实现聚合脚本并验证。** 从三个 JSON 读取每次 p50/p95、FPS 与 RSS；拒绝非 3 份或配置不一致输入；输出按运行编号的表及跨运行最小/最大值。跑目标测试、Ruff 和 `git diff --check`，提交 `Aggregate independent road benchmark runs` 并推送。
-- [ ] **Step 3: 验证本机资产。** 运行 `uv run --group dev python scripts/verify_assets.py`；确认本地 `models/driving/YOLOPv2_512.onnx` 哈希匹配 manifest。若失败，停止真实测量，不替换资产或填数。
-- [ ] **Step 4: 实测。** 对 `assets/driving/road_test.mp4` 和固定模型按 CPU、CoreML 优先配置各运行 3 个独立进程；每次使用新 `--output-dir`，输出留在 Git 忽略的 `runs/`。若 CoreML 不可用，只记录不可用并保留 CPU 三次；不静默回退。聚合前核查三个 JSON 的同源性与路径脱敏。
-- [ ] **Step 5: 写公开报告。** 从 JSON 生成 `docs/reports/2026-09-24-road-performance.md`，列出设备、系统、版本、模型/视频哈希、分辨率、缓存状态、每组逐次和聚合区间、阶段 p50/p95、真实 provider、FPS 边界及样本局限。README 仅摘录有证据支撑的数字并链接报告；只勾选 `todolist.md` 第 6.3 节实际完成的道路性能项，舱内和感知精度保持待办。
+- [x] **Step 3: 验证本机资产。** 运行 `uv run --group dev python scripts/verify_assets.py`；确认本地 `models/driving/YOLOPv2_512.onnx` 哈希匹配 manifest。若失败，停止真实测量，不替换资产或填数。
+- [x] **Step 4: 实测。** 对 `assets/driving/road_test.mp4` 和固定模型按 CPU、CoreML 优先配置各运行 3 个独立进程；每次使用新 `--output-dir`，输出留在 Git 忽略的 `runs/`。若 CoreML 不可用，只记录不可用并保留 CPU 三次；不静默回退。聚合前核查三个 JSON 的同源性与路径脱敏。
+- [x] **Step 5: 写公开报告。** 从 JSON 生成 `docs/reports/2026-09-24-road-performance.md`，列出设备、系统、版本、模型/视频哈希、分辨率、缓存状态、每组逐次和聚合区间、阶段 p50/p95、真实 provider、FPS 边界及样本局限。README 仅摘录有证据支撑的数字并链接报告；只勾选 `todolist.md` 第 6.3 节实际完成的道路性能项，舱内和感知精度保持待办。
 - [ ] **Step 6: 总体验收。** 运行全部离线 pytest、Ruff check/format、mypy 当前 CI 边界、源码大小、`git diff --check`；审查公开文件无密钥、绝对路径和夸大表述。提交推送，创建 PR 并等待必需 CI；CI 绿灯后再讨论合并 main。
