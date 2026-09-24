@@ -34,10 +34,10 @@
 
 **Interfaces:** 无密钥入口 `python -m apps.vehicle_ai_demo.replay_demo`；可选真实视频入口 `python -m apps.vehicle_ai_demo.integrated_demo`；可选在线 Agent 入口以仓库现有 CLI 为准，不新增未实现命令。
 
-- [ ] 先扩充 `tests/test_readme_commands.py`：检查离线命令、报告路径、示例场景、预期可见状态，以及在线路径的 `.env`/费用提示。运行目标测试，确认新增断言红灯。
-- [ ] 用临时唯一 `--run-id` 执行 README 无密钥命令，检查 `report.html`、`summary.json`、`trace.json`、`resolved_config.yaml` 和断言结果；记录确切命令与输出，不把本地运行目录提交 Git。
-- [ ] 把实际验证过的安装、打开报告、预期画面、常见失败处理写入 README。核对 `docs/offline_video_pipeline.md` 的可选真实视频命令与代码参数；在线演示只链接确实可运行且明确计费的现有指南。
-- [ ] 运行目标测试、离线 smoke test 与 `git diff --check`；按验收更新 `todolist.md`，提交并推送。
+- [x] 先扩充 `tests/test_readme_commands.py`：检查离线命令、报告路径、示例场景、预期可见状态，以及在线路径的 `.env`/费用提示。运行目标测试，确认新增断言红灯。
+- [x] 用临时唯一 `--run-id` 执行 README 无密钥命令，检查 `report.html`、`summary.json`、`trace.json`、`resolved_config.yaml` 和断言结果；记录确切命令与输出，不把本地运行目录提交 Git。
+- [x] 把实际验证过的安装、打开报告、预期画面、常见失败处理写入 README。核对 `docs/offline_video_pipeline.md` 的可选真实视频命令与代码参数；在线演示只链接确实可运行且明确计费的现有指南。
+- [x] 运行目标测试、离线 smoke test 与 `git diff --check`；按验收更新 `todolist.md`，提交并推送。
 
 ### Task 3: 业务模块—技术栈—个人贡献映射
 
