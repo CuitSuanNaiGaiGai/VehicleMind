@@ -142,6 +142,10 @@ def process_video(
         return result
     path = Path(input_dir) / item["basename"]
     service = service_factory(item["domain"])
+    if item["domain"] == "road":
+        session = getattr(getattr(service, "detector", None), "session", None)
+        get_providers = getattr(session, "get_providers", None)
+        result["active_providers"] = list(get_providers()) if callable(get_providers) else []
     capture = None
     try:
         capture = capture_factory(str(path))

@@ -59,6 +59,9 @@ class FakeRoadService:
     def __init__(self):
         self.timestamps = []
         self.closed = False
+        self.detector = SimpleNamespace(
+            session=SimpleNamespace(get_providers=lambda: ["CPUExecutionProvider"])
+        )
 
     def process_frame(self, _frame, timestamp_ms):
         self.timestamps.append(timestamp_ms)
@@ -113,6 +116,7 @@ def test_road_counts_outputs_and_adjacent_flips(tmp_path: Path):
     assert result["drivable_detected_frames"] == 3
     assert result["lane_output_flips"] == 2
     assert result["drivable_output_flips"] == 0
+    assert result["active_providers"] == ["CPUExecutionProvider"]
 
 
 def test_timestamp_fallback_is_explicit_when_codec_has_no_clock(tmp_path: Path):
