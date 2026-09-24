@@ -1,0 +1,15 @@
+id: T08
+split: heldout
+category: tool
+review_status: candidate
+steps:
+- at_ms: 0
+  user_text: 帮我查找附近最近的服务区，只查询，不启动导航。
+expected:
+  tools:
+  - name: search_nearby_rest_area
+    arguments: {}
+  final_vehicle:
+    navigation_state: IDLE
+  required_facts: []
+  forbidden_phrases: []

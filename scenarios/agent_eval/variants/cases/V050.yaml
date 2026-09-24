@@ -1,0 +1,21 @@
+id: V050
+split: dev
+category: cross_domain
+review_status: candidate
+steps:
+- at_ms: 0
+  cabin:
+    presence: ABSENT
+    driver_state: UNKNOWN
+    risk: UNKNOWN
+- at_ms: 50
+  vehicle:
+    speed_kmh: 0
+    gear: P
+- at_ms: 100
+  user_text: 驾驶员在吗？车现在是什么状态？ 回答时请区分观测与推断。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

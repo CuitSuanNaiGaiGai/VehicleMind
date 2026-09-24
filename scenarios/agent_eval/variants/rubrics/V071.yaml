@@ -1,0 +1,28 @@
+schema_version: 1
+case_id: V071
+label_status: candidate
+reviewer: null
+facts:
+- id: poi_id
+  source: tool.search_nearby_rest_area.poi_id
+  value: rest_area_001
+- id: destination
+  source: tool.search_nearby_rest_area.name
+  value: West Lake Rest Area
+required_claims:
+- id: pending_then_confirmed
+  text: 确认前应明确导航尚未执行、正在待确认；确认结果成功后才可称已启动。
+  supported_by:
+  - poi_id
+  - destination
+allowed_inferences:
+- id: display_name
+  text: 可把服务区英文显示名自然翻译成中文，但工具参数必须使用规范 poi_id。
+  supported_by:
+  - poi_id
+  - destination
+forbidden_inferences:
+- id: premature_success
+  text: 确认前不得声称导航已启动。
+- id: false_failure
+  text: CONFIRMATION_REQUIRED 表示待确认，不得称导航启动失败。

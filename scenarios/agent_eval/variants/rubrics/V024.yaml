@@ -1,0 +1,26 @@
+schema_version: 1
+case_id: V024
+label_status: candidate
+reviewer: null
+facts:
+- id: lane_missing
+  source: road.lane_detected
+  value: false
+- id: road_valid
+  source: road.drivable_area_detected
+  value: true
+required_claims:
+- id: lane_not_detected
+  text: 应说车道线未被检测到；不能断言现实道路不存在车道线。
+  supported_by:
+  - lane_missing
+allowed_inferences:
+- id: cautious_statement
+  text: 可提醒车道线观测不足，需要继续留意道路。
+  supported_by:
+  - lane_missing
+forbidden_inferences:
+- id: cause_guess
+  text: 不得无证据归因于驻车、摄像头关闭或算法未激活。
+- id: lane_present
+  text: 不得声称车道线已检测到。

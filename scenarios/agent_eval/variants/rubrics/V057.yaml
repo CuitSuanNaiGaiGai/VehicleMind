@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: V057
+label_status: candidate
+reviewer: null
+facts:
+- id: initial_target
+  source: vehicle.target_temperature_c
+  value: 22
+- id: requested_target
+  source: tool.set_temperature.target_temperature_c
+  value: 24
+required_claims:
+- id: set_target
+  text: 工具成功后应说明目标温度已从 22°C 调到 24°C。
+  supported_by:
+  - initial_target
+  - requested_target
+allowed_inferences:
+- id: ac_effect
+  text: 若工具结果显示空调开启，可一并说明。
+  supported_by:
+  - requested_target
+forbidden_inferences:
+- id: no_action_claim
+  text: 初始目标为 22°C，不得称原本就是 24°C 而无需调整。

@@ -1,0 +1,21 @@
+schema_version: 1
+case_id: T08
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: request
+  source: user_text
+  value: 帮我查找附近最近的服务区，只查询，不启动导航。
+required_claims:
+- id: main_claim
+  text: 应调用服务区搜索工具，返回地点但不启动导航。
+  supported_by:
+  - request
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - request
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得宣称导航已启动。

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from threading import RLock
 from typing import Any
+from collections.abc import Callable
 
 from modules.observation import ObservationMetadata
 from modules.vehicle_ai.context.contract import (
@@ -120,6 +121,7 @@ class ContextManager:
         self,
         initial_context: VehicleContext | None = None,
         max_change_history: int = 200,
+        quality_clock: Callable[[], float] = time.monotonic,
     ):
         self._lock = RLock()
 
@@ -141,7 +143,7 @@ class ContextManager:
             self._context = deepcopy(initial_context)
 
         self._changes: deque[ContextChange] = deque(maxlen=max_change_history)
-        self._quality = ObservationQualityTracker()
+        self._quality = ObservationQualityTracker(clock=quality_clock)
 
     # ========================================================
     # Snapshot

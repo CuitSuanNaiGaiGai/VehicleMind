@@ -1,0 +1,24 @@
+- case_id: C03
+  trial_index: 1
+  verdict: fail
+  evidence: 回答把舱内 SUSPECTED 状态描述为“疑似分心或疲劳”；舱内并无分心检测标签，分心仅来自用户自述，来源被混淆。
+- case_id: C03
+  trial_index: 3
+  verdict: fail
+  evidence: 回答称“根据当前舱内观测……疑似分心状态”，将用户自述的分心误归于舱内算法观测。
+- case_id: R03
+  trial_index: 1
+  verdict: fail
+  evidence: 回答把 road.traffic_level=LIGHT 解释为“轻度拥堵”，与轻车流观测语义相反；其余区域检测表述不能抵消该错误。
+- case_id: R03
+  trial_index: 2
+  verdict: fail
+  evidence: 回答把 road.traffic_level=LIGHT 解释为“轻度拥堵”，是无依据的路况结论。
+- case_id: R03
+  trial_index: 3
+  verdict: fail
+  evidence: 回答把 road.traffic_level=LIGHT 解释为“轻度拥堵”，是无依据的路况结论。
+- case_id: R06
+  trial_index: 3
+  verdict: fail
+  evidence: 两轮仅说“暂时无法获取”，没有说明第一轮观测已过期、第二轮新观测无效，遗漏两个必要质量结论。

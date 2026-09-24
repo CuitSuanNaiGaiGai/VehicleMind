@@ -1,0 +1,24 @@
+id: V013
+split: dev
+category: cabin
+review_status: candidate
+steps:
+- at_ms: 0
+  cabin:
+    presence: ABSENT
+    driver_state: UNKNOWN
+    risk: UNKNOWN
+    perclos: null
+    eye_closed: null
+    eye_closure_seconds: 0
+    recent_yawns: 0
+    blink_count: 0
+- at_ms: 100
+  user_text: 请用中文回答：当前舱内有驾驶员吗？能判断驾驶状态吗？
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases:
+  - 驾驶员状态正常
+  - 驾驶员疲劳

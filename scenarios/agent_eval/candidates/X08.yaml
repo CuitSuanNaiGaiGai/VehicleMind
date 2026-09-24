@@ -1,0 +1,21 @@
+id: X08
+split: heldout
+category: cross_domain
+review_status: candidate
+steps:
+- at_ms: 0
+  road:
+    traffic_level: HEAVY
+    vehicle_count: 11
+- at_ms: 1500
+  cabin:
+    presence: PRESENT
+    driver_state: DROWSY
+    risk: HIGH
+- at_ms: 1600
+  user_text: 结合我现在的状态和道路情况说说。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

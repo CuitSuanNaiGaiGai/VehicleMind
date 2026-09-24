@@ -9,7 +9,7 @@ from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse
 
 
 ROOT = Path(__file__).resolve().parents[3] / "scenarios" / "agent_eval"
-IDS = ("R01", "R02", "R03", "R04", "R05")
+IDS = ("R01", "R02", "R03", "R04", "R05", "R06")
 
 
 class FactReply(BaseLLMClient):
@@ -27,7 +27,7 @@ def test_road_candidate_cases_are_grounded_and_runnable() -> None:
         rubric = load_rubric(ROOT / "rubrics" / f"{case_id}.yaml", case)
         assert case.id == case_id
         assert case.category == "road"
-        assert case.split == ("heldout" if case_id == "R05" else "dev")
+        assert case.split == ("heldout" if case_id in {"R05", "R06"} else "dev")
         assert case.review_status == rubric.label_status == "candidate"
         assert rubric.facts and rubric.required_claims and rubric.forbidden_inferences
         assert (

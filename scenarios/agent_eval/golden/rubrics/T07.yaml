@@ -1,0 +1,21 @@
+schema_version: 1
+case_id: T07
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: initial_volume
+  source: vehicle.volume
+  value: 30
+required_claims:
+- id: main_claim
+  text: 应调用 set_volume(45) 并确认最终音量为 45。
+  supported_by:
+  - initial_volume
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - initial_volume
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得把音量说成温度。

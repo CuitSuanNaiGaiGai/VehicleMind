@@ -61,6 +61,34 @@ def _items(value: Any, name: str) -> list[dict[str, Any]]:
 
 
 def _source_value(case: EvaluationCase, source: str) -> tuple[bool, Any]:
+    if source == "timeline.confirmation_since_previous_request_ms":
+        previous_request_at_ms: int | None = None
+        for step in case.steps:
+            if step.get("confirm_pending"):
+                confirmation_at_ms = step.get("at_ms")
+                if previous_request_at_ms is None or confirmation_at_ms is None:
+                    raise ValueError("confirmation age requires timed prior request")
+                return True, confirmation_at_ms - previous_request_at_ms
+            if "user_text" in step:
+                previous_request_at_ms = step.get("at_ms")
+        raise ValueError("confirmation age requires a confirmation step")
+    timed_domain = {
+        "timeline.road_age_at_first_question_ms": "road",
+        "timeline.cabin_age_at_first_question_ms": "cabin",
+    }.get(source)
+    if timed_domain is not None:
+        observed_at_ms: int | None = None
+        for step in case.steps:
+            if timed_domain in step:
+                observed_at_ms = step.get("at_ms")
+            if "user_text" in step:
+                question_at_ms = step.get("at_ms")
+                if observed_at_ms is None or question_at_ms is None:
+                    raise ValueError(
+                        "observation age requires timed domain and question steps"
+                    )
+                return True, question_at_ms - observed_at_ms
+        raise ValueError("observation age requires a question")
     if source == "user_text":
         for step in reversed(case.steps):
             if "user_text" in step:
@@ -76,7 +104,10 @@ def _source_value(case: EvaluationCase, source: str) -> tuple[bool, Any]:
         }:
             raise ValueError(f"tool source not expected: {source}")
         return False, None
-    if domain not in {"cabin", "road", "vehicle"} or "." in field:
+    if (
+        domain not in {"cabin", "road", "road_quality", "tool_failure", "vehicle"}
+        or "." in field
+    ):
         raise ValueError(f"invalid fact source: {source}")
     for step in reversed(case.steps):
         values = step.get(domain)
@@ -130,13 +161,13 @@ def load_rubric(path: Path, case: EvaluationCase) -> GroundingRubric:
         raise ValueError("rubric case_id mismatch")
     status = document["label_status"]
     reviewer = document["reviewer"]
-    if status not in {"candidate", "reviewed"}:
+    if status not in {"candidate", "ai_reviewed", "reviewed"}:
         raise ValueError("invalid label_status")
     if status != case.review_status:
         raise ValueError("case and rubric review status mismatch")
     if status == "candidate" and reviewer is not None:
         raise ValueError("candidate rubric cannot have reviewer")
-    if status == "reviewed":
+    if status in {"ai_reviewed", "reviewed"}:
         reviewer = _text(reviewer, "reviewer")
 
     facts: list[SourceFact] = []

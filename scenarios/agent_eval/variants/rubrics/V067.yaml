@@ -1,0 +1,21 @@
+schema_version: 1
+case_id: V067
+label_status: candidate
+reviewer: null
+facts:
+- id: playing
+  source: vehicle.media_playing
+  value: true
+required_claims:
+- id: main_claim
+  text: 应调用 pause_music，并使播放状态为 false。
+  supported_by:
+  - playing
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - playing
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得声称已切换歌曲。

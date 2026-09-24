@@ -39,6 +39,7 @@ class ActionConfirmationController:
                 tool_name=tool_name,
                 arguments=dict(arguments),
                 display_text=f"Confirm vehicle action: {tool_name}",
+                created_at=self.pending_actions.now(),
             )
         )
 

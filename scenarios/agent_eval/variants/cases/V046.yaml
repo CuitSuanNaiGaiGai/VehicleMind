@@ -1,0 +1,21 @@
+id: V046
+split: dev
+category: cross_domain
+review_status: candidate
+steps:
+- at_ms: 0
+  cabin:
+    presence: PRESENT
+    driver_state: SUSPECTED
+    risk: MEDIUM
+- at_ms: 50
+  road:
+    traffic_level: LIGHT
+    pedestrian_count: 2
+- at_ms: 100
+  user_text: 我有点分心，前方有行人吗？简要说说。 请简短回答。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []

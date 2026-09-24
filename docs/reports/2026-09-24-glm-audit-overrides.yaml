@@ -1,0 +1,8 @@
+- case_id: X05
+  trial_index: 2
+  verdict: fail
+  evidence: 回答声称“系统检测到您当前状态有些分心”；场景中分心只来自用户自述，舱内观测没有分心检测标签，来源被混淆。
+- case_id: X05
+  trial_index: 3
+  verdict: fail
+  evidence: 回答称“您目前状态被检测为有些分心”，把用户自述当作感知算法输出，违反来源区分要求。

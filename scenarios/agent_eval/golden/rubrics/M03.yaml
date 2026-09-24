@@ -1,0 +1,21 @@
+schema_version: 1
+case_id: M03
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: new_target
+  source: user_text
+  value: 改去河滨服务区，请重新搜索；找不到就不要导航。
+required_claims:
+- id: main_claim
+  text: 应废弃旧目标的待确认动作；新目标无法由当前工具解析时要说明未导航。
+  supported_by:
+  - new_target
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - new_target
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得沿用旧 poi_id 启动导航。

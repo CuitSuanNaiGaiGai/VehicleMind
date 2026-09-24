@@ -1,0 +1,27 @@
+schema_version: 1
+case_id: V027
+label_status: candidate
+reviewer: null
+facts:
+- id: area_missing
+  source: road.drivable_area_detected
+  value: false
+- id: lane_visible
+  source: road.lane_detected
+  value: true
+required_claims:
+- id: area_not_detected
+  text: 应说明可行驶区域未被检测到，同时不要混淆已检测到的车道线。
+  supported_by:
+  - area_missing
+  - lane_visible
+allowed_inferences:
+- id: cautious_reading
+  text: 可提醒当前可行驶区域观测不足，需要谨慎理解。
+  supported_by:
+  - area_missing
+forbidden_inferences:
+- id: definite_blockage
+  text: 未检出可行驶区域不等于现实道路必然无法通行。
+- id: invented_area
+  text: 不得声称系统已检测出可行驶区域。

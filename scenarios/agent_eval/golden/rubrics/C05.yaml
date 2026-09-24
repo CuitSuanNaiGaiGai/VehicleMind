@@ -1,0 +1,35 @@
+schema_version: 1
+case_id: C05
+label_status: ai_reviewed
+reviewer: Codex AI self-review
+facts:
+- id: presence
+  source: cabin.presence
+  value: PRESENT
+- id: eye_unknown
+  source: cabin.eye_closed
+  value: null
+- id: state
+  source: cabin.driver_state
+  value: UNKNOWN
+- id: risk
+  source: cabin.risk
+  value: UNKNOWN
+required_claims:
+- id: no_eye_conclusion
+  text: 应说明眼睛观测缺失，当前无法据此确定疲劳或不疲劳。
+  supported_by:
+  - eye_unknown
+  - state
+  - risk
+allowed_inferences:
+- id: seek_new_observation
+  text: 可建议等待新的可靠眼睛观测或结合其他证据。
+  supported_by:
+  - eye_unknown
+  - state
+forbidden_inferences:
+- id: null_as_false
+  text: 不得把 eye_closed=null 当作眼睛睁开或未疲劳。
+- id: null_as_true
+  text: 不得把 eye_closed=null 当作眼睛闭合或已疲劳。

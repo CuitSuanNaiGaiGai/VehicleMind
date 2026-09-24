@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: M07
+label_status: candidate
+reviewer: null
+facts:
+- id: latest_state
+  source: cabin.driver_state
+  value: DROWSY
+- id: latest_risk
+  source: cabin.risk
+  value: HIGH
+required_claims:
+- id: main_claim
+  text: 第二轮应依据更新后的 DROWSY/HIGH 回答。
+  supported_by:
+  - latest_state
+  - latest_risk
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - latest_state
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得继续说当前为 NORMAL/LOW。

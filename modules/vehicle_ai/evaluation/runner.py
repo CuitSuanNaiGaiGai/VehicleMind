@@ -11,6 +11,8 @@ from modules.vehicle_ai.evaluation.models import EvaluationCase
 from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse
 from modules.vehicle_ai.replay.trace import plain_value
 from modules.vehicle_ai.runtime import VehicleMindRuntime
+from modules.observation import ObservationMetadata
+from modules.vehicle_ai.tools.base import ToolResult
 
 
 @dataclass(frozen=True)
@@ -70,7 +72,13 @@ def run_trial(
 ) -> TrialResult:
     """Run one isolated trial; only the supplied client may access a provider."""
     recording = RecordingClient(client)
-    runtime = VehicleMindRuntime(recording, max_tool_rounds=max_tool_rounds)
+    logical_time = [0.0]
+    runtime = VehicleMindRuntime(
+        recording,
+        max_tool_rounds=max_tool_rounds,
+        quality_clock=lambda: logical_time[0],
+        action_clock=lambda: logical_time[0],
+    )
     schema_hash = hashlib.sha256(
         json.dumps(runtime.tools.llm_schemas(), sort_keys=True).encode()
     ).hexdigest()
@@ -80,10 +88,33 @@ def run_trial(
     started = time.perf_counter()
     try:
         for step in case.steps:
+            if "at_ms" in step:
+                logical_time[0] = step["at_ms"] / 1000
             if "cabin" in step:
                 runtime.update_cabin(at_ms=step.get("at_ms"), **step["cabin"])
             if "road" in step:
                 runtime.update_driving(at_ms=step.get("at_ms"), **step["road"])
+            if "road_quality" in step:
+                runtime.update_driving(
+                    metadata=ObservationMetadata(
+                        timestamp_ms=step.get("at_ms", 0),
+                        sequence=0,
+                        source="agent_eval",
+                        confidence=None,
+                        valid=False,
+                        processing_ms=0,
+                    ),
+                    at_ms=step.get("at_ms"),
+                )
+            if "tool_failure" in step:
+                failure = step["tool_failure"]
+                runtime.tools.get(failure["name"]).handler = (
+                    lambda _error=failure["error"], **_kwargs: ToolResult(
+                        success=False,
+                        message="Simulated tool failure.",
+                        error=_error,
+                    )
+                )
             if "vehicle" in step:
                 vehicle = dict(step["vehicle"])
                 if "gear" in vehicle:
@@ -114,6 +145,15 @@ def run_trial(
                             "success": confirmation.success,
                             "error": confirmation.error,
                             "result": plain_value(confirmation.to_dict()),
+                        }
+                    )
+                else:
+                    interaction_events.append(
+                        {
+                            "kind": "confirmation",
+                            "at_ms": step.get("at_ms"),
+                            "success": False,
+                            "error": "NO_PENDING_ACTION",
                         }
                     )
             if step.get("reject_pending"):

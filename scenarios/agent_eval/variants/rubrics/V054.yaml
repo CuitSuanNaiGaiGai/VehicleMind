@@ -1,0 +1,25 @@
+schema_version: 1
+case_id: V054
+label_status: candidate
+reviewer: null
+facts:
+- id: ac_state
+  source: tool.get_climate_status.ac_enabled
+  value: false
+- id: cabin_temperature
+  source: tool.get_climate_status.cabin_temperature_c
+  value: 24.0
+required_claims:
+- id: climate_answer
+  text: 调用查询工具后，应准确说明空调关闭及当前车内温度。
+  supported_by:
+  - ac_state
+  - cabin_temperature
+allowed_inferences:
+- id: followup_offer
+  text: 可询问是否需要开启空调，但不得自行开启。
+  supported_by:
+  - ac_state
+forbidden_inferences:
+- id: action_claim
+  text: 查询工具不会更改状态，不得宣称已打开空调。

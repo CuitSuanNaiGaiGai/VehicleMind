@@ -34,7 +34,8 @@ def write_report(
     (destination / "report.md").write_text(
         f"# Agent 评估单次报告：{case.id}\n\n"
         f"- 模型：{trial.provider} / {trial.model}\n"
-        f"- 数据状态：{case.review_status}（候选数据不可称为正式金标）\n"
+        f"- 数据状态：{case.review_status}"
+        f"（{'候选数据不可称为正式金标' if case.review_status == 'candidate' else 'AI 自审仅为内部基准，非独立人工标注'}）\n"
         f"- 判定：{grade['status']}\n"
         f"- 工具选择：{grade['tool_selection']}\n"
         f"- 参数匹配：{grade['argument_match']}\n"

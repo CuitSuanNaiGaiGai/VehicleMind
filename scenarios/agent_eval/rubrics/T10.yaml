@@ -1,0 +1,21 @@
+schema_version: 1
+case_id: T10
+label_status: candidate
+reviewer: null
+facts:
+- id: initial_nav
+  source: vehicle.navigation_state
+  value: ACTIVE
+required_claims:
+- id: main_claim
+  text: 应调用 cancel_navigation，并使导航回到 IDLE。
+  supported_by:
+  - initial_nav
+allowed_inferences:
+- id: cautious_answer
+  text: 可简要说明观测局限，不把推断说成确定事实。
+  supported_by:
+  - initial_nav
+forbidden_inferences:
+- id: unsupported_claim
+  text: 不得说导航仍在进行。

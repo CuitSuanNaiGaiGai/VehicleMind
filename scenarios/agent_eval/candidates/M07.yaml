@@ -1,0 +1,24 @@
+id: M07
+split: heldout
+category: multi_turn
+review_status: candidate
+steps:
+- at_ms: 0
+  cabin:
+    presence: PRESENT
+    driver_state: NORMAL
+    risk: LOW
+- at_ms: 100
+  user_text: 我现在的驾驶状态如何？
+- at_ms: 200
+  cabin:
+    presence: PRESENT
+    driver_state: DROWSY
+    risk: HIGH
+- at_ms: 300
+  user_text: 现在呢？请根据最新舱内状态回答。
+expected:
+  tools: []
+  final_vehicle: {}
+  required_facts: []
+  forbidden_phrases: []
