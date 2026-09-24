@@ -6,7 +6,7 @@
 
 - 面部关键点和眼口观测构成低层特征，时序证据与驾驶员状态判定分离，便于替换算法及检查阈值。
 - 驾驶员状态及风险通过统一上下文进入事件层，Agent 消费的是状态和事件，不直接解析视频帧。
-- 舱内阈值见 `modules/config/cabin.yaml`；原始代码与脚本入口见 `modules/vehicle_ai/cabin/`、`apps/cabin_demo/`。
+- 舱内阈值见 `modules/config/cabin.yaml`；原始代码与脚本入口见 `modules/cabin/`、`apps/cabin_demo/`。
 - 运行本地离线视频与协同链路的操作见[离线视频演示](offline_video_pipeline.md)。视频和模型资产需要用户自行准备，权重不随仓库发布。
 
 ## 展示与验证边界

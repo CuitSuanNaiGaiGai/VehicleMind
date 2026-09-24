@@ -12,6 +12,7 @@ import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SCENARIO = Path("assets/scenarios/drowsy_rest_stop.yaml")
+CANCEL_SCENARIO = Path("assets/scenarios/drowsy_rest_stop_cancel.yaml")
 
 
 def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -55,6 +56,39 @@ def test_replay_demo_creates_a_complete_passing_result(tmp_path: Path) -> None:
     assert summary["passed"] is True
     assert summary["unauthorized_sensitive_executions"] == 0
     assert re.fullmatch(r"[0-9a-f]{64}", summary["semantic_sha256"])
+
+
+def test_replay_demo_keeps_navigation_idle_after_user_cancels(tmp_path: Path) -> None:
+    result = _run_cli(
+        "--scenario",
+        str(CANCEL_SCENARIO),
+        "--output-root",
+        str(tmp_path / "runs"),
+        "--allow-dirty",
+    )
+
+    assert result.returncode == 0, result.stderr
+    result_dir = tmp_path / "runs" / "drowsy-rest-stop-cancel"
+    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
+    trace = json.loads((result_dir / "trace.json").read_text(encoding="utf-8"))
+    assert summary["passed"] is True
+    assert summary["final_context"]["vehicle"]["navigation_state"] == "IDLE"
+    assert summary["unauthorized_sensitive_executions"] == 0
+    assert "start_navigation" not in summary["successful_tools"]
+    assert any(item["kind"] == "pending_action" for item in trace)
+    assert any(
+        item["kind"] == "user_utterance" and item["data"]["text"] == "取消"
+        for item in trace
+    )
+    assert any(
+        item["kind"] == "agent_response"
+        and item["data"]["summary"] == "已取消待确认操作。"
+        for item in trace
+    )
+    assert not any(
+        item["kind"] == "tool_result" and item["data"]["name"] == "start_navigation"
+        for item in trace
+    )
 
 
 def test_replay_demo_reports_invalid_scenario_without_traceback(

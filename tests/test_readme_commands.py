@@ -34,3 +34,23 @@ def test_readme_does_not_reference_renamed_demo_modules() -> None:
 
     assert "phone_test" not in content
     assert "real_perception_test" not in content
+
+
+def test_readme_explains_replay_outcome_and_optional_online_cost() -> None:
+    content = README.read_text(encoding="utf-8")
+    quickstart = content.split('id="quickstart"', 1)[1].split('id="structure"', 1)[0]
+    for expected in (
+        "assets/scenarios/drowsy_rest_stop.yaml",
+        "apps.vehicle_ai_demo.replay_demo",
+        'open "runs/$VM_RUN_ID/report.html"',
+        "运行后应看到",
+        "DROWSY",
+        "HIGH",
+        "待确认",
+        "模拟导航",
+        "常见问题",
+        ".env.example",
+        "API 调用会产生费用",
+        "modules.vehicle_ai.evaluation.cli",
+    ):
+        assert expected in quickstart, expected
