@@ -96,14 +96,16 @@ flowchart LR
 <a id="stack"></a>
 ## 🛠️ 技术栈与个人工作
 
-| 层级 | 技术与工作边界 |
-|---|---|
-| 感知接入 | OpenCV、MediaPipe、ONNX Runtime / CoreML 优先与 CPU 回退；项目内实现预处理、状态证据汇总、语义适配与离线视频流水线 |
-| 道路模型 | YOLOPv2 等预训练模型属于第三方资产；项目内实现加载、后处理、输出契约与展示，不将模型训练成果归为自研 |
-| Agent 编排 | Python、Qwen / GLM API、Context Selector、事件、工具注册表、PendingAction 和确认状态机 |
-| 工程与展示 | YAML 场景、可复现回放、HTML 报告、pytest、Ruff、mypy、GitHub Actions |
+| 业务模块 | 输入 → 输出 / 业务作用 | 技术与项目内工作 | 可核查实现 |
+|---|---|---|---|
+| **舱内感知** | 离线驾驶员视频 → 面部特征、时序疲劳证据和驾驶员风险；为提醒提供状态依据 | OpenCV 处理视频帧、第三方 MediaPipe 提取关键点；项目内实现眼口与头姿特征、PERCLOS/哈欠累计和状态判定，不宣称自研关键点模型 | [感知服务](modules/cabin/perception_service.py) · [算法说明](docs/cabin_perception.md) |
+| **舱外感知** | 离线道路视频 → 目标、车道、可行驶区；为道路上下文提供观测 | 第三方预训练 YOLOPv2 经 ONNX Runtime 推理，CoreML 可用时优先、CPU 回退；项目内实现预处理、后处理及结构化输出，另有 OpenCV 传统车道路径，不宣称自研模型训练 | [道路感知服务](modules/driving/perception_service.py) · [算法说明](docs/road_perception.md) |
+| **统一上下文与事件** | 舱内外语义观测 + 车辆状态 → Driver/Road/Vehicle 上下文与风险事件；隔离低层帧和决策层 | 项目内实现[舱内适配](modules/vehicle_ai/integration/cabin_adapter.py)、[舱外适配](modules/vehicle_ai/integration/driving_adapter.py)、字段契约、质量/过期状态及事件去抖 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [事件检测](modules/vehicle_ai/events/event_detector.py) |
+| **Agent 编排** | 用户请求 + 相关上下文/事件 → 回复或工具请求；决定何时读取车机状态与建议动作 | Qwen/GLM 是第三方在线 API；项目内实现上下文选择、对话与工具调用编排，也支持确定性离线脚本客户端 | [Agent](modules/vehicle_ai/agent/vehicle_agent.py) · [模型适配](modules/vehicle_ai/llm/factory.py) |
+| **工具确认门** | 工具请求 + 用户确认 → 模拟车机状态变化；阻止未授权导航 | 项目内实现 ToolRegistry、PendingAction 与一次性确认边界；执行层校验独立于 LLM 提示词 | [工具注册表](modules/vehicle_ai/tools/registry.py) · [确认设计](docs/agent_pending_actions.md) |
+| **回放与验证** | YAML 场景 → 语义 trace、自动断言和中文 HTML 报告；复现成功/失败链路 | 项目内实现确定性回放、配置快照、报告；pytest、Ruff、mypy 与 GitHub Actions 承担工程检查 | [回放运行器](modules/vehicle_ai/replay/runner.py) · [报告生成](modules/vehicle_ai/replay/report.py) · [CI](.github/workflows/ci.yml) |
 
-个人工作重点是把感知输出、Agent 决策与受控工具连成可解释的系统，并用回放与真实 API pilot 暴露、定位和修复编排问题；不是提出新的目标检测网络或实现真实车辆控制。
+项目内贡献的重点是把第三方感知与模型能力接入统一语义上下文，再用 Agent 编排、执行层确认门和可复现回放组成可解释的业务链路；**不把预训练权重、通用库能力或模拟车辆动作包装成自研算法与真实车控**。
 
 <a id="evidence"></a>
 ## 📊 结果与证据

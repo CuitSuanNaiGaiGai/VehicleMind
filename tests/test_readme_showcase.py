@@ -43,6 +43,29 @@ def test_showcase_first_screen_tells_a_verifiable_business_story() -> None:
     assert "GIF 来自独立的真实视频感知演示" in text
 
 
+def test_showcase_maps_business_modules_to_implementation_and_sources() -> None:
+    text = README.read_text(encoding="utf-8")
+    stack = text.split('<a id="stack"></a>', 1)[1].split('<a id="evidence"></a>', 1)[0]
+    assert (
+        "| 业务模块 | 输入 → 输出 / 业务作用 | 技术与项目内工作 | 可核查实现 |" in stack
+    )
+    for module in (
+        "舱内感知",
+        "舱外感知",
+        "统一上下文与事件",
+        "Agent 编排",
+        "工具确认门",
+        "回放与验证",
+    ):
+        assert f"| **{module}** |" in stack, module
+    for technology in ("OpenCV", "MediaPipe", "ONNX Runtime", "YOLOPv2", "Qwen", "GLM"):
+        assert technology in stack, technology
+    assert "第三方预训练" in stack
+    assert "项目内实现" in stack
+    assert "modules/vehicle_ai/agent/vehicle_agent.py" in stack
+    assert "modules/vehicle_ai/tools/registry.py" in stack
+
+
 def test_showcase_images_exist_and_keep_cabin_road_gifs() -> None:
     text = README.read_text(encoding="utf-8")
     images = re.findall(r'<img\s+[^>]*src="([^"]+)"', text)

@@ -6,7 +6,7 @@
 
 - 道路目标关注车辆、行人、骑行者、交通灯与交通标志；车道和可行驶区域分别给出检测或分割结果。
 - ONNX Runtime 优先尝试 CoreML 执行提供器，并保留 CPU 回退。实际速度取决于硬件、视频分辨率、模型资产与执行提供器，仓库不提供统一性能保证。
-- 配置在 `modules/config/perception.yaml`，算法实现位于 `modules/vehicle_ai/driving/`，单独演示入口位于 `apps/driving_demo/`。
+- 配置在 `modules/config/perception.yaml`，算法实现位于 `modules/driving/`，单独演示入口位于 `apps/driving_demo/`。
 - 模型权重不进入 Git；应按 `assets/model_manifest.yaml` 放置并用 `scripts/verify_assets.py` 校验。离线双视频协同运行见[操作说明](offline_video_pipeline.md)。
 
 ## 展示与验证边界
