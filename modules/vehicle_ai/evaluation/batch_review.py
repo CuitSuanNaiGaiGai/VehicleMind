@@ -12,7 +12,9 @@ from pathlib import Path
 REVIEWER = "Codex AI self-review"
 
 
-def review_batch(run_root: Path, decisions: list[dict]) -> dict:
+def review_batch(
+    run_root: Path, decisions: list[dict], *, reviewer: str = REVIEWER
+) -> dict:
     if (run_root / "reviewed.json").exists():
         raise FileExistsError(run_root / "reviewed.json")
     run = json.loads((run_root / "run.json").read_text(encoding="utf-8"))
@@ -80,7 +82,7 @@ def review_batch(run_root: Path, decisions: list[dict]) -> dict:
     result = {
         "schema_version": 1,
         "reviewed_at_utc": datetime.now(timezone.utc).isoformat(),
-        "reviewer": REVIEWER,
+        "reviewer": reviewer,
         "independent_human_review": False,
         "provider": run["provider"],
         "model": run["model"],
@@ -97,7 +99,7 @@ def review_batch(run_root: Path, decisions: list[dict]) -> dict:
         "",
         f"- 模型：{run['provider']} / {run['model']}",
         f"- Task Success（端到端任务成功）：{passed}/{len(reviewed)}",
-        "- 审核者：Codex AI 自审；不是独立人工标注。",
+        f"- 审核者：{reviewer}；不是独立人工标注。",
         "- 每条 verdict 和依据见 `reviewed.json`；失败与成功均保留原始 trace。",
         "",
         "## 分层结果",

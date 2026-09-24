@@ -58,15 +58,6 @@ def _trial_record(
     output: Path,
     trace_sha256: str,
 ) -> dict:
-    def total_usage(field: str) -> int | None:
-        values = [
-            (response.get("usage") or {}).get(field)
-            for response in trial.model_responses
-        ]
-        if not values or any(value is None for value in values):
-            return None
-        return sum(values)
-
     return {
         "case_id": case.id,
         "case_sha256": case.sha256,
@@ -83,11 +74,52 @@ def _trial_record(
         "error": trial.error,
         "request_count": trial.request_count,
         "latency_ms": trial.latency_ms,
-        "usage": {
-            "prompt_tokens": total_usage("prompt_tokens"),
-            "completion_tokens": total_usage("completion_tokens"),
-        },
+        "usage": _total_usage(trial.model_responses),
     }
+
+
+def _total_usage(responses: list[dict]) -> dict[str, int | None]:
+    def total(field: str) -> int | None:
+        provider_field = {
+            "prompt_tokens": "input_tokens",
+            "completion_tokens": "output_tokens",
+        }[field]
+        values = [
+            (response.get("usage") or {}).get(
+                field, (response.get("usage") or {}).get(provider_field)
+            )
+            for response in responses
+        ]
+        if not values or any(value is None for value in values):
+            return None
+        return sum(values)
+
+    return {
+        "prompt_tokens": total("prompt_tokens"),
+        "completion_tokens": total("completion_tokens"),
+    }
+
+
+def reconcile_usage_from_traces(run_root: Path) -> dict:
+    """Correct metadata from hash-verified immutable trial traces."""
+    run_path = run_root / "run.json"
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    if run.get("status") != "completed":
+        raise ValueError("cannot reconcile an incomplete run")
+    for item in run["trials"]:
+        trace_bytes = (run_root / item["trace"]).read_bytes()
+        if hashlib.sha256(trace_bytes).hexdigest() != item["trace_sha256"]:
+            raise ValueError(f"trace hash mismatch: {item['case_id']}")
+        trace = json.loads(trace_bytes)
+        item["usage"] = _total_usage(trace["trial"]["model_responses"])
+    run["usage_reconciled_from_traces"] = True
+    temporary = run_path.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(run, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    temporary.replace(run_path)
+    (run_root / "summary.md").write_text(_summary(run), encoding="utf-8")
+    return run
 
 
 def _summary(result: dict) -> str:
@@ -100,6 +132,13 @@ def _summary(result: dict) -> str:
     latencies = [item["latency_ms"] for item in trials]
     p50 = statistics.median(latencies) if latencies else 0.0
     p95 = sorted(latencies)[min(total - 1, int(total * 0.95))] if latencies else 0.0
+
+    def usage_total(field: str) -> str:
+        values = [item["usage"][field] for item in trials]
+        return (
+            "未完整报告" if any(value is None for value in values) else str(sum(values))
+        )
+
     return (
         "# 在线 Agent 内部评测运行摘要\n\n"
         f"- 模型：{result['provider']} / {result['model']}\n"
@@ -110,6 +149,7 @@ def _summary(result: dict) -> str:
         f"- 运行异常：{errors}/{total}\n"
         f"- 延迟 p50/p95：{p50:.1f}/{p95:.1f} ms\n"
         f"- 模型请求数：{sum(item['request_count'] for item in trials)}\n"
+        f"- 输入 token：{usage_total('prompt_tokens')}；输出 token：{usage_total('completion_tokens')}\n"
         "- 回答语义仍待逐条复核；本摘要不将 needs_review 计为成功。\n"
         "- 数据为 Codex AI 自审内部基准，不是独立人工标注或公开 Benchmark。\n"
     )

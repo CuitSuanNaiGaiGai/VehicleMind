@@ -3,7 +3,11 @@ from pathlib import Path
 
 import yaml
 
-from modules.vehicle_ai.evaluation.batch import load_frozen_cases, run_batch
+from modules.vehicle_ai.evaluation.batch import (
+    load_frozen_cases,
+    reconcile_usage_from_traces,
+    run_batch,
+)
 from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse
 
 
@@ -62,6 +66,49 @@ def test_missing_provider_usage_is_null_not_zero(tmp_path: Path) -> None:
         "prompt_tokens": None,
         "completion_tokens": None,
     }
+
+
+def test_real_provider_usage_keys_are_aggregated(tmp_path: Path) -> None:
+    class RealUsageClient(BaseLLMClient):
+        def chat(self, messages, tools=None):
+            return LLMResponse(
+                "回答。", [], usage={"input_tokens": 12, "output_tokens": 7}
+            )
+
+    result = run_batch(
+        load_frozen_cases(ROOT)[:1],
+        provider="test",
+        model="stub",
+        client_factory=RealUsageClient,
+        repetitions=1,
+        output=tmp_path / "run",
+    )
+    assert result["trials"][0]["usage"] == {
+        "prompt_tokens": 12,
+        "completion_tokens": 7,
+    }
+
+
+def test_usage_can_be_reconciled_from_hashed_traces(tmp_path: Path) -> None:
+    output = tmp_path / "run"
+    run_batch(
+        load_frozen_cases(ROOT)[:1],
+        provider="test",
+        model="stub",
+        client_factory=ReplyClient,
+        repetitions=1,
+        output=output,
+    )
+    run_path = output / "run.json"
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    run["trials"][0]["usage"] = {"prompt_tokens": None, "completion_tokens": None}
+    run_path.write_text(json.dumps(run), encoding="utf-8")
+    repaired = reconcile_usage_from_traces(output)
+    assert repaired["trials"][0]["usage"] == {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+    }
+    assert repaired["usage_reconciled_from_traces"] is True
 
 
 def test_frozen_case_hash_mismatch_is_rejected(tmp_path: Path) -> None:

@@ -1,6 +1,6 @@
 # 在线 Agent 评估候选集
 
-此目录存放结构化候选场景；舱内组覆盖 `C01–C06`，道路组覆盖 `R01–R06`。`R06` 通过评测逻辑时钟构造超过 1 秒的道路观测过期状态，再注入真实的无效观测元数据；Agent 收到 `quality_status`，不会把旧道路字段当成当前可靠事实。所有场景均不是已审定 Golden Set，也不是正式模型成绩。`heldout` 目前只表示预定分层，尚未冻结，不可用于正式保留集报告。
+此目录的 `candidates/` 存放结构化候选场景；舱内组覆盖 `C01–C06`，道路组覆盖 `R01–R06`。`R06` 通过评测逻辑时钟构造超过 1 秒的道路观测过期状态，再注入真实的无效观测元数据；Agent 收到 `quality_status`，不会把旧道路字段当成当前可靠事实。`golden/` 是从候选中冻结的 **AI 自审内部基准**，不等同于独立人工审定的公开 Golden Set；保留集只用于最终评测，不用于变体生成。
 
 安装依赖并在本地 `.env` 配好对应 API Key 后，分别运行：
 
@@ -9,7 +9,7 @@
 .venv/bin/python -m modules.vehicle_ai.evaluation.cli scenarios/agent_eval/candidates/T02.yaml --provider glm
 ```
 
-命令会产生真实在线调用和费用。每次运行在 `runs/agent_eval/` 下生成独立目录，包含中文 `report.md` 与原始 `trial.json`。`--provider` 是必填项，因此 `.env` 中的 `VEHICLEMIND_LLM_PROVIDER` 不决定评估对象。当前评分器对机械检查通过的回答给出 `needs_review`，须人工核实后才能形成成功率。
+命令会产生真实在线调用和费用。每次运行在 `runs/agent_eval/` 下生成独立目录，包含中文 `report.md` 与原始 `trial.json`。`--provider` 是必填项，因此 `.env` 中的 `VEHICLEMIND_LLM_PROVIDER` 不决定评估对象。当前评分器对机械检查通过的回答给出 `needs_review`，须逐条复核回答语义后才能形成成功率。
 
 可使用 `--model`、`--temperature`、`--timeout-seconds`、`--max-tool-rounds` 固定运行配置。默认不重试失败请求；异常 trial 会记录错误类别，不会静默重跑或重复执行工具。样例仅使用合成语义观测和问题，请勿将真实车内个人数据写入候选文件。
 
@@ -36,3 +36,11 @@
 ```
 
 命令会产生真实 API 调用和费用；开发集预检可加 `--split dev --repetitions 1`。每个 trial 保存完整 trace 与机械评分。`needs_review` 表示回答语义尚未复核，不能直接算作 Task Success。
+
+运行完成后，可用在线模型辅助逐条语义审核（也会产生 API 费用）：
+
+```bash
+.venv/bin/python -m modules.vehicle_ai.evaluation.batch_judge_cli runs/agent_eval/具体批次目录 --provider qwen
+```
+
+审核按场景分组、逐 trial 给出结论和中文依据，保存原始审核模型回复，并可从进度文件恢复。`reviewed_summary.md` 才包含 Task Success（端到端任务成功）；必须注明审核是在线 AI 辅助，不是独立人工评测。审核结论仍应抽查，尤其注意模型将未观测的车机默认值说成事实、把用户自述归于感知算法、或过度断言舱内外状态。
