@@ -249,6 +249,14 @@ class ContextManager:
             value = getattr(getattr(self._context, domain), field)
             return self._quality.field_status(domain, field, value, now=now)
 
+    def field_evidence(self, domain: str, field: str) -> dict[str, Any]:
+        with self._lock:
+            status = self.field_quality(domain, field)
+            return {
+                "quality_status": status,
+                **self._quality.field_evidence(domain, field),
+            }
+
     # ========================================================
     # Driver update
     # ========================================================

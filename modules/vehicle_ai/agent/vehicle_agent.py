@@ -9,6 +9,7 @@ from modules.vehicle_ai.agent.action_state import (
     PendingActionStore,
 )
 from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
+from modules.vehicle_ai.agent.decision_context import GROUNDING_NOTE, attach_field_evidence
 from modules.vehicle_ai.agent.pending_intent import (
     classify_pending_intent,
     requested_target,
@@ -121,7 +122,7 @@ class VehicleAgent:
             field_quality=self.context_manager.field_quality,
         )
 
-        selected_context = selection.context
+        selected_context = attach_field_evidence(selection.context, self.context_manager)
 
         if debug:
             print()
@@ -181,6 +182,7 @@ class VehicleAgent:
                 "current user request. "
                 "If a domain quality is STALE, INVALID or MISSING, "
                 "prior turns and stored values do not establish current facts for that domain."
+                f"\n{GROUNDING_NOTE}"
             ),
         }
 

@@ -256,6 +256,9 @@ class ContextSelector:
         # Domain coupling rules
         # ----------------------------------------------------
 
+        if topics & {ContextTopic.MEDIA, ContextTopic.NAVIGATION, ContextTopic.DRIVER}:
+            topics.update({ContextTopic.DRIVER, ContextTopic.ROAD, ContextTopic.VEHICLE})
+
         # Driver fatigue questions frequently involve whether
         # the vehicle is moving.
         if ContextTopic.DRIVER in topics:
