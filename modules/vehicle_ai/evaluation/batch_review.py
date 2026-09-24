@@ -13,10 +13,18 @@ REVIEWER = "Codex AI self-review"
 
 
 def review_batch(
-    run_root: Path, decisions: list[dict], *, reviewer: str = REVIEWER
+    run_root: Path,
+    decisions: list[dict],
+    *,
+    reviewer: str = REVIEWER,
+    output_stem: str = "reviewed",
+    audit_overrides: list[dict] | None = None,
 ) -> dict:
-    if (run_root / "reviewed.json").exists():
-        raise FileExistsError(run_root / "reviewed.json")
+    if output_stem not in {"reviewed", "audited"}:
+        raise ValueError("unsupported review output stem")
+    output_path = run_root / f"{output_stem}.json"
+    if output_path.exists():
+        raise FileExistsError(output_path)
     run = json.loads((run_root / "run.json").read_text(encoding="utf-8"))
     if run.get("status") != "completed":
         raise ValueError("cannot review an incomplete run")
@@ -84,6 +92,7 @@ def review_batch(
         "reviewed_at_utc": datetime.now(timezone.utc).isoformat(),
         "reviewer": reviewer,
         "independent_human_review": False,
+        "audit_overrides": audit_overrides or [],
         "provider": run["provider"],
         "model": run["model"],
         "task_success": {"passed": passed, "total": len(reviewed)},
@@ -91,7 +100,7 @@ def review_batch(
         "by_category": dict(by_category),
         "trials": reviewed,
     }
-    (run_root / "reviewed.json").write_text(
+    output_path.write_text(
         json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     lines = [
@@ -110,7 +119,7 @@ def review_batch(
     lines.extend(["", "## 类别结果", ""])
     for category, stats in sorted(by_category.items()):
         lines.append(f"- {category}: {stats['passed']}/{stats['total']}")
-    (run_root / "reviewed_summary.md").write_text(
+    (run_root / f"{output_stem}_summary.md").write_text(
         "\n".join(lines) + "\n", encoding="utf-8"
     )
     return result

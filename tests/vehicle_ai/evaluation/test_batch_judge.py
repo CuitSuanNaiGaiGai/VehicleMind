@@ -17,6 +17,8 @@ class AnswerClient(BaseLLMClient):
 class JudgeClient(BaseLLMClient):
     def chat(self, messages, tools=None):
         assert "C01" in messages[-1]["content"]
+        assert "mechanical_status" not in messages[-1]["content"]
+        assert "只审核回复语义" in messages[-1]["content"]
         return LLMResponse(
             json.dumps(
                 [
