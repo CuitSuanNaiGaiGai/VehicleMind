@@ -150,7 +150,18 @@ open "runs/$VM_RUN_ID/report.html"
 
 ### 真实视频与在线 Agent
 
-- 可选的真实视频推理需自备本地视频与模型权重，命令和运行限制见[视频运行指南](docs/offline_video_pipeline.md)；它是终端演示，不会自动生成上面的回放报告。
+- 可选的真实视频协同演示需自备本地视频与模型权重，命令和运行限制见[视频运行指南](docs/offline_video_pipeline.md)；它与上面的录制观测回放报告不是同一次运行。
+- 对无标注本地视频，可独立生成**感知自动核验报告**，查看处理覆盖、舱内状态输出、舱外目标/车道输出与失败原因；这不计算准确率，也不触发 Agent 决策：
+
+```bash
+uv sync --extra perception --group dev
+uv run --extra perception --group dev python -m scripts.audit_perception_videos \
+  --cabin-dir data/perception/cabin \
+  --road-dir data/perception/road
+# 终端会打印新建的 runs/perception_audit/<运行ID>/report.html 路径
+```
+
+  每侧最多 50 条视频，按文件名排序冻结；正式运行逐帧推理，可能需要较长时间。模型路径为 `models/mediapipe/face_landmarker.task` 和 `models/driving/YOLOPv2_512.onnx`。`manifest.json` 记录哈希、依赖、配置及 Git 状态，`videos/` 保留本地逐视频结构化结果；旧运行不会覆盖，只有完整写入后才出现 `.complete`。来源与许可未知时保持 `unknown`；没有对齐真值标签时精度为 `not_evaluated`，输出变化不能称为误报或漏报。`runs/` 与本地视频均被 Git 忽略，请勿公开原视频或逐视频记录。macOS 上 MediaPipe 初始化可能需要可用的图形上下文；若进程在初始化时直接退出，请在本机终端运行。
 - 可选的在线 Agent 决策可先复制[配置示例](.env.example)为本地 `.env`，填写 `DASHSCOPE_API_KEY` 或 `GLM_API_KEY` 与对应模型配置，然后运行下面的一条候选场景。**API 调用会产生费用**；将 `--provider qwen` 改为 `--provider glm` 可切换提供方。命令会在 `runs/agent_eval/` 生成 `report.md` 和 `trial.json`，这是在线 Agent 的单例调试，不等于上面的无密钥 HTML 演示，也不计正式成功率。不要把 `.env` 或 `runs/` 上传到 Git。
 
 ```bash

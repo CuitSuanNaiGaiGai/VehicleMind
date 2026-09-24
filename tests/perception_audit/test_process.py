@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+import hashlib
 
 import cv2
 import pytest
@@ -95,6 +96,9 @@ def test_cabin_processes_all_frames_at_native_timestamps(tmp_path: Path):
     assert result["processed_frames"] == result["valid_output_frames"] == 3
     assert service.timestamps == [0, 100, 200]
     assert result["state_counts"] == {"NORMAL": 2, "DROWSY": 1}
+    assert result["state_duration_seconds"] == pytest.approx(
+        {"NORMAL": 0.2, "DROWSY": 0.1}
+    )
     assert result["transitions"] == [
         {"frame_index": 2, "timestamp_ms": 200, "field": "driver_state",
          "from": "NORMAL", "to": "DROWSY"}
@@ -173,3 +177,66 @@ def test_probe_failure_stays_in_batch_results(tmp_path):
     assert result[0]["status"] == "failed"
     assert result[0]["error"] == "视频无法打开"
     assert result[0]["processed_frames"] == 0
+
+
+def test_container_frame_count_is_estimate_not_failure(tmp_path):
+    result = process_video(
+        entry("cabin", "short.mp4", frames=3), tmp_path,
+        capture_factory=lambda _: FakeCapture([0, 100]),
+        service_factory=lambda _: FakeCabinService(),
+    )
+    assert result["status"] == "success"
+    assert result["processed_frames"] == 2
+    assert result["frame_count_difference"] == -1
+
+
+def test_invalid_output_breaks_adjacent_transition_chain(tmp_path):
+    class GapRoadService(FakeRoadService):
+        def process_frame(self, frame, timestamp_ms):
+            snapshot = super().process_frame(frame, timestamp_ms)
+            if len(self.timestamps) == 2:
+                snapshot.metadata.valid = False
+            if len(self.timestamps) == 3:
+                snapshot.lane_detected = False
+            return snapshot
+
+    result = process_video(
+        entry("road", "gap.mp4"), tmp_path,
+        capture_factory=lambda _: FakeCapture([0, 100, 200]),
+        service_factory=lambda _: GapRoadService(),
+    )
+    assert result["valid_output_frames"] == 2
+    assert result["lane_output_flips"] == 0
+    assert result["transitions"] == []
+
+
+def test_modified_video_is_rejected_before_model_initialization(tmp_path):
+    video = tmp_path / "changed.mp4"
+    video.write_bytes(b"new content")
+    frozen_hash = hashlib.sha256(b"old content").hexdigest()
+    result = process_video(
+        entry("cabin", "changed.mp4", frames=1) | {"sha256": frozen_hash},
+        tmp_path, capture_factory=lambda _: pytest.fail("should not decode"),
+        service_factory=lambda _: pytest.fail("should not load model"),
+    )
+    assert result["status"] == "failed"
+    assert result["error"] == "文件与冻结清单不一致"
+
+
+def test_video_changed_while_processing_is_not_reported_success(tmp_path):
+    video = tmp_path / "during.mp4"
+    video.write_bytes(b"original")
+    frozen_hash = hashlib.sha256(b"original").hexdigest()
+
+    class MutatingService(FakeCabinService):
+        def process_frame(self, frame, timestamp_ms):
+            video.write_bytes(b"changed")
+            return super().process_frame(frame, timestamp_ms)
+
+    result = process_video(
+        entry("cabin", "during.mp4", frames=1) | {"sha256": frozen_hash},
+        tmp_path, capture_factory=lambda _: FakeCapture([0]),
+        service_factory=lambda _: MutatingService(),
+    )
+    assert result["status"] == "failed"
+    assert result["error"] == "文件与冻结清单不一致"

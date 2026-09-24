@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import re
 import subprocess
@@ -153,6 +154,15 @@ def run_audit(
     summary = build_summary(catalog, results)
     _write_json(output / "summary.json", summary)
     (output / "report.md").write_text(render_markdown(summary), encoding="utf-8")
-    (output / "report.html").write_text(render_html(summary), encoding="utf-8")
+    video_links = {
+        item["id"]: os.path.relpath(
+            Path(cabin_dir if item["domain"] == "cabin" else road_dir).resolve()
+            / item["basename"], output.resolve()
+        ) for item in catalog["items"]
+    }
+    (output / "report.html").write_text(
+        render_html(summary, results=results, video_links=video_links),
+        encoding="utf-8",
+    )
     (output / ".complete").write_text("complete\n", encoding="utf-8")
     return output

@@ -12,7 +12,7 @@ VIDEO_SUFFIXES = frozenset({".mp4", ".mov", ".avi", ".mkv", ".m4v"})
 MAX_VIDEOS_PER_DOMAIN = 50
 
 
-def _sha256(path: Path) -> str:
+def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
@@ -84,7 +84,7 @@ def scan_catalog(
     for domain, paths in frozen.items():
         for path in paths:
             video_id = f"{domain}/{path.name}"
-            digest = _sha256(path)
+            digest = file_sha256(path)
             item = {
                 "id": video_id,
                 "domain": domain,

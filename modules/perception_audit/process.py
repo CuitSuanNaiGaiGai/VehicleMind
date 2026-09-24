@@ -8,6 +8,8 @@ from typing import Callable
 
 import cv2
 
+from modules.perception_audit.catalog import file_sha256
+
 
 def default_service_factory(domain: str):
     """Construct one fresh model-backed service for one video."""
@@ -71,13 +73,15 @@ def _initial_result(item: dict) -> dict:
         "status": "failed",
         "error": None,
         "processed_frames": 0,
+        "decoded_frames": 0,
+        "frame_count_difference": None,
         "valid_output_frames": 0,
         "timestamp_fallback_frames": 0,
         "samples": [],
         "transitions": [],
     }
     if item["domain"] == "cabin":
-        result.update(state_counts={}, face_visible_frames=0,
+        result.update(state_counts={}, state_duration_seconds={}, face_visible_frames=0,
                       eye_closed_frames=0, yawn_output_frames=0)
     else:
         result.update(object_counts={}, lane_detected_frames=0,
@@ -141,6 +145,9 @@ def process_video(
         result["error"] = item.get("probe_error") or item["probe_status"]
         return result
     path = Path(input_dir) / item["basename"]
+    if "sha256" in item and (not path.is_file() or file_sha256(path) != item["sha256"]):
+        result["error"] = "文件与冻结清单不一致"
+        return result
     service = service_factory(item["domain"])
     if item["domain"] == "road":
         session = getattr(getattr(service, "detector", None), "session", None)
@@ -152,6 +159,7 @@ def process_video(
         if not capture.isOpened():
             raise OSError("视频无法打开")
         previous = None
+        previous_valid_timestamp = None
         last_timestamp = -1
         fps = float(item["fps"])
         if fps <= 0:
@@ -160,25 +168,43 @@ def process_video(
             decoded, frame = capture.read()
             if not decoded or frame is None:
                 break
-            index = result["processed_frames"]
+            index = result["decoded_frames"]
+            result["decoded_frames"] += 1
             timestamp, fallback = _timestamp_ms(capture, index, fps, last_timestamp)
             last_timestamp = timestamp
             result["timestamp_fallback_frames"] += int(fallback)
             snapshot = service.process_frame(frame, timestamp_ms=timestamp)
             result["processed_frames"] += 1
             if not snapshot.metadata.valid:
+                previous = None
+                previous_valid_timestamp = None
                 continue
             result["valid_output_frames"] += 1
             observation = (_cabin_observation(snapshot) if item["domain"] == "cabin"
                            else _road_observation(snapshot))
+            if item["domain"] == "cabin" and previous is not None:
+                state = previous["driver_state"]
+                durations = result["state_duration_seconds"]
+                durations[state] = durations.get(state, 0.0) + (
+                    timestamp - previous_valid_timestamp
+                ) / 1000
             _record_output(result, item["domain"], observation, previous,
                            index, timestamp, sample_interval, snapshot)
             previous = observation
+            previous_valid_timestamp = timestamp
         if result["processed_frames"] == 0:
             raise ValueError("视频无有效帧")
-        if result["processed_frames"] < int(item["frame_count"]):
-            raise ValueError("视频提前结束，实际帧数少于媒体元数据")
-        result["status"] = "success"
+        result["frame_count_difference"] = (
+            result["decoded_frames"] - int(item["frame_count"])
+        )
+        if item["domain"] == "cabin" and previous is not None:
+            state = previous["driver_state"]
+            durations = result["state_duration_seconds"]
+            durations[state] = durations.get(state, 0.0) + 1 / fps
+        if "sha256" in item and file_sha256(path) != item["sha256"]:
+            result["error"] = "文件与冻结清单不一致"
+        else:
+            result["status"] = "success"
     except Exception as exc:
         # Avoid leaking local paths or decoder messages into public artifacts.
         result["error"] = f"{type(exc).__name__}: 视频处理失败"
