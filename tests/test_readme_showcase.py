@@ -66,6 +66,29 @@ def test_showcase_maps_business_modules_to_implementation_and_sources() -> None:
     assert "modules/vehicle_ai/tools/registry.py" in stack
 
 
+def test_showcase_evidence_has_success_refusal_and_bounded_agent_metrics() -> None:
+    text = README.read_text(encoding="utf-8")
+    evidence = text.split('<a id="evidence"></a>', 1)[1].split(
+        '<a id="quickstart"></a>', 1
+    )[0]
+    for detail in (
+        "assets/scenarios/drowsy_rest_stop.yaml",
+        "assets/scenarios/drowsy_rest_stop_cancel.yaml",
+        "scenarios/agent_eval/golden/cases/R03.yaml",
+        "82/120",
+        "85/120",
+        "40 条冻结场景",
+        "每条重复 3 次",
+        "80 条开发回归变体不计入",
+        "AI 自审",
+        "在线 AI 辅助",
+        "合成语义观测",
+        "模拟车机",
+        "docs/reports/2026-09-24-online-agent-internal-evaluation.md",
+    ):
+        assert detail in evidence, detail
+
+
 def test_showcase_images_exist_and_keep_cabin_road_gifs() -> None:
     text = README.read_text(encoding="utf-8")
     images = re.findall(r'<img\s+[^>]*src="([^"]+)"', text)
