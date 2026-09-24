@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from modules.vehicle_ai.evaluation.grader import grade_trial
 from modules.vehicle_ai.evaluation.models import EvaluationCase
 from modules.vehicle_ai.evaluation.runner import run_trial
@@ -163,6 +165,11 @@ def test_report_is_chinese_and_does_not_promote_candidate(tmp_path) -> None:
     html = (output / "report.html").read_text(encoding="utf-8")
     assert "在线 Agent 决策展示" in html
     assert "暂时不确定。" in html
+    assert "独立感知演示素材" in html
+    for domain in ("cabin", "road"):
+        match = re.search(rf'<img[^>]+data-domain="{domain}"[^>]+src="([^"]+)"', html)
+        assert match is not None
+        assert (output / match.group(1)).resolve().is_file()
 
 
 def test_trials_do_not_share_context_or_history() -> None:

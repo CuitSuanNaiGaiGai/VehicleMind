@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+from collections.abc import Mapping
 from typing import Any
 
 from modules.vehicle_ai.evaluation.models import EvaluationCase
@@ -110,7 +111,18 @@ def _state(value: object, mapping: dict[str, str]) -> str:
     return mapping.get(str(value), str(value))
 
 
-def _observation_cards(cabin: dict, road: dict) -> str:
+def _media(domain: str, source: str | None, label: str) -> str:
+    if not source:
+        return ""
+    return (
+        "<figure class='demo-media'>"
+        f'<img data-domain="{domain}" src="{_escape(source)}" alt="{_escape(label)}" loading="lazy">'
+        f"<figcaption>{_escape(label)}：独立感知演示素材，非本次在线决策同步画面。</figcaption>"
+        "</figure>"
+    )
+
+
+def _observation_cards(cabin: dict, road: dict, media: Mapping[str, str]) -> str:
     if cabin:
         driver = "".join(
             (
@@ -173,8 +185,10 @@ def _observation_cards(cabin: dict, road: dict) -> str:
     else:
         outside = "<p class='empty'>未提供舱外观测</p>"
     return (
-        f"<article class='card'><div class='step'>01 · 录制观测</div><h2>舱内驾驶员</h2>{driver}</article>"
-        f"<article class='card'><div class='step'>02 · 录制观测</div><h2>舱外道路</h2>{outside}</article>"
+        f"<article class='card'><div class='step'>01 · 录制观测</div><h2>舱内驾驶员</h2>{driver}"
+        f"{_media('cabin', media.get('cabin'), '舱内感知画面')}</article>"
+        f"<article class='card'><div class='step'>02 · 录制观测</div><h2>舱外道路</h2>{outside}"
+        f"{_media('road', media.get('road'), '舱外感知画面')}</article>"
     )
 
 
@@ -229,7 +243,13 @@ def _action_rows(trial: TrialResult) -> str:
     )
 
 
-def render_showcase(case: EvaluationCase, trial: TrialResult, grade: dict) -> str:
+def render_showcase(
+    case: EvaluationCase,
+    trial: TrialResult,
+    grade: dict,
+    *,
+    media: Mapping[str, str] | None = None,
+) -> str:
     """Render an offline-openable HTML report from one actual online trial."""
     cabin, road, user_text = _first_turn_observations(case)
     selected = _sent_context(trial)
@@ -256,13 +276,15 @@ h1{{font-size:clamp(30px,4vw,46px);margin:8px 0}}h2{{margin:4px 0 18px;font-size
 .turn span{{font-size:13px;color:#526977;font-weight:700}}.turn p{{margin:4px 0;white-space:pre-wrap}}
 .tool{{border-color:#e5a749}}.empty{{color:#647584}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f8fa;padding:14px;border-radius:10px;font-size:13px}}
 .input-summary{{background:#edf6f7;border-left:4px solid #4b9bab;padding:10px 14px;border-radius:6px}}
+.demo-media{{margin:18px 0 0}}.demo-media img{{display:block;width:100%;border-radius:10px;background:#e9eef1}}
+.demo-media figcaption{{color:#61717e;font-size:12px;line-height:1.5;margin-top:8px}}
 details{{margin-top:14px}}summary{{cursor:pointer;font-weight:700}}.flow{{color:#235266;font-weight:700;margin:20px 0}}
 @media(max-width:700px){{.grid{{grid-template-columns:1fr}}body{{padding:18px 12px}}}}
 </style></head><body>
 <p class="eyebrow">VEHICLEMIND · 单次在线 Agent 决策</p><h1>从感知事实到车机建议</h1>
 <p class="sub">场景 {_escape(case.id)} · {_escape(trial.provider)} / {_escape(trial.model)} · 第 {_escape(trial.trial_index)} 次运行</p>
 <div class="banner">本页舱内外输入来自<strong>录制观测，非实时视频推理</strong>；模型回复来自本次真实在线调用。车辆状态和导航均为本地模拟。评分 {_escape(grade.get("status", "未评估"))} 不是独立人工判定。</div>
-<div class="grid">{_observation_cards(cabin, road)}</div>
+<div class="grid">{_observation_cards(cabin, road, media or {})}</div>
 <div class="flow">录制观测 → 上下文筛选 → 在线模型 → 工具确认与模拟结果</div>
 <section class="card"><div class="step">03 · 用户请求与模型输入</div><h2>Agent 实际看到了什么？</h2>
 <p><strong>用户：</strong>{_escape(user_text)}</p><p class="note">下方来自首轮实际发送给模型的消息；上方观测不一定全部入选。</p>
