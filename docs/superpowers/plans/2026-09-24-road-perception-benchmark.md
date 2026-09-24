@@ -54,12 +54,12 @@ def test_invalid_samples_are_rejected(values: list[float]) -> None:
 
 **Interfaces:** `BenchmarkConfig(video: Path, model: Path, provider: Literal["cpu", "coreml"], work_width: int = 1280, work_height: int = 720, warmup_frames: int = 5, measure_frames: int = 30, output_dir: Path)`；`run_benchmark(config, detector_factory=None, capture_factory=None) -> dict[str, object]`。默认 factory 延迟导入 `PanopticDrivingDetector`，以 `warmup_runs=0` 初始化；测试注入伪 detector/capture，不要求 ONNX Runtime。
 
-- [ ] **Step 1: 写失败测试。** 在 `tests/driving/benchmark/test_runner.py` 用 7 帧的伪 capture、带固定 `DrivingSceneResult` 时间字段的伪 detector：预热 2 帧、测量 4 帧时结果必须只含 4 条逐帧时间；第 7 帧不消费。另测 5 帧输入却要求预热 2 + 测量 4 时抛 `ValueError` 且输出目录不存在。用伪 session `get_providers()` 分别验证 CoreML 缺失时拒绝和 CPU 组无误报。
-- [ ] **Step 2: 验证红灯。** `uv run --group dev python -m pytest -q tests/driving/benchmark/test_runner.py`；预期 `runner`/`report` 尚不存在。
-- [ ] **Step 3: 实现运行器。** 验证输入文件、正整数参数和输出目录未存在；在同一进程按视频顺序读取第一帧作 `cold_first_frame_ms`，再读完预热帧、测量帧；实现时把首帧计入预热 5 帧总数，绝不混入测量统计。调用 `detector.detect(resized_frame)`，把每帧 `video_read_ms/resize_ms/preprocess_ms/inference_ms/postprocess_ms/detector_total_ms/frame_total_ms` 写入结果。测量墙钟从第一条测量帧读取前到最后一条处理后。始终 release capture。
-- [ ] **Step 4: 实现来源与运行环境。** `result.json` 只写输入 basename、大小、SHA-256，不写绝对路径；包含 Git commit/dirty、实际 session provider 列表、CoreML 缓存是否已存在、session 初始化时长、冷首帧时长、Python/OS/芯片/OpenCV/NumPy/ONNX Runtime 版本、配置、峰值 RSS。macOS 的 `ru_maxrss` 按字节、Linux 按 KiB 转成 MiB；报告注明进程级峰值。CoreML 组未激活指定 provider 时直接失败且不落盘。
-- [ ] **Step 5: 原子写入。** 在目标目录同级建临时目录，先生成 `result.json` 和由同一 dict 渲染的中文 `report.md`，成功后 rename 到目标；异常时只移除本次创建的临时目录。`scripts/benchmark_road_perception.py` 解析规格列出的参数，捕获已知输入/运行错误并给中文错误，不输出本机完整路径。
-- [ ] **Step 6: 验证与提交。** 目标测试至少覆盖短视频、provider、统计样本、字段脱敏、目标目录已存在、原子失败；运行全量离线 pytest、Ruff、源码大小和 `git diff --check`。提交 `Build reproducible road benchmark runner` 并推送。
+- [x] **Step 1: 写失败测试。** 在 `tests/driving/benchmark/test_runner.py` 用 7 帧的伪 capture、带固定 `DrivingSceneResult` 时间字段的伪 detector：预热 2 帧、测量 4 帧时结果必须只含 4 条逐帧时间；第 7 帧不消费。另测 5 帧输入却要求预热 2 + 测量 4 时抛 `ValueError` 且输出目录不存在。用伪 session `get_providers()` 分别验证 CoreML 缺失时拒绝和 CPU 组无误报。
+- [x] **Step 2: 验证红灯。** `uv run --group dev python -m pytest -q tests/driving/benchmark/test_runner.py`；预期 `runner`/`report` 尚不存在。
+- [x] **Step 3: 实现运行器。** 验证输入文件、正整数参数和输出目录未存在；在同一进程按视频顺序读取第一帧作 `cold_first_frame_ms`，再读完预热帧、测量帧；实现时把首帧计入预热 5 帧总数，绝不混入测量统计。调用 `detector.detect(resized_frame)`，把每帧 `video_read_ms/resize_ms/preprocess_ms/inference_ms/postprocess_ms/detector_total_ms/frame_total_ms` 写入结果。测量墙钟从第一条测量帧读取前到最后一条处理后。始终 release capture。
+- [x] **Step 4: 实现来源与运行环境。** `result.json` 只写输入 basename、大小、SHA-256，不写绝对路径；包含 Git commit/dirty、实际 session provider 列表、CoreML 缓存是否已存在、session 初始化时长、冷首帧时长、Python/OS/芯片/OpenCV/NumPy/ONNX Runtime 版本、配置、峰值 RSS。macOS 的 `ru_maxrss` 按字节、Linux 按 KiB 转成 MiB；报告注明进程级峰值。CoreML 组未激活指定 provider 时直接失败且不落盘。
+- [x] **Step 5: 原子写入。** 在目标目录同级建临时目录，先生成 `result.json` 和由同一 dict 渲染的中文 `report.md`，成功后 rename 到目标；异常时只移除本次创建的临时目录。`scripts/benchmark_road_perception.py` 解析规格列出的参数，捕获已知输入/运行错误并给中文错误，不输出本机完整路径。
+- [x] **Step 6: 验证与提交。** 目标测试至少覆盖短视频、provider、统计样本、字段脱敏、目标目录已存在、原子失败；运行全量离线 pytest、Ruff、源码大小和 `git diff --check`。提交 `Build reproducible road benchmark runner` 并推送。
 
 ### Task 3: 三次实测、聚合与受限展示
 
