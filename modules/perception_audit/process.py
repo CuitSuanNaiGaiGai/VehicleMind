@@ -29,7 +29,9 @@ def _name(value) -> str:
     return str(getattr(value, "value", value))
 
 
-def _timestamp_ms(capture, frame_index: int, fps: float, previous: int) -> tuple[int, bool]:
+def _timestamp_ms(
+    capture, frame_index: int, fps: float, previous: int
+) -> tuple[int, bool]:
     raw = float(capture.get(cv2.CAP_PROP_POS_MSEC))
     if math.isfinite(raw) and raw >= 0 and (frame_index == 0 or raw > previous):
         return int(raw), False
@@ -81,23 +83,42 @@ def _initial_result(item: dict) -> dict:
         "transitions": [],
     }
     if item["domain"] == "cabin":
-        result.update(state_counts={}, state_duration_seconds={}, face_visible_frames=0,
-                      eye_closed_frames=0, yawn_output_frames=0)
+        result.update(
+            state_counts={},
+            state_duration_seconds={},
+            face_visible_frames=0,
+            eye_closed_frames=0,
+            yawn_output_frames=0,
+        )
     else:
-        result.update(object_counts={}, lane_detected_frames=0,
-                      drivable_detected_frames=0, lane_output_flips=0,
-                      drivable_output_flips=0)
+        result.update(
+            object_counts={},
+            lane_detected_frames=0,
+            drivable_detected_frames=0,
+            lane_output_flips=0,
+            drivable_output_flips=0,
+        )
     return result
 
 
-def _record_output(result: dict, domain: str, observation: dict,
-                   previous: dict | None, frame_index: int,
-                   timestamp_ms: int, sample_interval: int,
-                   snapshot) -> None:
+def _record_output(
+    result: dict,
+    domain: str,
+    observation: dict,
+    previous: dict | None,
+    frame_index: int,
+    timestamp_ms: int,
+    sample_interval: int,
+    snapshot,
+) -> None:
     if frame_index % sample_interval == 0:
-        result["samples"].append({"frame_index": frame_index,
-                                  "timestamp_ms": timestamp_ms,
-                                  "output": observation})
+        result["samples"].append(
+            {
+                "frame_index": frame_index,
+                "timestamp_ms": timestamp_ms,
+                "output": observation,
+            }
+        )
     if domain == "cabin":
         state = observation["driver_state"]
         counts = result["state_counts"]
@@ -115,18 +136,25 @@ def _record_output(result: dict, domain: str, observation: dict,
         result["drivable_detected_frames"] += int(observation["drivable_area_detected"])
         if previous is not None:
             result["lane_output_flips"] += int(
-                previous["lane_detected"] != observation["lane_detected"])
+                previous["lane_detected"] != observation["lane_detected"]
+            )
             result["drivable_output_flips"] += int(
                 previous["drivable_area_detected"]
-                != observation["drivable_area_detected"])
+                != observation["drivable_area_detected"]
+            )
         transition_fields = ("lane_detected", "drivable_area_detected")
     if previous is not None:
         for field in transition_fields:
             if previous[field] != observation[field]:
-                result["transitions"].append({
-                    "frame_index": frame_index, "timestamp_ms": timestamp_ms,
-                    "field": field, "from": previous[field], "to": observation[field],
-                })
+                result["transitions"].append(
+                    {
+                        "frame_index": frame_index,
+                        "timestamp_ms": timestamp_ms,
+                        "field": field,
+                        "from": previous[field],
+                        "to": observation[field],
+                    }
+                )
 
 
 def process_video(
@@ -152,7 +180,9 @@ def process_video(
     if item["domain"] == "road":
         session = getattr(getattr(service, "detector", None), "session", None)
         get_providers = getattr(session, "get_providers", None)
-        result["active_providers"] = list(get_providers()) if callable(get_providers) else []
+        result["active_providers"] = (
+            list(get_providers()) if callable(get_providers) else []
+        )
     capture = None
     try:
         capture = capture_factory(str(path))
@@ -180,22 +210,34 @@ def process_video(
                 previous_valid_timestamp = None
                 continue
             result["valid_output_frames"] += 1
-            observation = (_cabin_observation(snapshot) if item["domain"] == "cabin"
-                           else _road_observation(snapshot))
+            observation = (
+                _cabin_observation(snapshot)
+                if item["domain"] == "cabin"
+                else _road_observation(snapshot)
+            )
             if item["domain"] == "cabin" and previous is not None:
                 state = previous["driver_state"]
                 durations = result["state_duration_seconds"]
-                durations[state] = durations.get(state, 0.0) + (
-                    timestamp - previous_valid_timestamp
-                ) / 1000
-            _record_output(result, item["domain"], observation, previous,
-                           index, timestamp, sample_interval, snapshot)
+                durations[state] = (
+                    durations.get(state, 0.0)
+                    + (timestamp - previous_valid_timestamp) / 1000
+                )
+            _record_output(
+                result,
+                item["domain"],
+                observation,
+                previous,
+                index,
+                timestamp,
+                sample_interval,
+                snapshot,
+            )
             previous = observation
             previous_valid_timestamp = timestamp
         if result["processed_frames"] == 0:
             raise ValueError("视频无有效帧")
-        result["frame_count_difference"] = (
-            result["decoded_frames"] - int(item["frame_count"])
+        result["frame_count_difference"] = result["decoded_frames"] - int(
+            item["frame_count"]
         )
         if item["domain"] == "cabin" and previous is not None:
             state = previous["driver_state"]
@@ -226,8 +268,13 @@ def process_catalog(
     """Continue after video failures, but not after model construction failures."""
     results = []
     for item in catalog["items"]:
-        results.append(process_video(
-            item, input_dirs[item["domain"]], capture_factory=capture_factory,
-            service_factory=service_factory, sample_interval=sample_interval,
-        ))
+        results.append(
+            process_video(
+                item,
+                input_dirs[item["domain"]],
+                capture_factory=capture_factory,
+                service_factory=service_factory,
+                sample_interval=sample_interval,
+            )
+        )
     return results

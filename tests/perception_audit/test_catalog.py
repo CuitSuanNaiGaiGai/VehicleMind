@@ -9,7 +9,9 @@ from modules.perception_audit.catalog import scan_catalog
 
 
 class FakeCapture:
-    def __init__(self, opened: bool = True, frames: int = 30, decodes: bool = True) -> None:
+    def __init__(
+        self, opened: bool = True, frames: int = 30, decodes: bool = True
+    ) -> None:
         self.opened = opened
         self.frames = frames
         self.decodes = decodes
@@ -57,7 +59,9 @@ def test_sorted_frozen_catalog_and_unknown_truth(tmp_path: Path) -> None:
 
     result = scan_catalog(cabin, road, capture_factory=factory)
     assert [item["id"] for item in result["items"]] == [
-        "cabin/a.MP4", "cabin/b.mp4", "road/z.mov"
+        "cabin/a.MP4",
+        "cabin/b.mp4",
+        "road/z.mov",
     ]
     assert result["attempted"] == {"cabin": 2, "road": 1}
     first = result["items"][0]
@@ -83,7 +87,8 @@ def test_probe_failures_remain_in_attempted_denominator(tmp_path: Path) -> None:
     result = scan_catalog(cabin, road, capture_factory=lambda _path: captures.pop(0))
     assert result["attempted"] == {"cabin": 1, "road": 1}
     assert [item["probe_status"] for item in result["items"]] == [
-        "cannot_open", "empty_video"
+        "cannot_open",
+        "empty_video",
     ]
 
 

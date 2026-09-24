@@ -69,8 +69,11 @@ def scan_catalog(
         if not directory.is_dir():
             raise ValueError(f"{domain} 输入目录不存在")
         files = sorted(
-            (path for path in directory.iterdir() if path.is_file()
-             and path.suffix.lower() in VIDEO_SUFFIXES),
+            (
+                path
+                for path in directory.iterdir()
+                if path.is_file() and path.suffix.lower() in VIDEO_SUFFIXES
+            ),
             key=lambda path: path.name,
         )
         if not files:

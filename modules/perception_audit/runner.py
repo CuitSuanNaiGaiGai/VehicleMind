@@ -26,8 +26,12 @@ DEFAULT_MODELS = {
     "road": REPOSITORY_ROOT / "models/driving/YOLOPv2_512.onnx",
 }
 ROAD_SERVICE_CONFIG = {
-    "work_width": 1280, "work_height": 720, "score_threshold": 0.30,
-    "nms_threshold": 0.45, "prefer_coreml": True, "warmup_runs": 2,
+    "work_width": 1280,
+    "work_height": 720,
+    "score_threshold": 0.30,
+    "nms_threshold": 0.45,
+    "prefer_coreml": True,
+    "warmup_runs": 2,
 }
 
 
@@ -40,8 +44,7 @@ def _hash_file(path: Path) -> str:
 
 
 def _asset(path: Path) -> dict:
-    return {"name": path.name, "bytes": path.stat().st_size,
-            "sha256": _hash_file(path)}
+    return {"name": path.name, "bytes": path.stat().st_size, "sha256": _hash_file(path)}
 
 
 def _version(package: str) -> str:
@@ -53,8 +56,11 @@ def _version(package: str) -> str:
 
 def _git(args: list[str]) -> str | None:
     result = subprocess.run(
-        ["git", *args], cwd=REPOSITORY_ROOT, capture_output=True,
-        text=True, check=False,
+        ["git", *args],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     return result.stdout.strip() if result.returncode == 0 else None
 
@@ -66,26 +72,36 @@ def _provenance(model_paths: dict[str, Path], sample_interval: int) -> dict:
         configs[name] = _asset(path)
     status = _git(["status", "--porcelain"])
     return {
-        "git": {"commit": _git(["rev-parse", "HEAD"]),
-                "dirty": None if status is None else bool(status)},
-        "platform": {"system": platform.system(), "machine": platform.machine(),
-                     "python": platform.python_version()},
-        "dependencies": {name: _version(name) for name in
-                         ("numpy", "opencv-python", "mediapipe", "onnxruntime")},
+        "git": {
+            "commit": _git(["rev-parse", "HEAD"]),
+            "dirty": None if status is None else bool(status),
+        },
+        "platform": {
+            "system": platform.system(),
+            "machine": platform.machine(),
+            "python": platform.python_version(),
+        },
+        "dependencies": {
+            name: _version(name)
+            for name in ("numpy", "opencv-python", "mediapipe", "onnxruntime")
+        },
         "models": {domain: _asset(path) for domain, path in model_paths.items()},
-        "configuration": {"sample_interval": sample_interval,
-                          "mode": "full_video_no_frame_skip",
-                          "config_files": configs,
-                          "effective": {
-                              "cabin": asdict(CabinPerceptionConfig.load_default()),
-                              "road": ROAD_SERVICE_CONFIG,
-                          }},
+        "configuration": {
+            "sample_interval": sample_interval,
+            "mode": "full_video_no_frame_skip",
+            "config_files": configs,
+            "effective": {
+                "cabin": asdict(CabinPerceptionConfig.load_default()),
+                "road": ROAD_SERVICE_CONFIG,
+            },
+        },
     }
 
 
 def _write_json(path: Path, value: dict) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n",
-                    encoding="utf-8")
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def _model_factory(model_paths: dict[str, Path]):
@@ -94,7 +110,8 @@ def _model_factory(model_paths: dict[str, Path]):
             from modules.cabin.perception_service import CabinPerceptionService
 
             return CabinPerceptionService(
-                model_paths[domain], config=CabinPerceptionConfig.load_default())
+                model_paths[domain], config=CabinPerceptionConfig.load_default()
+            )
         if domain == "road":
             from modules.driving.perception_service import DrivingPerceptionService
 
@@ -118,11 +135,17 @@ def run_audit(
     """Create a new immutable run directory; `.complete` is written last."""
     if sample_interval < 1:
         raise ValueError("sample_interval 必须大于 0")
-    run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+    run_id = (
+        run_id
+        or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        + "-"
+        + uuid.uuid4().hex[:8]
+    )
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", run_id):
         raise ValueError("run_id 包含不支持的字符")
-    models = {domain: Path(path) for domain, path in
-              (model_paths or DEFAULT_MODELS).items()}
+    models = {
+        domain: Path(path) for domain, path in (model_paths or DEFAULT_MODELS).items()
+    }
     if set(models) != {"cabin", "road"}:
         raise ValueError("必须提供舱内和舱外两个模型")
     for path in models.values():
@@ -142,8 +165,10 @@ def run_audit(
     }
     _write_json(output / "manifest.json", manifest)
     results = process_factory(
-        catalog, {"cabin": Path(cabin_dir), "road": Path(road_dir)},
-        service_factory=_model_factory(models), sample_interval=sample_interval,
+        catalog,
+        {"cabin": Path(cabin_dir), "road": Path(road_dir)},
+        service_factory=_model_factory(models),
+        sample_interval=sample_interval,
     )
     if [row["id"] for row in results] != [item["id"] for item in catalog["items"]]:
         raise ValueError("处理结果与冻结清单不一致")
@@ -157,8 +182,10 @@ def run_audit(
     video_links = {
         item["id"]: os.path.relpath(
             Path(cabin_dir if item["domain"] == "cabin" else road_dir).resolve()
-            / item["basename"], output.resolve()
-        ) for item in catalog["items"]
+            / item["basename"],
+            output.resolve(),
+        )
+        for item in catalog["items"]
     }
     (output / "report.html").write_text(
         render_html(summary, results=results, video_links=video_links),
