@@ -10,7 +10,7 @@ import onnxruntime as ort
 from modules.driving.perception import yolopv2_utils
 from modules.driving.perception.postprocess import decode_masks
 from modules.driving.perception.preprocess import preprocess_frame
-from modules.driving.perception.runtime import warm_up_session
+from modules.driving.perception.runtime import coreml_cache_directory, warm_up_session
 from modules.driving.perception.types import DrivingObject, DrivingSceneResult
 
 
@@ -70,6 +70,7 @@ class PanopticDrivingDetector:
         input_size: int = 640,
         prefer_coreml: bool = True,
         warmup_runs: int = 2,
+        coreml_cache_dir: Path | None = None,
     ):
         self.model_path = Path(model_path)
 
@@ -110,12 +111,14 @@ class PanopticDrivingDetector:
         # Avoid recompiling the CoreML graph every launch.
         # ----------------------------------------------------
 
-        cache_dir = self.model_path.parent / ".coreml_cache"
-
-        cache_dir.mkdir(
-            parents=True,
-            exist_ok=True,
+        cache_dir = coreml_cache_directory(
+            model_path=self.model_path,
+            prefer_coreml=prefer_coreml,
+            available_providers=available_providers,
+            override=coreml_cache_dir,
         )
+        if cache_dir is not None:
+            cache_dir.mkdir(parents=True, exist_ok=True)
 
         # ====================================================
         # Providers

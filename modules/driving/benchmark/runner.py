@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import resource
 import shutil
@@ -139,16 +140,33 @@ def _write_result(destination: Path, result: dict[str, object]) -> None:
     staging = Path(
         tempfile.mkdtemp(prefix=f".{destination.name}.tmp-", dir=destination.parent)
     )
+    published: list[Path] = []
+    reserved = False
     try:
         (staging / "result.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         (staging / "report.md").write_text(render_report(result), encoding="utf-8")
-        staging.rename(destination)
+        (staging / ".complete").write_text("", encoding="utf-8")
+        destination.mkdir()
+        reserved = True
+        for name in ("result.json", "report.md", ".complete"):
+            target = destination / name
+            os.link(staging / name, target)
+            published.append(target)
     except Exception:
-        shutil.rmtree(staging)
+        for target in reversed(published):
+            if target.exists() and os.path.samefile(target, staging / target.name):
+                target.unlink()
+        if reserved:
+            try:
+                destination.rmdir()
+            except OSError:
+                pass
         raise
+    finally:
+        shutil.rmtree(staging)
 
 
 def run_benchmark(
@@ -156,16 +174,18 @@ def run_benchmark(
     detector_factory: Callable[..., Any] | None = None,
     capture_factory: Callable[[str], Any] | None = None,
 ) -> dict[str, object]:
-    """Measure one local run and atomically publish only complete artifacts."""
+    """Measure one local run and publish exclusively with a completion marker."""
 
     _validate(config)
-    cache_existed = (config.model.parent / ".coreml_cache").exists()
+    cache_dir = config.output_dir.parent / ".coreml_cache"
+    cache_existed = cache_dir.exists()
     factory = detector_factory or _default_detector_factory
     started = time.perf_counter()
     detector = factory(
         model_path=config.model,
         prefer_coreml=config.provider == "coreml",
         warmup_runs=0,
+        coreml_cache_dir=cache_dir,
     )
     session_init_ms = (time.perf_counter() - started) * 1000
     active_providers = list(detector.session.get_providers())

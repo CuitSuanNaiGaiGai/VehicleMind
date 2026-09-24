@@ -4,7 +4,7 @@
 
 **Goal:** 用本地离线道路视频与 YOLOPv2 权重生成可追溯、可核验、没有虚构 provider 或精度数字的性能报告。
 
-**Architecture:** 统计逻辑与模型/视频 IO 分离。基准运行器调用现有 `PanopticDrivingDetector.detect()` 的分段计时，另计解码、尺寸调整和完整帧；CLI 生成原子化 JSON 与中文 Markdown，聚合器只读取 JSON。模型和视频不进 Git。
+**Architecture:** 统计逻辑与模型/视频 IO 分离。基准运行器调用现有 `PanopticDrivingDetector.detect()` 的分段计时，另计解码、尺寸调整和完整帧；CLI 独占创建结果目录，以完成标记区分完整产物，聚合器只读取完整 JSON。模型和视频不进 Git。
 
 **Tech Stack:** Python 3.13、OpenCV、NumPy、ONNX Runtime、pytest、Ruff；本机运行可选 CoreMLExecutionProvider。
 
@@ -58,7 +58,7 @@ def test_invalid_samples_are_rejected(values: list[float]) -> None:
 - [x] **Step 2: 验证红灯。** `uv run --group dev python -m pytest -q tests/driving/benchmark/test_runner.py`；预期 `runner`/`report` 尚不存在。
 - [x] **Step 3: 实现运行器。** 验证输入文件、正整数参数和输出目录未存在；在同一进程按视频顺序读取第一帧作 `cold_first_frame_ms`，再读完预热帧、测量帧；实现时把首帧计入预热 5 帧总数，绝不混入测量统计。调用 `detector.detect(resized_frame)`，把每帧 `video_read_ms/resize_ms/preprocess_ms/inference_ms/postprocess_ms/detector_total_ms/frame_total_ms` 写入结果。测量墙钟从第一条测量帧读取前到最后一条处理后。始终 release capture。
 - [x] **Step 4: 实现来源与运行环境。** `result.json` 只写输入 basename、大小、SHA-256，不写绝对路径；包含 Git commit/dirty、实际 session provider 列表、CoreML 缓存是否已存在、session 初始化时长、冷首帧时长、Python/OS/芯片/OpenCV/NumPy/ONNX Runtime 版本、配置、峰值 RSS。macOS 的 `ru_maxrss` 按字节、Linux 按 KiB 转成 MiB；报告注明进程级峰值。CoreML 组未激活指定 provider 时直接失败且不落盘。
-- [x] **Step 5: 原子写入。** 在目标目录同级建临时目录，先生成 `result.json` 和由同一 dict 渲染的中文 `report.md`，成功后 rename 到目标；异常时只移除本次创建的临时目录。`scripts/benchmark_road_perception.py` 解析规格列出的参数，捕获已知输入/运行错误并给中文错误，不输出本机完整路径。
+- [x] **Step 5: 独占发布。** 在目标目录同级建临时目录，先生成 `result.json` 和由同一 dict 渲染的中文 `report.md`，独占创建目标目录后发布文件，最后写入 `.complete` 标记；异常时只移除本次创建的文件和临时目录，绝不覆盖竞态创建的同名目录。`scripts/benchmark_road_perception.py` 解析规格列出的参数，捕获已知输入/运行错误并给中文错误，不输出本机完整路径。
 - [x] **Step 6: 验证与提交。** 目标测试至少覆盖短视频、provider、统计样本、字段脱敏、目标目录已存在、原子失败；运行全量离线 pytest、Ruff、源码大小和 `git diff --check`。提交 `Build reproducible road benchmark runner` 并推送。
 
 ### Task 3: 三次实测、聚合与受限展示

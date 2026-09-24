@@ -68,9 +68,15 @@ def config(tmp_path: Path, **overrides) -> BenchmarkConfig:
 def test_warmup_is_excluded_and_paths_are_redacted(tmp_path: Path) -> None:
     capture = FakeCapture(7)
     detector = FakeDetector(["CPUExecutionProvider"])
+    factory_kwargs = {}
+
+    def detector_factory(**kwargs):
+        factory_kwargs.update(kwargs)
+        return detector
+
     result = run_benchmark(
         config(tmp_path),
-        detector_factory=lambda **kwargs: detector,
+        detector_factory=detector_factory,
         capture_factory=lambda path: capture,
     )
 
@@ -82,6 +88,9 @@ def test_warmup_is_excluded_and_paths_are_redacted(tmp_path: Path) -> None:
     assert result["provenance"]["video"]["name"] == "sample.mp4"
     assert result["provenance"]["model"]["name"] == "model.onnx"
     assert result["active_providers"] == ["CPUExecutionProvider"]
+    assert factory_kwargs["coreml_cache_dir"] == tmp_path / ".coreml_cache"
+    assert not (tmp_path / ".coreml_cache").exists()
+    assert (tmp_path / "result" / ".complete").is_file()
     report = (tmp_path / "result" / "report.md").read_text(encoding="utf-8")
     serialized = (tmp_path / "result" / "result.json").read_text(encoding="utf-8")
     assert json.loads(serialized)["samples"] == result["samples"]
@@ -170,3 +179,24 @@ def test_cli_hides_path_in_unexpected_error(
     error_text = capsys.readouterr().err
     assert "LookupError" in error_text
     assert str(tmp_path) not in error_text
+
+
+def test_racing_existing_directory_is_not_replaced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    requested = config(tmp_path)
+    original_render = runner.render_report
+
+    def create_competing_directory(result):
+        requested.output_dir.mkdir()
+        return original_render(result)
+
+    monkeypatch.setattr(runner, "render_report", create_competing_directory)
+    with pytest.raises(FileExistsError):
+        run_benchmark(
+            requested,
+            detector_factory=lambda **kwargs: FakeDetector(["CPUExecutionProvider"]),
+            capture_factory=lambda path: FakeCapture(7),
+        )
+    assert requested.output_dir.is_dir()
+    assert list(requested.output_dir.iterdir()) == []
