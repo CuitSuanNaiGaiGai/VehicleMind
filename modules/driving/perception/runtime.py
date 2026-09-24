@@ -1,8 +1,22 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
+from pathlib import Path
 
 import numpy as np
+
+
+def coreml_cache_directory(
+    *,
+    model_path: Path,
+    prefer_coreml: bool,
+    available_providers: Sequence[str],
+    override: Path | None = None,
+) -> Path | None:
+    if not prefer_coreml or "CoreMLExecutionProvider" not in available_providers:
+        return None
+    return override if override is not None else model_path.parent / ".coreml_cache"
 
 
 def warm_up_session(
