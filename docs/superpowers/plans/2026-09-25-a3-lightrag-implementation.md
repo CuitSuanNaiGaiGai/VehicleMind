@@ -212,12 +212,12 @@ class KnowledgeCatalog:
 
 **Interfaces:** `RagCase` contains `case_id`, `query`, `profile`, `answerable`, `expected_source_ids`, `expected_abstention_reason`; `compute_recall_at_k(cases, results, k=5) -> Metric`; `compute_abstention_metrics(...)`; `compute_profile_leaks(...) -> int`. Citation Support records facts, citation IDs, support decision, reviewer type and review note; AI assistance is explicitly tagged.
 
-- [ ] **Step 1: Write deterministic metric tests** for Recall@5 denominator restricted to answerable cases, 5/5 abstention groups, profile leakage count, citation fact-level numerator/denominator, and unavailable token usage as `null`/`N/A`, not zero.
-- [ ] **Step 2: Run metric tests**; expected: fail because metric module is absent.
-- [ ] **Step 3: Freeze 30 cases** in YAML: 20 answerable with one or more expected source IDs, 5 no-answer, 5 profile mismatch. Hash the case file; each modification creates a new evaluation version.
-- [ ] **Step 4: Implement deterministic runner and metrics** saving raw query/retrieval/Agent response/trace plus exact numerator, denominator and per-case status. Include Agent token counts only from `LLMResponse.usage`; LightRAG internal tokens remain unavailable unless directly exposed by provider/service.
-- [ ] **Step 5: Run offline fixture tests**; expected: Recall@5 and abstention results match hand-constructed fixtures, leakage detector catches any demo-only source returned to common profile, failed trials remain in output.
-- [ ] **Step 6: Commit** as `test(rag): freeze scoped retrieval evaluation and metrics`.
+- [x] **Step 1: Write deterministic metric tests** for answerable-only Recall@5, separate abstention groups, scope leakage, fact-level citation support and unavailable token usage.
+- [x] **Step 2: Run metric tests**; observed: collection failed because the RAG metric modules did not exist.
+- [x] **Step 3: Freeze 30 cases** in YAML: 20 answerable, 5 no-answer, 5 profile mismatch; case file SHA-256 is recorded by the loader.
+- [x] **Step 4: Implement deterministic runner and metrics** retaining raw retrieval and Agent outcomes, failures, exact metric counts and provider-reported Agent usage when supplied. Unreviewed citation support and LightRAG internal tokens remain null.
+- [x] **Step 5: Run offline fixture tests**; observed: 530 full tests passed, 2 optional online tests skipped; Ruff, mypy and source-size checks passed.
+- [x] **Step 6: Commit** as `test(rag): freeze scoped retrieval evaluation and metrics`.
 
 ### Task 8: Produce Chinese Evidence Report and Opt-In Demo Workflow
 

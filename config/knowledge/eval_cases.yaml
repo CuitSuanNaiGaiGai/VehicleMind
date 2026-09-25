@@ -1,0 +1,33 @@
+version: rag-internal-v1
+review_status: ai_assisted_internal
+cases:
+  - {case_id: R01, query: "频繁打哈欠和眼皮沉重是否属于困倦驾驶线索？", profile: vehicle_common, answerable: true, expected_source_ids: [K001]}
+  - {case_id: R02, query: "车道偏移是否可能提示驾驶员困倦？", profile: vehicle_common, answerable: true, expected_source_ids: [K002]}
+  - {case_id: R03, query: "错过出口或记不清刚才路程可能说明什么？", profile: vehicle_common, answerable: true, expected_source_ids: [K003]}
+  - {case_id: R04, query: "开车犯困时应优先采取什么行动？", profile: vehicle_common, answerable: true, expected_source_ids: [K004]}
+  - {case_id: R05, query: "把音乐开大或开窗能代替停车休息吗？", profile: vehicle_common, answerable: true, expected_source_ids: [K005]}
+  - {case_id: R06, query: "咖啡因能长期解决疲劳驾驶吗？", profile: vehicle_common, answerable: true, expected_source_ids: [K006]}
+  - {case_id: R07, query: "长途驾驶前为什么要保证睡眠？", profile: vehicle_common, answerable: true, expected_source_ids: [K007]}
+  - {case_id: R08, query: "哪些时段更容易出现困倦驾驶风险？", profile: vehicle_common, answerable: true, expected_source_ids: [K008]}
+  - {case_id: R09, query: "酒精与致困药物对驾驶警觉性有什么影响？", profile: vehicle_common, answerable: true, expected_source_ids: [K009]}
+  - {case_id: R10, query: "驾驶时如何避免手机等分心行为？", profile: vehicle_common, answerable: true, expected_source_ids: [K010]}
+  - {case_id: R11, query: "VehicleMind 的舱内闭眼与哈欠证据如何形成驾驶状态？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K011]}
+  - {case_id: R12, query: "VehicleMind 遇到驾驶员高风险状态会给什么建议？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K012]}
+  - {case_id: R13, query: "VehicleMind 如何区分 KNOWN、STALE 与 INVALID 状态？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K013]}
+  - {case_id: R14, query: "VehicleMind 舱外感知能识别哪些道路语义信息？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K014]}
+  - {case_id: R15, query: "VehicleMind 的风险事件建议如何组织证据？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K015]}
+  - {case_id: R16, query: "VehicleMind 怎样读取当前媒体播放状态？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K016]}
+  - {case_id: R17, query: "VehicleMind 的音乐播放和音量工具有哪些？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K017]}
+  - {case_id: R18, query: "VehicleMind 怎样搜索附近休息地点？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K018]}
+  - {case_id: R19, query: "VehicleMind 开始模拟导航前需要用户确认吗？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K019]}
+  - {case_id: R20, query: "VehicleMind 离线视频回放有哪些能力边界？", profile: vehiclemind_demo, answerable: true, expected_source_ids: [K020]}
+  - {case_id: R21, query: "我的车现在还剩多少升燃油？", profile: vehicle_common, answerable: false, expected_source_ids: [], expected_abstention_reason: no_answer}
+  - {case_id: R22, query: "明天北京具体几点下雨？", profile: vehicle_common, answerable: false, expected_source_ids: [], expected_abstention_reason: no_answer}
+  - {case_id: R23, query: "请给出我的车辆电池实时健康度百分比。", profile: vehicle_common, answerable: false, expected_source_ids: [], expected_abstention_reason: no_answer}
+  - {case_id: R24, query: "我的车牌号是什么？", profile: vehiclemind_demo, answerable: false, expected_source_ids: [], expected_abstention_reason: no_answer}
+  - {case_id: R25, query: "请给出我此刻的精确 GPS 经纬度。", profile: vehiclemind_demo, answerable: false, expected_source_ids: [], expected_abstention_reason: no_answer}
+  - {case_id: R26, query: "VehicleMind 的舱内疲劳算法输出哪些证据字段？", profile: vehicle_common, answerable: false, expected_source_ids: [K011], expected_abstention_reason: profile_mismatch}
+  - {case_id: R27, query: "VehicleMind 的事件建议具体如何组织？", profile: vehicle_common, answerable: false, expected_source_ids: [K015], expected_abstention_reason: profile_mismatch}
+  - {case_id: R28, query: "VehicleMind 模拟导航的 PendingAction 确认机制是什么？", profile: vehicle_common, answerable: false, expected_source_ids: [K019], expected_abstention_reason: profile_mismatch}
+  - {case_id: R29, query: "VehicleMind 如何执行媒体音量工具？", profile: vehicle_common, answerable: false, expected_source_ids: [K017], expected_abstention_reason: profile_mismatch}
+  - {case_id: R30, query: "VehicleMind 的离线回放边界是什么？", profile: vehicle_common, answerable: false, expected_source_ids: [K020], expected_abstention_reason: profile_mismatch}
