@@ -74,6 +74,7 @@ def test_showcase_evidence_has_success_refusal_and_bounded_agent_metrics() -> No
     for detail in (
         "assets/scenarios/drowsy_rest_stop.yaml",
         "assets/scenarios/drowsy_rest_stop_cancel.yaml",
+        "assets/scenarios/normal_driver_music.yaml",
         "scenarios/agent_eval/golden/cases/R03.yaml",
         "82/120",
         "85/120",
@@ -87,6 +88,19 @@ def test_showcase_evidence_has_success_refusal_and_bounded_agent_metrics() -> No
         "docs/reports/2026-09-24-online-agent-internal-evaluation.md",
     ):
         assert detail in evidence, detail
+
+
+def test_quickstart_documents_all_three_offline_showcase_scenarios() -> None:
+    text = README.read_text(encoding="utf-8")
+    quickstart = text.split('<a id="quickstart"></a>', 1)[1]
+    for scenario in (
+        "assets/scenarios/drowsy_rest_stop.yaml",
+        "assets/scenarios/normal_driver_music.yaml",
+        "assets/scenarios/drowsy_rest_stop_cancel.yaml",
+    ):
+        assert scenario in quickstart
+    assert "三条回放都使用" in quickstart
+    assert "不调用在线模型" in quickstart
 
 
 def test_showcase_images_exist_and_keep_cabin_road_gifs() -> None:

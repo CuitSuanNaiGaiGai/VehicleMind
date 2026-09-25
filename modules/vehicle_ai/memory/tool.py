@@ -17,6 +17,7 @@ EVENT_TYPES = (
     "ACTION_CANCELLED",
     "ACTION_OUTCOME",
     "ACTION_EXPIRED",
+    "TASK_STEP",
 )
 
 

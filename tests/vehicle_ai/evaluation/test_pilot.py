@@ -102,7 +102,7 @@ def test_interrupted_pilot_keeps_preflight_manifest(tmp_path) -> None:
     assert payload["cases"] == []
 
 
-def test_multiturn_confirmation_is_separate_event() -> None:
+def test_m01_pointer_selection_uses_fresh_candidate_and_separate_confirmation() -> None:
     class NavigationClient(BaseLLMClient):
         def __init__(self):
             self.calls = 0
@@ -129,9 +129,16 @@ def test_multiturn_confirmation_is_separate_event() -> None:
                 )
             return LLMResponse("请确认导航。", [])
 
-    case = load_pilot_cases(CASE_DIR)[-1]
+    case = next(case for case in load_pilot_cases(CASE_DIR) if case.id == "M01")
     trial = run_trial(
         case, NavigationClient(), provider="fake", model="fake-1", trial_index=1
+    )
+    assert case.id == "M01"
+    assert any(
+        event.get("kind") == "plan_step"
+        and event.get("event") == "PLAN_COMPLETED"
+        and event.get("plan", {}).get("selected_poi_id") == "rest_area_001"
+        for event in trial.agent_trace
     )
     assert trial.interaction_events[-2]["kind"] == "agent_reply"
     assert trial.interaction_events[-1]["kind"] == "confirmation"

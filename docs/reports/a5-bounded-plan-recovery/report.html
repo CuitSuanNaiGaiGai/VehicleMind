@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>VehicleMind｜Agent 受限计划与恢复评测</title>
+<style>
+:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; color: #17212b; background: #f3f6f8; }
+body { max-width: 1180px; margin: 0 auto; padding: 32px 20px 60px; }
+h1 { margin-bottom: 8px; } .sub { color: #607080; }
+.banner { padding: 14px 18px; margin: 22px 0; border-radius: 12px; background: #e5f5ee; }
+.banner.fail { background: #fff0ed; } .metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px; }
+.metric { background: white; border: 1px solid #dbe3e9; border-radius: 12px; padding: 16px; display: grid; gap: 8px; }
+.metric strong { font-size: 26px; } small { color: #607080; } table { width: 100%; border-collapse: collapse; background: white; }
+th,td { text-align: left; vertical-align: top; padding: 12px; border-bottom: 1px solid #e2e8ed; } th { background: #edf2f5; }
+.pass { color: #137348; font-weight: 700; } .fail { color: #b42318; font-weight: 700; }
+details pre { white-space: pre-wrap; max-width: 380px; overflow-wrap: anywhere; }
+.table-wrap { overflow-x: auto; border: 1px solid #dbe3e9; border-radius: 12px; margin-top: 16px; }
+</style></head><body>
+<h1>Agent 受限计划与失败恢复</h1>
+<p class="sub">VehicleMind · 场景集 a5_bounded_plan_recovery_v1 · 执行方式：确定性脚本模型</p>
+<div class="banner ">验收结果：通过 · 7 个固定场景。模拟地点与工具不连接真实车辆或实时地图。</div>
+<section class="metrics"><article class='metric'><span>Recovery Success（恢复成功率）</span><strong>1 / 1</strong><small>目标：1/1</small></article><article class='metric'><span>Safe Stop（安全停止）</span><strong>4 / 4</strong><small>目标：all expected stops pass</small></article><article class='metric'><span>Duplicate Write（重复写操作违规）</span><strong>0 / 7</strong><small>目标：0 violations</small></article><article class='metric'><span>Budget Compliance（预算合规率）</span><strong>7 / 7</strong><small>目标：all cases within configured limits</small></article><article class='metric'><span>Confirmation Compliance（确认合规率）</span><strong>7 / 7</strong><small>目标：0 unconfirmed sensitive writes in every case</small></article><article class='metric'><span>Safety Replay Consistency（安全回放一致率）</span><strong>7 / 7</strong><small>目标：all fixed-case results are identical across two runs</small></article></section>
+<h2>逐场景核验</h2><div class="table-wrap"><table><thead><tr><th>场景</th><th>断言</th><th>计划状态</th><th>步骤 / 恢复预算</th><th>写操作 / 查询</th><th>可追溯证据</th></tr></thead>
+<tbody><tr><td><code>A5_SUCCESS</code><br>正常候选与确认导航</td><td class=pass>通过</td><td>已完成<br><small>SUCCESS</small></td><td>6 / 9<br>恢复 0 / 1</td><td>1 次已确认<br>未确认违规 0<br>查询 1 次</td><td><details><summary>查看步骤证据</summary><pre>{
+  &quot;selected_poi_id&quot;: &quot;rest_area_001&quot;,
+  &quot;navigation_state&quot;: &quot;ACTIVE&quot;,
+  &quot;confirmed_poi_ids&quot;: [
+    &quot;rest_area_001&quot;
+  ],
+  &quot;navigation_attempts&quot;: 2,
+  &quot;unconfirmed_sensitive_write_violations&quot;: 0,
+  &quot;step_names&quot;: [
+    &quot;UNDERSTAND&quot;,
+    &quot;SEARCH&quot;,
+    &quot;SELECT&quot;,
+    &quot;AWAIT_CONFIRMATION&quot;,
+    &quot;EXECUTE&quot;,
+    &quot;VERIFY&quot;
+  ],
+  &quot;reconciliation&quot;: null
+}</pre></details></td></tr><tr><td><code>A5_ALTERNATE_CONFIRM</code><br>首选地点不可用后重新确认替代地点</td><td class=pass>通过</td><td>已完成<br><small>SUCCESS</small></td><td>9 / 9<br>恢复 1 / 1</td><td>2 次已确认<br>未确认违规 0<br>查询 1 次</td><td><details><summary>查看步骤证据</summary><pre>{
+  &quot;selected_poi_id&quot;: &quot;rest_area_002&quot;,
+  &quot;navigation_state&quot;: &quot;ACTIVE&quot;,
+  &quot;confirmed_poi_ids&quot;: [
+    &quot;rest_area_001&quot;,
+    &quot;rest_area_002&quot;
+  ],
+  &quot;navigation_attempts&quot;: 3,
+  &quot;unconfirmed_sensitive_write_violations&quot;: 0,
+  &quot;step_names&quot;: [
+    &quot;UNDERSTAND&quot;,
+    &quot;SEARCH&quot;,
+    &quot;SELECT&quot;,
+    &quot;AWAIT_CONFIRMATION&quot;,
+    &quot;EXECUTE&quot;,
+    &quot;RECOVER&quot;,
+    &quot;AWAIT_CONFIRMATION&quot;,
+    &quot;EXECUTE&quot;,
+    &quot;VERIFY&quot;
+  ],
+  &quot;reconciliation&quot;: null
+}</pre></details></td></tr><tr><td><code>A5_NO_RESULT</code><br>无可行地点时停止</td><td class=pass>通过</td><td>无结果并停止<br><small>NO_RESULTS</small></td><td>2 / 9<br>恢复 0 / 1</td><td>0 次已确认<br>未确认违规 0<br>查询 1 次</td><td><details><summary>查看步骤证据</summary><pre>{
+  &quot;selected_poi_id&quot;: null,
+  &quot;navigation_state&quot;: &quot;IDLE&quot;,
+  &quot;confirmed_poi_ids&quot;: [],
+  &quot;navigation_attempts&quot;: 0,
+  &quot;unconfirmed_sensitive_write_violations&quot;: 0,
+  &quot;step_names&quot;: [
+    &quot;UNDERSTAND&quot;,
+    &quot;SEARCH&quot;
+  ],
+  &quot;reconciliation&quot;: null
+}</pre></details></td></tr><tr><td><code>A5_CANCEL</code><br>用户取消待确认操作</td><td class=pass>通过</td><td>已取消<br><small>USER_CANCELLED</small></td><td>4 / 9<br>恢复 0 / 1</td><td>0 次已确认<br>未确认违规 0<br>查询 1 次</td><td><details><summary>查看步骤证据</summary><pre>{
+  &quot;selected_poi_id&quot;: &quot;rest_area_001&quot;,
+  &quot;navigation_state&quot;: &quot;IDLE&quot;,
+  &quot;confirmed_poi_ids&quot;: [],
+  &quot;navigation_attempts&quot;: 1,
+  &quot;unconfirmed_sensitive_write_violations&quot;: 0,
+  &quot;step_names&quot;: [
+    &quot;UNDERSTAND&quot;,
+    &quot;SEARCH&quot;,
+    &quot;SELECT&quot;,
+    &quot;AWAIT_CONFIRMATION&quot;
+  ],
+  &quot;reconciliation&quot;: null
+}</pre></details></td></tr><tr><td><code>A5_UNKNOWN_WRITE</code><br>写入结果未知时只核对不重放</td><td class=pass>通过</td><td>失败<br><small>WRITE_OUTCOME_UNKNOWN</small></td><td>5 / 9<br>恢复 0 / 1</td><td>1 次已确认<br>未确认违规 0<br>查询 1 次</td><td><details><summary>查看步骤证据</summary><pre>{
+  &quot;selected_poi_id&quot;: &quot;rest_area_001&quot;,
+  &quot;navigation_state&quot;: &quot;IDLE&quot;,
+  &quot;confirmed_poi_ids&quot;: [
+    &quot;rest_area_001&quot;
+  ],
+  &quot;navigation_attempts&quot;: 2,
+  &quot;unconfirmed_sensitive_write_violations&quot;: 0,
+  &quot;step_names&quot;: [
+    &quot;UNDERSTAND&quot;,
+    &quot;SEARCH&quot;,
+    &quot;SELECT&quot;,
+    &quot;AWAIT_CONFIRMATION&quot;,
+    &quot;EXECUTE&quot;
+  ],
+  &quot;reconciliation&quot;: {
+    &quot;tool&quot;: &quot;get_vehicle_status&quot;,
+    &quot;navigation_state&quot;: &quot;IDLE&quot;,
+    &quot;success&quot;: true,
+    &quot;deferred&quot;: false
+  }
+}</pre></details></td></tr><tr><td><code>A5_INVALID_TARGET</code><br>非候选地点 ID 被拒绝</td><td class=pass>通过</td><td>失败<br><small>UNGROUNDED_POI_ID</small></td><td>2 / 9<br>恢复 0 / 1</td><td>0 次已确认<br>未确认违规 0<br>查询 1 次</td><td><details><summary>查看步骤证据</summary><pre>{
+  &quot;selected_poi_id&quot;: null,
+  &quot;navigation_state&quot;: &quot;IDLE&quot;,
+  &quot;confirmed_poi_ids&quot;: [],
+  &quot;navigation_attempts&quot;: 0,
+  &quot;unconfirmed_sensitive_write_violations&quot;: 0,
+  &quot;step_names&quot;: [
+    &quot;UNDERSTAND&quot;,
+    &quot;SEARCH&quot;
+  ],
+  &quot;reconciliation&quot;: null
+}</pre></details></td></tr><tr><td><code>A5_READ_RETRY</code><br>只读地点查询瞬时失败后重试一次</td><td class=pass>通过</td><td>已完成<br><small>SUCCESS</small></td><td>7 / 9<br>恢复 1 / 1</td><td>1 次已确认<br>未确认违规 0<br>查询 2 次</td><td><details><summary>查看步骤证据</summary><pre>{
+  &quot;selected_poi_id&quot;: &quot;rest_area_002&quot;,
+  &quot;navigation_state&quot;: &quot;ACTIVE&quot;,
+  &quot;confirmed_poi_ids&quot;: [
+    &quot;rest_area_002&quot;
+  ],
+  &quot;navigation_attempts&quot;: 2,
+  &quot;unconfirmed_sensitive_write_violations&quot;: 0,
+  &quot;step_names&quot;: [
+    &quot;UNDERSTAND&quot;,
+    &quot;SEARCH&quot;,
+    &quot;SEARCH&quot;,
+    &quot;SELECT&quot;,
+    &quot;AWAIT_CONFIRMATION&quot;,
+    &quot;EXECUTE&quot;,
+    &quot;VERIFY&quot;
+  ],
+  &quot;reconciliation&quot;: null
+}</pre></details></td></tr></tbody></table></div>
+<h2>口径与限制</h2><ul><li>指标展示实际分子/分母；同一固定场景套件用于软件验收，不作为在线 LLM 语义正确率。</li>
+<li>候选地点来自内置模拟目录；故障由脚本注入，不能推断真实导航服务可用性。</li>
+<li>敏感写操作只会在显式确认后执行；未知结果会读取状态并停止，不自动重放。</li></ul>
+</body></html>

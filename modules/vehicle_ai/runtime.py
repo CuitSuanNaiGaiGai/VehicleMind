@@ -14,6 +14,7 @@ from modules.vehicle_ai.agent import (
 )
 from modules.vehicle_ai.agent.policy import AgentPolicy, RecommendationPolicy
 from modules.vehicle_ai.agent.recommendation import RecommendationCoordinator
+from modules.vehicle_ai.agent.session import record
 
 from modules.vehicle_ai.context import (
     ContextManager,
@@ -39,8 +40,10 @@ from modules.vehicle_ai.knowledge.lightrag_client import LightRAGClient
 from modules.vehicle_ai.knowledge.profile_router import ProfileRouter
 from modules.vehicle_ai.knowledge.tool import KnowledgeClient, build_knowledge_tool
 from modules.vehicle_ai.memory import TripEvent, TripEventStore, build_trip_memory_tool
+from modules.vehicle_ai.memory.trace_persistence import trace_to_trip_event
 
 from modules.vehicle_ai.tools import (
+    NavigationConfig,
     ToolDefinition,
     ToolRegistry,
     build_default_tool_registry,
@@ -79,6 +82,7 @@ class VehicleMindRuntime:
         trip_event_store: TripEventStore | None = None,
         trip_id: str | None = None,
         trip_event_retention_days: int = 30,
+        navigation_config: NavigationConfig | None = None,
     ):
         # ====================================================
         # Shared context
@@ -142,7 +146,9 @@ class VehicleMindRuntime:
             else ()
         )
         self.tools: ToolRegistry = build_default_tool_registry(
-            self.context_manager, extra_tools=knowledge_tools + memory_tools
+            self.context_manager,
+            extra_tools=knowledge_tools + memory_tools,
+            navigation_config=navigation_config,
         )
 
         # ====================================================
@@ -204,9 +210,25 @@ class VehicleMindRuntime:
         try:
             enriched = self._attach_prior_trip_interactions(event)
             trigger = self.recommendation_coordinator.on_event(enriched)
+            self._record_fallback_recommendation(trigger, event)
             self._persist_recommendation(trigger, event)
         except Exception as error:
-            self.recommendation_coordinator.record_failure(event, error)
+            trigger = self.recommendation_coordinator.record_failure(event, error)
+            self._record_fallback_recommendation(trigger, event)
+            self._persist_recommendation(trigger, event)
+
+    def _record_fallback_recommendation(self, trigger, event: VehicleEvent) -> None:
+        if not trigger.fallback_message:
+            return
+        record(
+            self.agent,
+            "event_recommendation",
+            source="deterministic_fallback",
+            quality="DETERMINISTIC",
+            event_id=event.event_id,
+            text=trigger.fallback_message,
+            error=trigger.error,
+        )
 
     def _attach_prior_trip_interactions(self, event: VehicleEvent) -> VehicleEvent:
         if self.trip_event_store is None:
@@ -286,67 +308,33 @@ class VehicleMindRuntime:
     def _persist_agent_trace(self, trace: dict) -> None:
         if self.trip_event_store is None:
             return
-        kind = trace.get("kind")
-        event_type: str | None = None
-        if kind == "user_request":
-            event_type = "USER_REQUEST"
-        elif kind == "selection":
-            event_type = "USER_SELECTION"
-        elif kind == "confirmation":
-            event_type = (
-                "ACTION_CONFIRMED"
-                if trace.get("result", {}).get("success")
-                else "ACTION_OUTCOME"
-            )
-        elif kind == "rejection":
-            if trace.get("result", {}).get("success"):
-                event_type = "ACTION_CANCELLED"
-        elif kind == "pending_expired":
-            event_type = "ACTION_EXPIRED"
-        elif kind == "tool_result":
-            source = trace.get("source", "")
-            if source in {
-                "search_vehicle_knowledge",
-                "query_trip_events",
-                "get_vehicle_status",
-                "get_climate_status",
-                "get_media_status",
-                "search_nearby_rest_area",
-            }:
-                return
-            result = trace.get("result", {})
-            event_type = (
-                "ACTION_PROPOSED"
-                if result.get("error") == "CONFIRMATION_REQUIRED"
-                else "ACTION_OUTCOME"
-            )
-        if event_type is None:
-            return
-        event_id = f"{self.trip_id}:trace:{uuid.uuid4().hex}"
-        self._append_trip_event(
-            TripEvent(
-                event_id=event_id,
-                trip_id=self.trip_id,
-                event_type=event_type,
-                occurred_at=float(trace.get("at_seconds", time.time())),
-                source=str(trace.get("source", kind)),
-                payload={key: value for key, value in trace.items() if key != "task"},
-            )
-        )
+        event = trace_to_trip_event(self.trip_id, trace)
+        if event is not None:
+            self._append_trip_event(event)
 
     def _persist_recommendation(self, trigger, event: VehicleEvent) -> None:
-        if self.trip_event_store is None or trigger.reason != "TRIGGERED":
+        if self.trip_event_store is None or not (
+            trigger.reason == "TRIGGERED" or trigger.fallback_message
+        ):
             return
+        fallback = trigger.fallback_message is not None
         self._append_trip_event(
             TripEvent(
                 event_id=f"reminder:{event.event_id}",
                 trip_id=self.trip_id,
                 event_type="REMINDER",
                 occurred_at=event.timestamp,
-                source="event_recommendation_agent",
+                source=(
+                    "deterministic_safety_fallback"
+                    if fallback
+                    else "event_recommendation_agent"
+                ),
                 payload={
                     "event_id": event.event_id,
-                    "message": trigger.model_result,
+                    "message": trigger.fallback_message or trigger.model_result,
+                    "recommendation_source": (
+                        "deterministic_fallback" if fallback else "model"
+                    ),
                     "evidence": trigger.evidence or {},
                 },
             )
