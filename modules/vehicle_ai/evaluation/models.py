@@ -14,6 +14,7 @@ class EvaluationCase:
     review_status: str
     steps: tuple[dict[str, Any], ...]
     expected: dict[str, Any]
+    policy_expectations: dict[str, Any] | None = None
 
     @property
     def sha256(self) -> str:
@@ -25,15 +26,30 @@ class EvaluationCase:
             "steps": self.steps,
             "expected": self.expected,
         }
+        if self.policy_expectations is not None:
+            payload["policy_expectations"] = self.policy_expectations
         return hashlib.sha256(
             json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
         ).hexdigest()
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> EvaluationCase:
-        allowed = {"id", "split", "category", "review_status", "steps", "expected"}
-        if set(data) != allowed:
-            raise ValueError(f"case fields mismatch: {sorted(set(data) ^ allowed)}")
+        required = {"id", "split", "category", "review_status", "steps", "expected"}
+        allowed = required | {"policy_expectations"}
+        if not required.issubset(data) or set(data) - allowed:
+            raise ValueError(f"case fields mismatch: {sorted(set(data) ^ required)}")
+        policy_expectations = data.get("policy_expectations")
+        if policy_expectations is not None:
+            if not isinstance(policy_expectations, dict) or set(
+                policy_expectations
+            ) != {"reasons", "required_phrases", "forbidden_phrases"}:
+                raise ValueError("invalid policy_expectations fields")
+            for field in ("reasons", "required_phrases", "forbidden_phrases"):
+                if not isinstance(policy_expectations[field], list) or not all(
+                    isinstance(value, str) and value
+                    for value in policy_expectations[field]
+                ):
+                    raise ValueError(f"policy_expectations.{field} must be a text list")
         if data["split"] not in {"dev", "heldout"}:
             raise ValueError("split must be dev or heldout")
         if data["review_status"] not in {"candidate", "ai_reviewed", "reviewed"}:
@@ -77,6 +93,8 @@ class EvaluationCase:
                 "cabin",
                 "road",
                 "road_quality",
+                "cabin_quality",
+                "policy_probe",
                 "tool_failure",
                 "vehicle",
                 "user_text",
@@ -97,6 +115,15 @@ class EvaluationCase:
                     raise ValueError(f"step.{domain} must be a mapping")
             if "road_quality" in step and step["road_quality"] != {"valid": False}:
                 raise ValueError("step.road_quality must be {valid: false}")
+            if "cabin_quality" in step and step["cabin_quality"] != {"valid": False}:
+                raise ValueError("step.cabin_quality must be {valid: false}")
+            if "policy_probe" in step and (
+                policy_expectations is None
+                or step["policy_probe"] != "high_driver_risk"
+            ):
+                raise ValueError(
+                    "policy_probe is only allowed for A2 high-driver-risk cases"
+                )
             if "tool_failure" in step:
                 failure = step["tool_failure"]
                 if (
@@ -121,4 +148,7 @@ class EvaluationCase:
             review_status=data["review_status"],
             steps=tuple(dict(step) for step in data["steps"]),
             expected=dict(expected),
+            policy_expectations=(
+                dict(policy_expectations) if policy_expectations is not None else None
+            ),
         )

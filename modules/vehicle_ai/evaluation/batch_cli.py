@@ -9,7 +9,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from modules.vehicle_ai.evaluation.batch import load_frozen_cases, run_batch
+from modules.vehicle_ai.evaluation.batch import (
+    load_frozen_cases,
+    load_policy_cases,
+    run_batch,
+)
 from modules.vehicle_ai.llm import build_llm_client
 from modules.vehicle_ai.agent.budget import AgentBudgetConfig
 
@@ -19,6 +23,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider", choices=("qwen", "glm"), required=True)
     parser.add_argument(
         "--golden", type=Path, default=Path("scenarios/agent_eval/golden")
+    )
+    parser.add_argument(
+        "--policy",
+        type=Path,
+        help="改用独立 A2 策略冻结集，如 scenarios/agent_eval/policy",
     )
     parser.add_argument("--output-root", type=Path, default=Path("runs/agent_eval"))
     parser.add_argument(
@@ -44,7 +53,11 @@ def main(argv: list[str] | None = None) -> int:
     tool_rounds = args.max_tool_rounds or config.max_tool_rounds
     if turn_timeout <= 0 or tool_calls <= 0 or tool_rounds <= 0:
         parser.error("Agent 时间预算和工具次数预算必须为正数")
-    cases = load_frozen_cases(args.golden)
+    cases = (
+        load_policy_cases(args.policy)
+        if args.policy
+        else load_frozen_cases(args.golden)
+    )
     if args.split != "all":
         cases = tuple(case for case in cases if case.split == args.split)
     if args.case_id:

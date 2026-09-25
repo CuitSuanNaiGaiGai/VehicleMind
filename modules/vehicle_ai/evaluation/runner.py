@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from modules.vehicle_ai.context import GearState, NavigationState
@@ -11,6 +11,7 @@ from modules.vehicle_ai.evaluation.models import EvaluationCase
 from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse
 from modules.vehicle_ai.replay.trace import plain_value
 from modules.vehicle_ai.runtime import VehicleMindRuntime
+from modules.vehicle_ai.events import EventPriority, EventType, VehicleEvent
 from modules.observation import ObservationMetadata
 from modules.vehicle_ai.tools.base import ToolResult
 
@@ -36,6 +37,7 @@ class TrialResult:
     settings: dict[str, Any]
     interaction_events: tuple[dict[str, Any], ...]
     agent_trace: tuple[dict[str, Any], ...] = ()
+    policy_trace: tuple[dict[str, Any], ...] = ()
 
 
 class RecordingClient(BaseLLMClient):
@@ -99,7 +101,7 @@ def run_trial(
         turn_timeout_seconds=turn_timeout_seconds,
         max_tool_calls=max_tool_calls,
         max_task_trace_events=max_task_trace_events,
-        enable_event_recommendations=False,
+        enable_event_recommendations=case.policy_expectations is not None,
     )
     schema_hash = hashlib.sha256(
         json.dumps(runtime.tools.llm_schemas(), sort_keys=True).encode()
@@ -109,11 +111,15 @@ def run_trial(
     error = None
     started = time.perf_counter()
     try:
-        for step in case.steps:
+        for step_index, step in enumerate(case.steps):
             if "at_ms" in step:
                 logical_time[0] = step["at_ms"] / 1000
             if "cabin" in step:
                 runtime.update_cabin(at_ms=step.get("at_ms"), **step["cabin"])
+                if case.policy_expectations is not None:
+                    runtime.wait_for_recommendations(
+                        timeout_seconds=turn_timeout_seconds
+                    )
             if "road" in step:
                 runtime.update_driving(at_ms=step.get("at_ms"), **step["road"])
             if "road_quality" in step:
@@ -127,6 +133,34 @@ def run_trial(
                         processing_ms=0,
                     ),
                     at_ms=step.get("at_ms"),
+                )
+                if case.policy_expectations is not None:
+                    runtime.wait_for_recommendations(
+                        timeout_seconds=turn_timeout_seconds
+                    )
+            if "cabin_quality" in step:
+                runtime.update_cabin(
+                    metadata=ObservationMetadata(
+                        timestamp_ms=step.get("at_ms", 0),
+                        sequence=0,
+                        source="agent_eval",
+                        confidence=None,
+                        valid=False,
+                        processing_ms=0,
+                    ),
+                    at_ms=step.get("at_ms"),
+                )
+            if step.get("policy_probe") == "high_driver_risk":
+                runtime.recommendation_coordinator.on_event(
+                    VehicleEvent(
+                        type=EventType.HIGH_RISK_DETECTED,
+                        priority=EventPriority.CRITICAL,
+                        source="agent_eval_policy_probe",
+                        message="Policy probe after invalid driver observation.",
+                        data={"risk": "HIGH"},
+                        timestamp=logical_time[0],
+                        event_id=f"{case.id}-policy-probe-{step_index}",
+                    )
                 )
             if "tool_failure" in step:
                 failure = step["tool_failure"]
@@ -217,6 +251,8 @@ def run_trial(
             "success": item.success,
             "error": item.error,
             "confirmed": item.confirmed,
+            "requires_confirmation": item.requires_confirmation,
+            "policy": plain_value(item.policy),
             "result_data": plain_value(item.result_data),
         }
         for item in runtime.tools.execution_history()
@@ -265,4 +301,8 @@ def run_trial(
         },
         interaction_events=tuple(interaction_events),
         agent_trace=tuple(plain_value(runtime.agent.trace)),
+        policy_trace=tuple(
+            plain_value(asdict(item))
+            for item in runtime.recommendation_coordinator.trace
+        ),
     )

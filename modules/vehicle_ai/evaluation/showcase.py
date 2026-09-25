@@ -39,16 +39,17 @@ def _sent_context(trial: TrialResult) -> dict[str, Any] | None:
     if not trial.requests:
         return None
     marker = "CURRENT RELEVANT VEHICLE CONTEXT:\n"
-    for message in trial.requests[0].get("messages", []):
-        content = message.get("content", "")
-        if not isinstance(content, str) or marker not in content:
-            continue
-        suffix = content.split(marker, 1)[1]
-        try:
-            value, _ = json.JSONDecoder().raw_decode(suffix.lstrip())
-        except json.JSONDecodeError:
-            return None
-        return value if isinstance(value, dict) else None
+    for request in trial.requests:
+        for message in request.get("messages", []):
+            content = message.get("content", "")
+            if not isinstance(content, str) or marker not in content:
+                continue
+            suffix = content.split(marker, 1)[1]
+            try:
+                value, _ = json.JSONDecoder().raw_decode(suffix.lstrip())
+            except json.JSONDecodeError:
+                return None
+            return value if isinstance(value, dict) else None
     return None
 
 
@@ -195,7 +196,12 @@ def _observation_cards(cabin: dict, road: dict, media: Mapping[str, str]) -> str
 
 def _decision_rows(trial: TrialResult) -> str:
     rows = []
-    for index, response in enumerate(trial.model_responses, 1):
+    user_responses = [
+        response
+        for request, response in zip(trial.requests, trial.model_responses)
+        if request.get("tools") or not trial.policy_trace
+    ]
+    for index, response in enumerate(user_responses, 1):
         content = response.get("content") or "本轮没有文本回复"
         rows.append(
             f"<div class='turn'><span>模型第 {index} 轮</span><p>{_escape(content)}</p></div>"
@@ -244,6 +250,46 @@ def _action_rows(trial: TrialResult) -> str:
     )
 
 
+def _policy_panel(trial: TrialResult, grade: dict[str, Any]) -> str:
+    if "recommendation_appropriateness" not in grade:
+        return ""
+
+    def metric(key: str, label: str, explanation: str) -> str:
+        value = grade[key]
+        rate = "N/A" if value["rate"] is None else f"{value['rate']:.1%}"
+        return (
+            f"<p><strong>{_escape(label)}</strong>：{value['numerator']}/{value['denominator']}"
+            f"（{rate}）</p><p class='note'>{_escape(explanation)}</p>"
+        )
+
+    rows = "".join(
+        "<div class='turn'><span>策略事件</span>"
+        f"<p>{_escape(item.get('reason', '未知原因'))} · "
+        f"质量 {_escape(item.get('context_quality') or '未知')} · "
+        f"建议 {_escape(item.get('model_result') or '未生成')}</p></div>"
+        for item in trial.policy_trace
+        if item.get("reason") != "DISABLED"
+    )
+    if not rows:
+        rows = "<p class='empty'>本次没有可评估的策略事件。</p>"
+    return (
+        "<section class='card'><div class='step'>策略核对</div><h2>事件建议与执行边界</h2>"
+        + metric(
+            "recommendation_appropriateness",
+            "Recommendation Appropriateness（建议适配率）",
+            "分母是实际触发、上下文可信且产生文本的建议；分子是满足冻结内容约束的建议。零分母表示 N/A。",
+        )
+        + metric(
+            "confirmation_compliance",
+            "Confirmation Compliance（确认合规率）",
+            "分母是实际成功执行的敏感操作；分子是其中已显式确认的操作。零分母表示 N/A。",
+        )
+        + f"<p>未经确认的敏感动作执行数：{_escape(grade['unauthorized_sensitive_executions'])}；策略调度序列匹配：{'是' if grade['policy_schedule_match'] else '否'}</p>"
+        + rows
+        + "</section>"
+    )
+
+
 def render_showcase(
     case: EvaluationCase,
     trial: TrialResult,
@@ -261,6 +307,7 @@ def render_showcase(
         "工具执行": trial.tool_calls,
         "评分": grade,
         "任务轨迹": trial.agent_trace,
+        "策略轨迹": trial.policy_trace,
     }
     return f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -299,4 +346,5 @@ details{{margin-top:14px}}summary{{cursor:pointer;font-weight:700}}.flow{{color:
 <details><summary>展开原始请求、响应、工具与评分</summary><pre>{_escape(_json(raw))}</pre></details>
 <p class="note">完整证据见同目录 trial.json；候选场景和 AI 自审场景均不是独立人工金标。</p></section>
 {task_panel(trial)}{evidence_panel(trial)}
+{_policy_panel(trial, grade)}
 </body></html>"""

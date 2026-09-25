@@ -1,0 +1,11 @@
+schema_version: 1
+reviewer: Codex AI self-review
+independent_human_review: false
+evidence_scope: 独立 A2 策略冻结集；建议内容与执行证据按实际 trace 复核
+cases:
+- id: A2-01
+  case_sha256: ca76b102613af6a107889b4f750868b8333f631983734e9053794e8b875f5789
+- id: A2-02
+  case_sha256: 023cc1f40a077d01b2c87b5c8a05ec8ba143c705434d893f4654aa7a2559b914
+- id: A2-03
+  case_sha256: 7b8c08a4f94b4ecb3c956f8e9de5d0c330410a82a37b92f8b4b6ed91c219a3b3
