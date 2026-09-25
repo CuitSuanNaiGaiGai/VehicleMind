@@ -197,9 +197,11 @@ def _observation_cards(cabin: dict, road: dict, media: Mapping[str, str]) -> str
 def _decision_rows(trial: TrialResult) -> str:
     rows = []
     user_responses = [
-        response
-        for request, response in zip(trial.requests, trial.model_responses)
-        if request.get("tools") or not trial.policy_trace
+        trial.model_responses[request["response_index"]]
+        for request in trial.requests
+        if request.get("kind") == "user_turn"
+        and isinstance(request.get("response_index"), int)
+        and request["response_index"] < len(trial.model_responses)
     ]
     for index, response in enumerate(user_responses, 1):
         content = response.get("content") or "本轮没有文本回复"

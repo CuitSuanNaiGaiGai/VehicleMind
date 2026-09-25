@@ -56,13 +56,14 @@ class RecordingClient(BaseLLMClient):
         return self._chat(messages, tools, timeout_seconds)
 
     def _chat(self, messages, tools=None, timeout_seconds=None) -> LLMResponse:
-        self.requests.append(
-            {
-                "at_ms": int(time.time() * 1000),
-                "messages": plain_value(messages),
-                "tools": plain_value(tools or []),
-            }
-        )
+        request = {
+            "at_ms": int(time.time() * 1000),
+            "messages": plain_value(messages),
+            "tools": plain_value(tools or []),
+            "kind": "user_turn" if tools else "event_advice",
+            "response_index": None,
+        }
+        self.requests.append(request)
         started = time.perf_counter()
         try:
             response = (
@@ -75,6 +76,7 @@ class RecordingClient(BaseLLMClient):
         finally:
             self.latencies_ms.append((time.perf_counter() - started) * 1000)
         self.responses.append(response)
+        request["response_index"] = len(self.responses) - 1
         return response
 
 
@@ -286,8 +288,9 @@ def run_trial(
         request_latencies_ms=tuple(recording.latencies_ms),
         requested_tools=tuple(
             {"name": call.name, "arguments": plain_value(call.arguments)}
-            for response in recording.responses
-            for call in response.tool_calls
+            for request in recording.requests
+            if request["kind"] == "user_turn" and request["response_index"] is not None
+            for call in recording.responses[request["response_index"]].tool_calls
         ),
         requests=tuple(recording.requests),
         settings={

@@ -227,3 +227,51 @@ def test_policy_batch_persists_trace_and_chinese_report(tmp_path):
     assert "Recommendation Appropriateness（建议适配率）" in page
     assert "<details>" in page and "cabin_demo.gif" in page
     assert "建议适配率" in (tmp_path / "run" / "summary.md").read_text(encoding="utf-8")
+
+
+def test_event_advice_tool_call_is_ignored_by_user_tool_grading():
+    class RogueAdviceClient(BaseLLMClient):
+        def chat(self, messages, tools=None):
+            if not tools:
+                return LLMResponse(
+                    "请安全停车休息。",
+                    [
+                        LLMToolCall(
+                            "rogue",
+                            "set_driver_window",
+                            {"open": True},
+                            '{"open": true}',
+                        )
+                    ],
+                )
+            return LLMResponse("已收到。", [])
+
+    case = load_policy_cases(ROOT)[0]
+    trial = run_trial(
+        case, RogueAdviceClient(), provider="test", model="stub", trial_index=1
+    )
+    assert trial.model_responses[0]["tool_calls"][0]["name"] == "set_driver_window"
+    assert trial.agent_trace[0]["tool_calls_ignored"] == 1
+    assert trial.requested_tools == ()
+    assert grade_trial(case, trial)["tool_selection"] is True
+
+
+def test_failed_event_request_does_not_hide_later_user_response():
+    class FailedAdviceClient(BaseLLMClient):
+        def chat(self, messages, tools=None):
+            if not tools:
+                raise RuntimeError("event advice unavailable")
+            return LLMResponse("用户回合的实际回答", [])
+
+    case = load_policy_cases(ROOT)[0]
+    trial = run_trial(
+        case, FailedAdviceClient(), provider="test", model="stub", trial_index=1
+    )
+    assert trial.request_count == 2
+    assert len(trial.model_responses) == 1
+    assert trial.requests[0]["response_index"] is None
+    assert trial.requests[1]["response_index"] == 0
+    assert trial.policy_trace[0]["reason"] == "RECOMMENDATION_ERROR"
+    page = render_showcase(case, trial, grade_trial(case, trial))
+    assert "模型第 1 轮" in page
+    assert "用户回合的实际回答" in page
