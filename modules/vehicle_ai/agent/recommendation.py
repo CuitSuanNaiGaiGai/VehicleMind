@@ -129,7 +129,11 @@ class RecommendationCoordinator:
             if qualities[(domain, field)] is QualityStatus.KNOWN:
                 value = getattr(getattr(snapshot, domain), field)
                 evidence[event_field] = getattr(value, "value", value)
-        safe_event = replace(event, data=evidence)
+        safe_event = replace(
+            event,
+            message=f"检测到可信驾驶员风险：{evidence['risk']}。",
+            data=evidence,
+        )
 
         key = (event.type, str(event.data["risk"]))
         now = self.clock()
