@@ -123,12 +123,12 @@ class KnowledgeCatalog:
 
 **Interfaces:** `lightrag_services.py` exposes `validate_sidecar_config`, `start_services`, `stop_services`, and `healthcheck_services`; commands accept no arbitrary remote host and use only the two fixed loopback ports configured in `modules/config/knowledge.yaml`.
 
-- [ ] **Step 1: Write config and service contract tests** requiring two distinct ports, two distinct work directories, fixed profile mapping, env-only API keys, and explicit refusal of a service using a mismatched index directory.
-- [ ] **Step 2: Run focused tests**; expected: failures because sidecar management files do not exist.
-- [ ] **Step 3: Add a separate uv project pinned to `lightrag-hku==1.5.7`.** Generate `uv.lock`; configure OpenAI-compatible LLM and embedding bindings from environment (`DASHSCOPE_API_KEY`, `QWEN_MODEL`, `QWEN_BASE_URL`, configured embedding model/dimensions). Keep service endpoints on loopback, persistence directories separate, and do not echo secrets in logs.
-- [ ] **Step 4: Implement lifecycle/health checks** with explicit process IDs, startup timeout and logs that redact environment values. Do not start services when running ordinary offline commands.
-- [ ] **Step 5: Run optional live API contract smoke test** against both loopback services: health endpoint, document upload/status, and `/query/data` using `mode="mix"`, `only_need_context=true`, `include_references=true`. Expected: response contains context/references and no application path consumes a LightRAG generated answer. If 1.5.7 fails the documented contract, stop and record the failure before selecting another exact pinned version.
-- [ ] **Step 6: Run unit tests and commit** as `build(rag): isolate and pin LightRAG sidecars`.
+- [x] **Step 1: Write config and service contract tests** requiring two distinct ports, two distinct work directories, fixed profile mapping, env-only API keys, and explicit refusal of a service using a mismatched index directory.
+- [x] **Step 2: Run focused tests**; observed: collection failed because the sidecar manager module did not exist.
+- [x] **Step 3: Add a separate uv project pinned to `lightrag-hku==1.5.7`.** Generated `uv.lock` and installed the isolated environment; OpenAI-compatible Qwen and embedding bindings come from existing environment variables.
+- [x] **Step 4: Implement lifecycle/health checks** with fixed process scope, startup timeout and environment-only credentials. Ordinary offline commands do not start services.
+- [x] **Step 5: Run optional live API contract smoke test** against both loopback services. Observed: both services became healthy; `vehiclemind_demo` upload/status/`mix` context-only query passed; `vehicle_common` upload and indexing passed, an initial 45-second client query timeout occurred, and a subsequent query with a 180-second timeout returned one chunk and one reference. The temporary smoke indexes were moved out of the project runtime directory.
+- [x] **Step 6: Run unit tests and commit** as `build(rag): isolate and pin LightRAG sidecars`.
 
 ### Task 3: Build a Traceable 20-Source Knowledge Corpus
 
