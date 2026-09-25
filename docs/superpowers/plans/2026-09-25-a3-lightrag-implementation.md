@@ -99,16 +99,16 @@ class KnowledgeCatalog:
 - Create: `modules/vehicle_ai/knowledge/catalog.py`
 - Create: `modules/vehicle_ai/knowledge/profile_router.py`
 - Create: `modules/config/knowledge.yaml`
-- Test: `tests/vehicle_ai/knowledge/test_catalog.py`
+- Test: `tests/vehicle_ai/knowledge/test_knowledge_catalog.py`
 - Test: `tests/vehicle_ai/knowledge/test_profile_router.py`
 
 **Interfaces:** Provide the `KnowledgeReference`, `RetrievedChunk`, `RetrievalResult`, `KnowledgeSource`, `KnowledgeCatalog.load/validate`, and `ProfileRouter.resolve` interfaces defined above. `resolve(None)` and any unrecognized profile return `("vehicle_common", common_url)`.
 
-- [ ] **Step 1: Write catalog and routing tests** covering duplicate IDs, missing fields, incorrect SHA-256, missing source text, profile labels outside the allowlist, unknown profile fallback and attempts to inject URLs.
-- [ ] **Step 2: Run focused tests and confirm failure** with `pytest tests/vehicle_ai/knowledge/test_catalog.py tests/vehicle_ai/knowledge/test_profile_router.py -q`; expected: collection/import failures because modules do not exist.
-- [ ] **Step 3: Implement immutable models, strict catalog parsing and allowlisted routing.** Use `yaml.safe_load`, resolve source text paths under `config/knowledge/` only, recompute SHA-256 from UTF-8 bytes, reject traversal and reject duplicate IDs. Configuration defines exactly `vehicle_common` and `vehiclemind_demo` base URLs and a positive timeout; secrets are not stored there.
-- [ ] **Step 4: Run focused tests and lint**; expected: all tests pass and Ruff reports no errors.
-- [ ] **Step 5: Commit** as `feat(rag): add scoped knowledge catalog and profile router`.
+- [x] **Step 1: Write catalog and routing tests** covering duplicate IDs, missing fields, incorrect SHA-256, missing source text, profile labels outside the allowlist, unknown profile fallback and attempts to inject URLs.
+- [x] **Step 2: Run focused tests and confirm failure** with `python -m pytest tests/vehicle_ai/knowledge/test_knowledge_catalog.py tests/vehicle_ai/knowledge/test_profile_router.py -q`; observed: collection failed because the knowledge package did not exist.
+- [x] **Step 3: Implement immutable models, strict catalog parsing and allowlisted routing.** Use `yaml.safe_load`, resolve source text paths under `config/knowledge/` only, recompute SHA-256 from UTF-8 bytes, reject traversal and reject duplicate IDs. Configuration defines exactly `vehicle_common` and `vehiclemind_demo` base URLs and a positive timeout; secrets are not stored there.
+- [x] **Step 4: Run focused tests and lint**; observed: 26 focused tests and 493 full tests passed; Ruff, mypy and source-size checks passed.
+- [x] **Step 5: Commit** as `feat(rag): add scoped knowledge catalog and profile router`.
 
 ### Task 2: Pin and Smoke-Test the Isolated LightRAG Sidecars
 
