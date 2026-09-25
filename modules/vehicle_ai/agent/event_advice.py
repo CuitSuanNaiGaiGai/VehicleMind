@@ -33,7 +33,6 @@ def build_event_advice_messages(
         {
             "role": "user",
             "content": (
-                f"事件编号：{event.event_id}\n"
                 f"事件说明：{event.message}\n"
                 "白名单感知证据（JSON）："
                 f"{json.dumps(evidence, ensure_ascii=False, sort_keys=True)}\n"
