@@ -54,7 +54,7 @@
 - [x] 实现高风险音乐固定安全回复；保留后续暂停、失败与待确认状态，不让模型矛盾表述覆盖真实执行状态。
 - [x] 原子读取策略所需上下文与字段质量；任何拒绝分支都回收提交的有效授权。
 - [x] 运行策略/Registry/确认相关测试、Ruff/mypy。
-- [x] 提交 `feat(agent): enforce policy at tool execution boundary` 及评审修复；更新记录待复审确认。
+- [x] 提交 `feat(agent): enforce policy at tool execution boundary` 及复审修复；最终复审通过。全量 434 项测试及静态检查通过，详见 `.superpowers/sdd/task-2-report.md` 与后续中文 A2 验收报告。
 
 ### Task 3: 高风险事件建议与冷却去重
 
