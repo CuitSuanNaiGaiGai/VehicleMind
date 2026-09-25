@@ -268,6 +268,54 @@ def test_second_play_with_stale_state_does_not_clear_turn_safety_latch() -> None
     assert "停车休息" in answer
 
 
+def test_replay_after_pause_and_state_invalidation_reports_playing() -> None:
+    app = runtime(
+        ScriptedResponse(
+            content=None,
+            tool_calls=(call("play_music", {"query": "轻音乐"}),),
+        ),
+        ScriptedResponse(
+            content=None,
+            tool_calls=(call("pause_music"),),
+        ),
+        ScriptedResponse(
+            content=None,
+            tool_calls=(call("play_music", {"query": "古典音乐"}),),
+        ),
+        ScriptedResponse(content="操作完成。"),
+    )
+    app.context_manager.update_driver(risk=RiskLevel.HIGH)
+    original_chat = app.agent.llm.chat
+    calls = 0
+
+    def invalidate_before_third_request(messages, tools=None):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            app.context_manager.mark_invalid_observation(
+                "driver",
+                ObservationMetadata(
+                    timestamp_ms=1000,
+                    sequence=2,
+                    source="test",
+                    confidence=None,
+                    valid=False,
+                    processing_ms=0.0,
+                ),
+            )
+        return original_chat(messages, tools)
+
+    app.agent.llm.chat = invalidate_before_third_request
+
+    answer = app.chat("播放，暂停，然后换首歌", debug=False)
+
+    assert app.agent.task.status == "COMPLETED"
+    assert app.context_manager.get_context().vehicle.media_playing is True
+    assert "播放成功" in answer
+    assert "随后已暂停" not in answer
+    assert "音乐不能消除疲劳" in answer
+
+
 def test_high_risk_play_then_second_tool_failure_reports_incomplete_turn() -> None:
     app = runtime(
         ScriptedResponse(

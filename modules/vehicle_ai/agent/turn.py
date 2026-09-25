@@ -140,9 +140,9 @@ def run_turn(
                         ),
                         "",
                     )
+                    agent._turn_music_paused = False
                     if warning:
                         agent._turn_music_warning = warning
-                        agent._turn_music_paused = False
                 elif call.name == "pause_music" and result.success:
                     agent._turn_music_paused = True
                 agent.task.last_tool_result = result.to_dict()
