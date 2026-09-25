@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
-from collections.abc import Mapping
+from functools import partial
+from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Mapping
 
 from modules.vehicle_ai.tools.base import (
     ToolDefinition,
     ToolExecutionRecord,
     ToolResult,
 )
+
+if TYPE_CHECKING:
+    from modules.vehicle_ai.agent.policy import AgentPolicy, PolicyContext
 
 
 @dataclass(frozen=True)
@@ -70,7 +74,11 @@ class ToolRegistry:
 
     def __init__(
         self,
-    ):
+        policy: AgentPolicy,
+        context_provider: Callable[[str], PolicyContext],
+    ) -> None:
+        self._policy = policy
+        self._context_provider = context_provider
         self._tools: dict[
             str,
             ToolDefinition,
@@ -167,7 +175,10 @@ class ToolRegistry:
         requires_confirmation: bool,
         confirmed: bool,
         result: ToolResult,
+        user_intent: str,
+        policy: dict[str, Any],
     ) -> ToolResult:
+        result.policy = deepcopy(policy)
         self._execution_history.append(
             ToolExecutionRecord(
                 name=name,
@@ -177,6 +188,8 @@ class ToolRegistry:
                 success=result.success,
                 error=result.error,
                 result_data=deepcopy(result.data),
+                user_intent=user_intent,
+                policy=deepcopy(policy),
             )
         )
         return result
@@ -191,6 +204,7 @@ class ToolRegistry:
         arguments: dict[str, Any] | None = None,
         *,
         confirmation: object | None = None,
+        user_intent: str = "",
     ) -> ToolResult:
 
         if arguments is None:
@@ -207,14 +221,57 @@ class ToolRegistry:
                     message=(f"Tool '{name}' is not available."),
                     error="UNKNOWN_TOOL",
                 ),
+                user_intent=user_intent,
+                policy={
+                    "decision": "DENY",
+                    "reason": "Tool is not registered.",
+                    "risk": None,
+                    "warnings": [],
+                },
             )
 
         tool = self._tools[name]
         confirmed = False
+        try:
+            decision = self._policy.evaluate(tool, self._context_provider(user_intent))
+            policy = {
+                "decision": decision.decision.value,
+                "reason": decision.reason,
+                "risk": decision.risk.value if decision.risk is not None else None,
+                "warnings": list(decision.warnings),
+            }
+        except Exception as exc:
+            policy = {
+                "decision": "DENY",
+                "reason": f"Policy evaluation failed: {type(exc).__name__}.",
+                "risk": None,
+                "warnings": [],
+            }
+        record = partial(self._record, user_intent=user_intent, policy=policy)
+
+        if policy["decision"] == "DENY":
+            if (
+                isinstance(confirmation, _ConfirmationGrant)
+                and self._issued_confirmations.get(confirmation.action_id)
+                is confirmation
+            ):
+                self._issued_confirmations.pop(confirmation.action_id)
+                self._used_confirmation_ids.add(confirmation.action_id)
+            return record(
+                name=name,
+                arguments=arguments,
+                requires_confirmation=tool.requires_confirmation,
+                confirmed=False,
+                result=ToolResult(
+                    success=False,
+                    message=str(policy["reason"]),
+                    error="POLICY_DENIED",
+                ),
+            )
 
         if tool.requires_confirmation:
             if confirmation is None:
-                return self._record(
+                return record(
                     name=name,
                     arguments=arguments,
                     requires_confirmation=True,
@@ -226,7 +283,7 @@ class ToolRegistry:
                     ),
                 )
             if not isinstance(confirmation, _ConfirmationGrant):
-                return self._record(
+                return record(
                     name=name,
                     arguments=arguments,
                     requires_confirmation=True,
@@ -238,7 +295,7 @@ class ToolRegistry:
                     ),
                 )
             if confirmation.action_id in self._used_confirmation_ids:
-                return self._record(
+                return record(
                     name=name,
                     arguments=arguments,
                     requires_confirmation=True,
@@ -253,7 +310,7 @@ class ToolRegistry:
                 self._issued_confirmations.get(confirmation.action_id)
                 is not confirmation
             ):
-                return self._record(
+                return record(
                     name=name,
                     arguments=arguments,
                     requires_confirmation=True,
@@ -268,7 +325,7 @@ class ToolRegistry:
                 confirmation.tool_name != name
                 or dict(confirmation.arguments) != arguments
             ):
-                return self._record(
+                return record(
                     name=name,
                     arguments=arguments,
                     requires_confirmation=True,
@@ -295,7 +352,7 @@ class ToolRegistry:
         missing = [field_name for field_name in required if field_name not in arguments]
 
         if missing:
-            return self._record(
+            return record(
                 name=name,
                 arguments=arguments,
                 requires_confirmation=tool.requires_confirmation,
@@ -322,7 +379,7 @@ class ToolRegistry:
         unknown = [key for key in arguments if key not in known_properties]
 
         if unknown:
-            return self._record(
+            return record(
                 name=name,
                 arguments=arguments,
                 requires_confirmation=tool.requires_confirmation,
@@ -345,7 +402,7 @@ class ToolRegistry:
             result = tool.handler(**arguments)
 
         except Exception as exc:
-            return self._record(
+            return record(
                 name=name,
                 arguments=arguments,
                 requires_confirmation=tool.requires_confirmation,
@@ -371,7 +428,7 @@ class ToolRegistry:
                 error="INVALID_TOOL_RESULT",
             )
 
-        return self._record(
+        return record(
             name=name,
             arguments=arguments,
             requires_confirmation=tool.requires_confirmation,

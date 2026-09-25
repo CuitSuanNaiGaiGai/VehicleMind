@@ -19,7 +19,9 @@ class ActionConfirmationController:
         self.tool_registry = tool_registry
         self.__confirmation_issuer = confirmation_issuer
 
-    def stage(self, tool_name: str, arguments: dict[str, Any]) -> None:
+    def stage(
+        self, tool_name: str, arguments: dict[str, Any], user_intent: str = ""
+    ) -> None:
         try:
             tool = self.tool_registry.get(tool_name)
         except KeyError:
@@ -39,11 +41,18 @@ class ActionConfirmationController:
                 tool_name=tool_name,
                 arguments=dict(arguments),
                 display_text=f"Confirm vehicle action: {tool_name}",
+                metadata={"user_intent": user_intent},
                 created_at=self.pending_actions.now(),
             )
         )
 
     def confirm(self, action_id: str) -> ToolResult:
+        pending = self.pending_actions.get()
+        user_intent = (
+            str(pending.metadata.get("user_intent", ""))
+            if pending is not None and pending.action_id == action_id
+            else ""
+        )
         confirmation = self.pending_actions.consume(action_id)
         if confirmation is None:
             return ToolResult(
@@ -60,6 +69,7 @@ class ActionConfirmationController:
             confirmation.tool_name,
             dict(confirmation.arguments),
             confirmation=grant,
+            user_intent=user_intent,
         )
 
     def reject(self, action_id: str) -> ToolResult:

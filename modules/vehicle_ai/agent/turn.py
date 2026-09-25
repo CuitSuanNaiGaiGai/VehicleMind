@@ -12,9 +12,7 @@ if TYPE_CHECKING:
     from modules.vehicle_ai.agent.vehicle_agent import VehicleAgent
 
 
-def reconcile(
-    agent: "VehicleAgent", name: str, result
-):
+def reconcile(agent: "VehicleAgent", name: str, result):
     """Read back state without treating matching current state as execution proof."""
     if name in {"set_ac", "set_temperature"}:
         query = "get_climate_status"
@@ -24,7 +22,9 @@ def reconcile(
         query = "get_vehicle_status"
     try:
         # Reserve one deterministic read-only call for uncertain-write recovery.
-        observed = agent.tool_registry.execute(query, {})
+        observed = agent.tool_registry.execute(
+            query, {}, user_intent=agent.current_user_intent
+        )
         agent.task.reconciliation = {"tool": query, "result": observed.to_dict()}
         agent.task.tool_results.append(observed.to_dict())
         record(
@@ -125,8 +125,21 @@ def run_turn(
                 if call.name != "start_navigation" or (
                     pending and pending.tool_name == "start_navigation"
                 ):
-                    agent.confirmations.stage(call.name, arguments)
-                result = agent.tool_registry.execute(call.name, arguments)
+                    agent.confirmations.stage(
+                        call.name, arguments, user_intent=user_text
+                    )
+                result = agent.tool_registry.execute(
+                    call.name, arguments, user_intent=user_text
+                )
+                if call.name == "play_music" and result.success and result.policy:
+                    agent._turn_music_warning = next(
+                        (
+                            warning
+                            for warning in result.policy["warnings"]
+                            if "停车休息" in warning
+                        ),
+                        "",
+                    )
                 agent.task.last_tool_result = result.to_dict()
                 agent.task.tool_results.append(result.to_dict())
                 record(

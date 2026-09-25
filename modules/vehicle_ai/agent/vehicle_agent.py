@@ -66,6 +66,8 @@ class VehicleAgent:
         self.context_manager = context_manager
 
         self.tool_registry = tool_registry
+        self.current_user_intent = ""
+        self._turn_music_warning = ""
 
         self.max_tool_rounds = max_tool_rounds
         self.turn_timeout_seconds = turn_timeout_seconds
@@ -245,6 +247,7 @@ class VehicleAgent:
                             "name": name,
                             "distance_km": tool_result.data.get("distance_km"),
                             "eta_minutes": tool_result.data.get("eta_minutes"),
+                            "user_intent": self.current_user_intent,
                         },
                         expires_after_seconds=(120.0),
                         created_at=self.pending_actions.now(),
@@ -311,6 +314,11 @@ class VehicleAgent:
     # ========================================================
 
     def _record_final_response(self, user_text: str, answer: str) -> str:
+        if self._turn_music_warning:
+            if "音乐不能消除疲劳" not in answer:
+                answer = f"{answer.rstrip()}\n音乐不能消除疲劳。"
+            if self._turn_music_warning not in answer:
+                answer = f"{answer.rstrip()}\n{self._turn_music_warning}"
         self.history.extend(
             [
                 {"role": "user", "content": user_text},
@@ -331,6 +339,8 @@ class VehicleAgent:
 
         if not user_text:
             return ""
+        self.current_user_intent = user_text
+        self._turn_music_warning = ""
 
         pending = self.pending_actions.get()
         expired = self.task.pending_action is not None and pending is None
@@ -364,8 +374,10 @@ class VehicleAgent:
             )
             previous_primary = set(previous_matches)
             current_primary = set(current_matches)
-            if previous_topics and current_topics and previous_primary.isdisjoint(
-                current_primary
+            if (
+                previous_topics
+                and current_topics
+                and previous_primary.isdisjoint(current_primary)
             ):
                 self.task = AgentTask(goal=user_text)
         elif pending is None and self.task.status is not TaskStatus.AWAITING_INPUT:
@@ -429,3 +441,5 @@ class VehicleAgent:
         self.task = AgentTask()
         self.trace.clear()
         self.trace_sequence = 0
+        self.current_user_intent = ""
+        self._turn_music_warning = ""

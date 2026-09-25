@@ -39,7 +39,21 @@ def build_default_tool_registry(
     context_manager: ContextManager,
 ) -> ToolRegistry:
 
-    registry = ToolRegistry()
+    from modules.vehicle_ai.agent.policy import AgentPolicy, PolicyContext
+
+    def policy_context(user_intent: str) -> PolicyContext:
+        snapshot = context_manager.get_context()
+        return PolicyContext(
+            driver_risk=snapshot.driver.risk,
+            driver_quality=context_manager.field_quality("driver", "risk"),
+            vehicle_moving=(
+                context_manager.field_quality("vehicle", "speed_kmh") == "KNOWN"
+                and snapshot.vehicle.speed_kmh > 0
+            ),
+            user_intent=user_intent,
+        )
+
+    registry = ToolRegistry(AgentPolicy.from_yaml(), policy_context)
 
     all_tools = (
         build_climate_tools(context_manager)
