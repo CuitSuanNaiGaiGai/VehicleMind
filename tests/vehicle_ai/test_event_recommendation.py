@@ -11,7 +11,7 @@ from modules.observation import ObservationMetadata
 from modules.vehicle_ai.agent.policy import AgentPolicy
 from modules.vehicle_ai.agent.recommendation import RecommendationCoordinator
 from modules.vehicle_ai.context import ContextManager
-from modules.vehicle_ai.context.enums import RiskLevel
+from modules.vehicle_ai.context.enums import DriverState, RiskLevel
 from modules.vehicle_ai.events import EventPriority, EventType, VehicleEvent
 from modules.vehicle_ai.llm.base import LLMToolCall
 from modules.vehicle_ai.replay.models import ScriptedResponse
@@ -75,7 +75,14 @@ def test_first_event_triggers_exactly_one_no_tools_request_and_evidence() -> Non
 
 
 def test_recommendation_prompt_includes_allowlisted_perception_evidence() -> None:
-    coordinator, agent, llm, _ = setup_coordinator()
+    coordinator, agent, llm, context = setup_coordinator()
+    context.update_driver(
+        state=DriverState.DROWSY,
+        perclos=0.35,
+        eye_closure_seconds=1.5,
+        recent_yawns=1,
+    )
+    context.update_vehicle(speed_kmh=48.0)
     event = VehicleEvent(
         type=EventType.HIGH_RISK_DETECTED,
         priority=EventPriority.CRITICAL,
@@ -96,15 +103,114 @@ def test_recommendation_prompt_includes_allowlisted_perception_evidence() -> Non
     coordinator.on_event(event)
 
     prompt = llm.requests[0].messages[-1]["content"]
-    assert "eye_closure_seconds" in prompt and "2.4" in prompt
-    assert "recent_yawns" in prompt and "2" in prompt
+    assert '"eye_closure_seconds": 1.5' in prompt
+    assert '"recent_yawns": 1' in prompt
+    assert '"vehicle_speed_kmh": 48.0' in prompt
+    assert '"perclos": 0.35' in prompt
+    assert "2.4" not in prompt and "80.0" not in prompt
     assert "untrusted_extra" not in prompt
     assert agent_trace_contains_event(coordinator.agent, "evidence-event")
     trace = next(
         item for item in agent.trace if item.get("event_id") == "evidence-event"
     )
-    assert trace["evidence"]["eye_closure_seconds"] == 2.4
+    assert trace["evidence"]["eye_closure_seconds"] == 1.5
+    assert trace["evidence"]["vehicle_speed_kmh"] == 48.0
     assert "untrusted_extra" not in trace["evidence"]
+
+
+def test_missing_optional_evidence_excludes_context_defaults_and_forged_event_data() -> (
+    None
+):
+    coordinator, agent, llm, _ = setup_coordinator()
+    event = VehicleEvent(
+        type=EventType.HIGH_RISK_DETECTED,
+        priority=EventPriority.CRITICAL,
+        source="test",
+        message="High driver risk detected.",
+        data={
+            "risk": "HIGH",
+            "driver_state": "DROWSY",
+            "perclos": 0.5,
+            "eye_closure_seconds": 4.0,
+            "recent_yawns": 3,
+            "vehicle_speed_kmh": 0.0,
+        },
+        event_id="missing-optionals",
+    )
+
+    assert coordinator.on_event(event).reason == "TRIGGERED"
+    evidence = agent.trace[-1]["evidence"]
+    assert evidence == {"risk": "HIGH"}
+    prompt = llm.requests[-1].messages[-1]["content"]
+    assert '"risk": "HIGH"' in prompt
+    for field in (
+        "driver_state",
+        "perclos",
+        "eye_closure_seconds",
+        "recent_yawns",
+        "vehicle_speed_kmh",
+    ):
+        assert field not in prompt
+
+
+def test_stale_optional_fields_are_omitted_while_current_fields_remain() -> None:
+    now = [0.0]
+    coordinator, agent, llm, context = setup_coordinator(clock=now)
+    context.update_driver(eye_closure_seconds=4.0, recent_yawns=2)
+    context.update_vehicle(speed_kmh=80.0)
+    now[0] = 3.0
+    context.update_driver(risk=RiskLevel.HIGH, state=DriverState.DROWSY, perclos=0.25)
+    event = VehicleEvent(
+        type=EventType.HIGH_RISK_DETECTED,
+        priority=EventPriority.CRITICAL,
+        source="test",
+        message="High driver risk detected.",
+        data={
+            "risk": "HIGH",
+            "driver_state": "NORMAL",
+            "perclos": 0.9,
+            "eye_closure_seconds": 4.0,
+            "recent_yawns": 2,
+            "vehicle_speed_kmh": 80.0,
+        },
+        event_id="stale-optionals",
+    )
+
+    assert coordinator.on_event(event).reason == "TRIGGERED"
+    evidence = agent.trace[-1]["evidence"]
+    assert evidence == {"risk": "HIGH", "driver_state": "DROWSY", "perclos": 0.25}
+    prompt = llm.requests[-1].messages[-1]["content"]
+    assert '"perclos": 0.25' in prompt and '"driver_state": "DROWSY"' in prompt
+    for field in ("eye_closure_seconds", "recent_yawns", "vehicle_speed_kmh"):
+        assert field not in prompt
+
+
+def test_invalid_vehicle_and_unknown_driver_fields_are_omitted() -> None:
+    coordinator, agent, llm, context = setup_coordinator()
+    context.update_vehicle(speed_kmh=35.0)
+    context.mark_invalid_observation(
+        "vehicle", ObservationMetadata(1, 1, "test", None, False, 0.0)
+    )
+    context.update_driver(state=DriverState.UNKNOWN, perclos=None)
+    event = VehicleEvent(
+        type=EventType.HIGH_RISK_DETECTED,
+        priority=EventPriority.CRITICAL,
+        source="test",
+        message="High driver risk detected.",
+        data={
+            "risk": "HIGH",
+            "driver_state": "DROWSY",
+            "perclos": 0.8,
+            "vehicle_speed_kmh": 35.0,
+        },
+        event_id="invalid-unknown-optionals",
+    )
+
+    assert coordinator.on_event(event).reason == "TRIGGERED"
+    assert agent.trace[-1]["evidence"] == {"risk": "HIGH"}
+    prompt = llm.requests[-1].messages[-1]["content"]
+    for field in ("driver_state", "perclos", "vehicle_speed_kmh"):
+        assert field not in prompt
 
 
 def test_duplicate_and_cooldown_then_new_event_after_cooldown() -> None:

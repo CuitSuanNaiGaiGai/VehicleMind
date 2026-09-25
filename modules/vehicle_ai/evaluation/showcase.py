@@ -264,11 +264,35 @@ def _policy_panel(trial: TrialResult, grade: dict[str, Any]) -> str:
             f"（{rate}）</p><p class='note'>{_escape(explanation)}</p>"
         )
 
+    evidence_labels = {
+        "risk": "风险",
+        "driver_state": "驾驶状态",
+        "perclos": "闭眼比例",
+        "eye_closure_seconds": "持续闭眼秒数",
+        "recent_yawns": "近期哈欠次数",
+        "vehicle_speed_kmh": "车速（公里/小时）",
+    }
+
+    def policy_row(item: dict[str, Any]) -> str:
+        evidence = item.get("evidence") or {}
+        evidence_text = (
+            "，".join(
+                f"{label} {_escape(evidence[field])}"
+                for field, label in evidence_labels.items()
+                if field in evidence
+            )
+            or "未发送"
+        )
+        return (
+            "<div class='turn'><span>策略事件</span>"
+            f"<p>{_escape(item.get('reason', '未知原因'))} · "
+            f"质量 {_escape(item.get('context_quality') or '未知')} · "
+            f"建议 {_escape(item.get('model_result') or '未生成')}</p>"
+            f"<p>实际发送证据：{evidence_text}</p></div>"
+        )
+
     rows = "".join(
-        "<div class='turn'><span>策略事件</span>"
-        f"<p>{_escape(item.get('reason', '未知原因'))} · "
-        f"质量 {_escape(item.get('context_quality') or '未知')} · "
-        f"建议 {_escape(item.get('model_result') or '未生成')}</p></div>"
+        policy_row(item)
         for item in trial.policy_trace
         if item.get("reason") != "DISABLED"
     )

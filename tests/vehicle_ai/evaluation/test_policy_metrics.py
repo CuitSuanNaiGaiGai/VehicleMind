@@ -189,7 +189,11 @@ def test_three_policy_scenarios_replay_with_auditable_trace():
         assert grade["status"] != "fail", (case.id, grade, trial.tool_calls)
         if case.id == "A2-01":
             assert trial.policy_trace[0]["reason"] == "TRIGGERED"
+            assert trial.policy_trace[0]["evidence"]["risk"] == "HIGH"
+            assert "vehicle_speed_kmh" not in trial.policy_trace[0]["evidence"]
             assert trial.requests[0]["tools"] == []
+            page = render_showcase(case, trial, grade)
+            assert "实际发送证据" in page and "驾驶状态" in page
             assert grade["recommendation_appropriateness"]["denominator"] == 1
         elif case.id == "A2-02":
             assert trial.policy_trace[0]["reason"] == "INVALID_CONTEXT"

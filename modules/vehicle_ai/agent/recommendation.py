@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from threading import RLock
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from modules.vehicle_ai.agent.policy import RecommendationPolicy
 from modules.vehicle_ai.agent.vehicle_agent import VehicleAgent
@@ -23,6 +23,17 @@ class RecommendationTrigger:
     reason: str
     model_result: str | None = None
     error: str | None = None
+    evidence: dict[str, object] | None = None
+
+
+_EVIDENCE_FIELDS = (
+    ("driver", "risk", "risk"),
+    ("driver", "state", "driver_state"),
+    ("driver", "perclos", "perclos"),
+    ("driver", "eye_closure_seconds", "eye_closure_seconds"),
+    ("driver", "recent_yawns", "recent_yawns"),
+    ("vehicle", "speed_kmh", "vehicle_speed_kmh"),
+)
 
 
 class RecommendationCoordinator:
@@ -65,6 +76,7 @@ class RecommendationCoordinator:
         reason: str,
         result: str | None = None,
         error: str | None = None,
+        evidence: dict[str, object] | None = None,
     ) -> RecommendationTrigger:
         trigger = RecommendationTrigger(
             event_id=event.event_id,
@@ -73,6 +85,7 @@ class RecommendationCoordinator:
             reason=reason,
             model_result=result,
             error=error,
+            evidence=evidence,
         )
         with self._lock:
             self.trace.append(trigger)
@@ -101,7 +114,7 @@ class RecommendationCoordinator:
             self._remember_event(event.event_id)
 
         snapshot, qualities = self.context_manager.snapshot_with_quality(
-            (("driver", "risk"),)
+            tuple((domain, field) for domain, field, _ in _EVIDENCE_FIELDS)
         )
         quality = qualities[("driver", "risk")]
         if (
@@ -110,6 +123,13 @@ class RecommendationCoordinator:
             or event.data.get("risk") != RiskLevel.HIGH
         ):
             return self._record(event, quality, "INVALID_CONTEXT")
+
+        evidence: dict[str, object] = {}
+        for domain, field, event_field in _EVIDENCE_FIELDS:
+            if qualities[(domain, field)] is QualityStatus.KNOWN:
+                value = getattr(getattr(snapshot, domain), field)
+                evidence[event_field] = getattr(value, "value", value)
+        safe_event = replace(event, data=evidence)
 
         key = (event.type, str(event.data["risk"]))
         now = self.clock()
@@ -124,9 +144,15 @@ class RecommendationCoordinator:
             # rapid retry loop and concurrent events cannot both pass the gate.
             self._last_triggered[key] = now
         try:
-            result = self.agent.recommend_from_event(event)
+            result = self.agent.recommend_from_event(safe_event)
         except Exception as error:
             return self._record(
-                event, quality, "RECOMMENDATION_ERROR", error=str(error)
+                event,
+                quality,
+                "RECOMMENDATION_ERROR",
+                error=str(error),
+                evidence=evidence,
             )
-        return self._record(event, quality, "TRIGGERED", result=result)
+        return self._record(
+            event, quality, "TRIGGERED", result=result, evidence=evidence
+        )
