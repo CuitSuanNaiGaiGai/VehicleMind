@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import yaml
 
@@ -20,7 +21,9 @@ class ScriptedClient(BaseLLMClient):
 
 def call(name: str, arguments: dict | None = None) -> LLMResponse:
     arguments = arguments or {}
-    return LLMResponse(None, [LLMToolCall(name, name, arguments, "{}")])
+    return LLMResponse(
+        None, [LLMToolCall(name, name, arguments, json.dumps(arguments))]
+    )
 
 
 def load(case_id: str) -> EvaluationCase:

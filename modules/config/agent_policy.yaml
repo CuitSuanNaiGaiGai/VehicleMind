@@ -1,0 +1,23 @@
+schema_version: 2
+tool_risks:
+  get_vehicle_status: READ_ONLY
+  get_climate_status: READ_ONLY
+  get_media_status: READ_ONLY
+  search_nearby_rest_area: READ_ONLY
+  search_vehicle_knowledge: READ_ONLY
+  query_trip_events: READ_ONLY
+  play_music: REVERSIBLE_WRITE
+  pause_music: REVERSIBLE_WRITE
+  set_volume: REVERSIBLE_WRITE
+  set_temperature: REVERSIBLE_WRITE
+  set_ac: REVERSIBLE_WRITE
+  start_navigation: CONFIRMATION_REQUIRED
+  cancel_navigation: CONFIRMATION_REQUIRED
+  set_driver_window: CONFIRMATION_REQUIRED
+risk_policy:
+  high_driver_risk: HIGH
+  fatigue_warning_code: REST_REQUIRED
+  unknown_driver_warning_code: STATE_UNAVAILABLE
+recommendation:
+  enabled: true
+  cooldown_ms: 60000

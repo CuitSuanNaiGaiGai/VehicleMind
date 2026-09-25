@@ -58,9 +58,13 @@ class QwenClient(BaseLLMClient):
         self,
         messages,
         tools=None,
+        timeout_seconds=None,
     ) -> LLMResponse:
 
         kwargs = {
+            "timeout": min(self.timeout_seconds, timeout_seconds)
+            if timeout_seconds is not None
+            else self.timeout_seconds,
             "model": self.model,
             "messages": messages,
             "temperature": self.temperature,
@@ -116,3 +120,8 @@ class QwenClient(BaseLLMClient):
                 else None
             ),
         )
+
+    def chat_with_timeout(
+        self, messages, tools=None, *, timeout_seconds: float
+    ) -> LLMResponse:
+        return self.chat(messages, tools, timeout_seconds=timeout_seconds)

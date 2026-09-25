@@ -7,6 +7,13 @@ from modules.vehicle_ai.agent.action_state import (
 from modules.vehicle_ai.agent.vehicle_agent import (
     VehicleAgent,
 )
+from modules.vehicle_ai.agent.policy import (
+    ActionRisk,
+    AgentPolicy,
+    PolicyContext,
+    PolicyDecision,
+    PolicyResult,
+)
 
 
 __all__ = [
@@ -14,4 +21,9 @@ __all__ = [
     "PendingAction",
     "PendingActionStore",
     "VehicleAgent",
+    "ActionRisk",
+    "AgentPolicy",
+    "PolicyContext",
+    "PolicyDecision",
+    "PolicyResult",
 ]

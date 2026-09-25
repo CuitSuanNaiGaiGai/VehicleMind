@@ -8,6 +8,7 @@ import statistics
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -51,6 +52,29 @@ def load_frozen_cases(root: Path) -> tuple[EvaluationCase, ...]:
     return tuple(cases)
 
 
+def load_policy_cases(root: Path) -> tuple[EvaluationCase, ...]:
+    """Load the separate, hash-checked A2 policy set."""
+    manifest = yaml.safe_load((root / "manifest.yaml").read_text(encoding="utf-8"))
+    if manifest.get("schema_version") != 1 or len(manifest.get("cases", [])) != 3:
+        raise ValueError("expected a complete three-case policy manifest")
+    cases: list[EvaluationCase] = []
+    for item in manifest["cases"]:
+        case_id = item["id"]
+        case = EvaluationCase.from_mapping(
+            yaml.safe_load(
+                (root / "cases" / f"{case_id}.yaml").read_text(encoding="utf-8")
+            )
+        )
+        if case.id != case_id or case.sha256 != item["case_sha256"]:
+            raise ValueError(f"policy case hash/identity mismatch: {case_id}")
+        if case.policy_expectations is None:
+            raise ValueError(f"missing policy expectations: {case_id}")
+        cases.append(case)
+    if len({case.id for case in cases}) != 3:
+        raise ValueError("duplicate policy case")
+    return tuple(cases)
+
+
 def _trial_record(
     case: EvaluationCase,
     trial: TrialResult,
@@ -58,7 +82,7 @@ def _trial_record(
     output: Path,
     trace_sha256: str,
 ) -> dict:
-    return {
+    record = {
         "case_id": case.id,
         "case_sha256": case.sha256,
         "split": case.split,
@@ -76,9 +100,23 @@ def _trial_record(
         "latency_ms": trial.latency_ms,
         "usage": _total_usage(trial.model_responses),
     }
+    if case.policy_expectations is not None:
+        record.update(
+            {
+                "recommendation_appropriateness": grade[
+                    "recommendation_appropriateness"
+                ],
+                "confirmation_compliance": grade["confirmation_compliance"],
+                "unauthorized_sensitive_executions": grade[
+                    "unauthorized_sensitive_executions"
+                ],
+                "policy_schedule_match": grade["policy_schedule_match"],
+            }
+        )
+    return record
 
 
-def _total_usage(responses: list[dict]) -> dict[str, int | None]:
+def _total_usage(responses: Sequence[dict[str, Any]]) -> dict[str, int | None]:
     def total(field: str) -> int | None:
         provider_field = {
             "prompt_tokens": "input_tokens",
@@ -92,7 +130,7 @@ def _total_usage(responses: list[dict]) -> dict[str, int | None]:
         ]
         if not values or any(value is None for value in values):
             return None
-        return sum(values)
+        return sum(int(value) for value in values if value is not None)
 
     return {
         "prompt_tokens": total("prompt_tokens"),
@@ -122,12 +160,12 @@ def reconcile_usage_from_traces(run_root: Path) -> dict:
     return run
 
 
-def _summary(result: dict) -> str:
+def _summary(result: dict[str, Any]) -> str:
     trials = result["trials"]
     total = len(trials)
-    successes = sum(item["tool_selection"] for item in trials)
-    arguments = sum(item["argument_match"] for item in trials)
-    states = sum(item["final_state"] for item in trials)
+    successes = sum(bool(item["tool_selection"]) for item in trials)
+    arguments = sum(bool(item["argument_match"]) for item in trials)
+    states = sum(bool(item["final_state"]) for item in trials)
     errors = sum(item["error"] is not None for item in trials)
     latencies = [item["latency_ms"] for item in trials]
     p50 = statistics.median(latencies) if latencies else 0.0
@@ -136,9 +174,28 @@ def _summary(result: dict) -> str:
     def usage_total(field: str) -> str:
         values = [item["usage"][field] for item in trials]
         return (
-            "未完整报告" if any(value is None for value in values) else str(sum(values))
+            "未完整报告"
+            if any(value is None for value in values)
+            else str(sum(int(value) for value in values if value is not None))
         )
 
+    policy_lines = ""
+    if any("recommendation_appropriateness" in item for item in trials):
+        policy_trials = [
+            item for item in trials if "recommendation_appropriateness" in item
+        ]
+
+        def aggregate(key: str) -> str:
+            numerator = sum(item[key]["numerator"] for item in policy_trials)
+            denominator = sum(item[key]["denominator"] for item in policy_trials)
+            return f"{numerator}/{denominator}（{'N/A' if denominator == 0 else f'{numerator / denominator:.1%}'}）"
+
+        policy_lines = (
+            f"- Recommendation Appropriateness（建议适配率）：{aggregate('recommendation_appropriateness')}\n"
+            f"- Confirmation Compliance（确认合规率）：{aggregate('confirmation_compliance')}\n"
+            f"- 未经确认的敏感动作执行数：{sum(item['unauthorized_sensitive_executions'] for item in policy_trials)}\n"
+            f"- 策略调度序列匹配：{sum(bool(item['policy_schedule_match']) for item in policy_trials)}/{len(policy_trials)}\n"
+        )
     return (
         "# 在线 Agent 内部评测运行摘要\n\n"
         f"- 模型：{result['provider']} / {result['model']}\n"
@@ -150,8 +207,9 @@ def _summary(result: dict) -> str:
         f"- 延迟 p50/p95：{p50:.1f}/{p95:.1f} ms\n"
         f"- 模型请求数：{sum(item['request_count'] for item in trials)}\n"
         f"- 输入 token：{usage_total('prompt_tokens')}；输出 token：{usage_total('completion_tokens')}\n"
-        "- 回答语义仍待逐条复核；本摘要不将 needs_review 计为成功。\n"
-        "- 数据为 Codex AI 自审内部基准，不是独立人工标注或公开 Benchmark。\n"
+        + policy_lines
+        + "- 回答语义仍待逐条复核；本摘要不将 needs_review 计为成功。\n"
+        + "- 数据为 Codex AI 自审内部基准，不是独立人工标注或公开 Benchmark。\n"
     )
 
 
@@ -164,11 +222,14 @@ def run_batch(
     repetitions: int,
     output: Path,
     max_tool_rounds: int = 5,
+    turn_timeout_seconds: float = 90.0,
+    max_tool_calls: int = 10,
+    max_task_trace_events: int = 200,
 ) -> dict:
     if repetitions < 1 or not cases:
         raise ValueError("batch requires cases and positive repetitions")
     output.mkdir(parents=True, exist_ok=False)
-    result = {
+    result: dict[str, Any] = {
         "schema_version": 1,
         "provider": provider,
         "model": model,
@@ -195,6 +256,9 @@ def run_batch(
                 model=model,
                 trial_index=trial_index,
                 max_tool_rounds=max_tool_rounds,
+                turn_timeout_seconds=turn_timeout_seconds,
+                max_tool_calls=max_tool_calls,
+                max_task_trace_events=max_task_trace_events,
             )
             grade = grade_trial(case, trial)
             relative = Path(case.id) / f"trial-{trial_index}"

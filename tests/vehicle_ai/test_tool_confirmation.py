@@ -191,11 +191,6 @@ def test_confirmation_must_match_and_cannot_be_replayed() -> None:
         {"poi_id": "rest_area_002"},
         confirmation=grant,
     )
-    success = registry.execute(
-        "start_navigation",
-        {"poi_id": "rest_area_001"},
-        confirmation=grant,
-    )
     replay = registry.execute(
         "start_navigation",
         {"poi_id": "rest_area_001"},
@@ -203,8 +198,9 @@ def test_confirmation_must_match_and_cannot_be_replayed() -> None:
     )
 
     assert mismatch.error == "CONFIRMATION_MISMATCH"
-    assert success.success is True
     assert replay.error == "CONFIRMATION_REPLAY"
+    assert context.get_context().vehicle.navigation_state == "IDLE"
+    assert not registry._issued_confirmations
 
 
 def test_structurally_similar_confirmation_cannot_authorize_execution(

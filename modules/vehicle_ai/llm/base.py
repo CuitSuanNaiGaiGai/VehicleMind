@@ -43,6 +43,12 @@ class BaseLLMClient(ABC):
     Common interface for Qwen / GLM.
     """
 
+    def chat_with_timeout(
+        self, messages, tools=None, *, timeout_seconds: float
+    ) -> LLMResponse:
+        """Offline clients run synchronously; network clients override timeout handling."""
+        return self.chat(messages, tools)
+
     @abstractmethod
     def chat(
         self,

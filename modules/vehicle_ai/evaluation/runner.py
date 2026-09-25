@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from modules.vehicle_ai.context import GearState, NavigationState
@@ -11,6 +11,7 @@ from modules.vehicle_ai.evaluation.models import EvaluationCase
 from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse
 from modules.vehicle_ai.replay.trace import plain_value
 from modules.vehicle_ai.runtime import VehicleMindRuntime
+from modules.vehicle_ai.events import EventPriority, EventType, VehicleEvent
 from modules.observation import ObservationMetadata
 from modules.vehicle_ai.tools.base import ToolResult
 
@@ -35,6 +36,8 @@ class TrialResult:
     requests: tuple[dict[str, Any], ...]
     settings: dict[str, Any]
     interaction_events: tuple[dict[str, Any], ...]
+    agent_trace: tuple[dict[str, Any], ...] = ()
+    policy_trace: tuple[dict[str, Any], ...] = ()
 
 
 class RecordingClient(BaseLLMClient):
@@ -45,19 +48,35 @@ class RecordingClient(BaseLLMClient):
         self.latencies_ms: list[float] = []
 
     def chat(self, messages, tools=None) -> LLMResponse:
-        self.requests.append(
-            {
-                "at_ms": int(time.time() * 1000),
-                "messages": plain_value(messages),
-                "tools": plain_value(tools or []),
-            }
-        )
+        return self._chat(messages, tools)
+
+    def chat_with_timeout(
+        self, messages, tools=None, *, timeout_seconds: float
+    ) -> LLMResponse:
+        return self._chat(messages, tools, timeout_seconds)
+
+    def _chat(self, messages, tools=None, timeout_seconds=None) -> LLMResponse:
+        request = {
+            "at_ms": int(time.time() * 1000),
+            "messages": plain_value(messages),
+            "tools": plain_value(tools or []),
+            "kind": "user_turn" if tools else "event_advice",
+            "response_index": None,
+        }
+        self.requests.append(request)
         started = time.perf_counter()
         try:
-            response = self.inner.chat(messages, tools)
+            response = (
+                self.inner.chat(messages, tools)
+                if timeout_seconds is None
+                else self.inner.chat_with_timeout(
+                    messages, tools, timeout_seconds=timeout_seconds
+                )
+            )
         finally:
             self.latencies_ms.append((time.perf_counter() - started) * 1000)
         self.responses.append(response)
+        request["response_index"] = len(self.responses) - 1
         return response
 
 
@@ -69,6 +88,9 @@ def run_trial(
     model: str,
     trial_index: int,
     max_tool_rounds: int = 5,
+    turn_timeout_seconds: float = 90.0,
+    max_tool_calls: int = 10,
+    max_task_trace_events: int = 200,
 ) -> TrialResult:
     """Run one isolated trial; only the supplied client may access a provider."""
     recording = RecordingClient(client)
@@ -78,6 +100,10 @@ def run_trial(
         max_tool_rounds=max_tool_rounds,
         quality_clock=lambda: logical_time[0],
         action_clock=lambda: logical_time[0],
+        turn_timeout_seconds=turn_timeout_seconds,
+        max_tool_calls=max_tool_calls,
+        max_task_trace_events=max_task_trace_events,
+        enable_event_recommendations=case.policy_expectations is not None,
     )
     schema_hash = hashlib.sha256(
         json.dumps(runtime.tools.llm_schemas(), sort_keys=True).encode()
@@ -87,11 +113,15 @@ def run_trial(
     error = None
     started = time.perf_counter()
     try:
-        for step in case.steps:
+        for step_index, step in enumerate(case.steps):
             if "at_ms" in step:
                 logical_time[0] = step["at_ms"] / 1000
             if "cabin" in step:
                 runtime.update_cabin(at_ms=step.get("at_ms"), **step["cabin"])
+                if case.policy_expectations is not None:
+                    runtime.wait_for_recommendations(
+                        timeout_seconds=turn_timeout_seconds
+                    )
             if "road" in step:
                 runtime.update_driving(at_ms=step.get("at_ms"), **step["road"])
             if "road_quality" in step:
@@ -105,6 +135,34 @@ def run_trial(
                         processing_ms=0,
                     ),
                     at_ms=step.get("at_ms"),
+                )
+                if case.policy_expectations is not None:
+                    runtime.wait_for_recommendations(
+                        timeout_seconds=turn_timeout_seconds
+                    )
+            if "cabin_quality" in step:
+                runtime.update_cabin(
+                    metadata=ObservationMetadata(
+                        timestamp_ms=step.get("at_ms", 0),
+                        sequence=0,
+                        source="agent_eval",
+                        confidence=None,
+                        valid=False,
+                        processing_ms=0,
+                    ),
+                    at_ms=step.get("at_ms"),
+                )
+            if step.get("policy_probe") == "high_driver_risk":
+                runtime.recommendation_coordinator.on_event(
+                    VehicleEvent(
+                        type=EventType.HIGH_RISK_DETECTED,
+                        priority=EventPriority.CRITICAL,
+                        source="agent_eval_policy_probe",
+                        message="Policy probe after invalid driver observation.",
+                        data={"risk": "HIGH"},
+                        timestamp=logical_time[0],
+                        event_id=f"{case.id}-policy-probe-{step_index}",
+                    )
                 )
             if "tool_failure" in step:
                 failure = step["tool_failure"]
@@ -170,6 +228,21 @@ def run_trial(
                     )
         if any(not reply.strip() for reply in replies):
             error = "EmptyResponse"
+        infrastructure_errors = {
+            "MODEL_TIMEOUT",
+            "MODEL_ERROR",
+            "EMPTY_RESPONSE",
+            "TIME_BUDGET",
+            "TOOL_BUDGET",
+            "ROUND_LIMIT",
+            "REPEATED_CALL",
+            "INVALID_ARGUMENTS",
+        }
+        for event in runtime.agent.trace:
+            reason = event.get("task", {}).get("reason")
+            if reason in infrastructure_errors:
+                error = reason
+                break
     except Exception as exc:
         error = type(exc).__name__
     elapsed = (time.perf_counter() - started) * 1000
@@ -180,6 +253,8 @@ def run_trial(
             "success": item.success,
             "error": item.error,
             "confirmed": item.confirmed,
+            "requires_confirmation": item.requires_confirmation,
+            "policy": plain_value(item.policy),
             "result_data": plain_value(item.result_data),
         }
         for item in runtime.tools.execution_history()
@@ -213,15 +288,24 @@ def run_trial(
         request_latencies_ms=tuple(recording.latencies_ms),
         requested_tools=tuple(
             {"name": call.name, "arguments": plain_value(call.arguments)}
-            for response in recording.responses
-            for call in response.tool_calls
+            for request in recording.requests
+            if request["kind"] == "user_turn" and request["response_index"] is not None
+            for call in recording.responses[request["response_index"]].tool_calls
         ),
         requests=tuple(recording.requests),
         settings={
             "temperature": getattr(client, "temperature", None),
             "timeout_seconds": getattr(client, "timeout_seconds", None),
             "max_tool_rounds": max_tool_rounds,
+            "turn_timeout_seconds": turn_timeout_seconds,
+            "max_tool_calls": max_tool_calls,
+            "max_task_trace_events": max_task_trace_events,
             "client_max_retries": 0,
         },
         interaction_events=tuple(interaction_events),
+        agent_trace=tuple(plain_value(runtime.agent.trace)),
+        policy_trace=tuple(
+            plain_value(asdict(item))
+            for item in runtime.recommendation_coordinator.trace
+        ),
     )

@@ -27,6 +27,7 @@ class ToolResult:
     data: dict[str, Any] = field(default_factory=dict)
 
     error: str | None = None
+    policy: dict[str, Any] | None = None
 
     def to_dict(
         self,
@@ -37,6 +38,7 @@ class ToolResult:
             "message": self.message,
             "data": self.data,
             "error": self.error,
+            "policy": self.policy,
         }
 
 
@@ -51,6 +53,8 @@ class ToolExecutionRecord:
     success: bool
     error: str | None
     result_data: dict[str, Any] = field(default_factory=dict)
+    user_intent: str = ""
+    policy: dict[str, Any] | None = None
 
 
 # ============================================================
@@ -78,6 +82,7 @@ class ToolDefinition:
     category: str = "general"
 
     requires_confirmation: bool = False
+    read_only: bool = False
 
     def llm_schema(
         self,

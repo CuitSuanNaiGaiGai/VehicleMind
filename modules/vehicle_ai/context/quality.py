@@ -35,6 +35,9 @@ class ObservationQualityTracker:
         self._field_receipts: dict[tuple[str, str], Receipt] = {}
         self._clock = clock
 
+    def now(self) -> float:
+        return self._clock()
+
     def record(
         self,
         domain: str,
@@ -92,3 +95,16 @@ class ObservationQualityTracker:
         if value is None or value == "UNKNOWN":
             return QualityStatus.UNKNOWN
         return QualityStatus.KNOWN
+
+    def field_evidence(self, domain: str, field: str) -> dict[str, Any]:
+        """Return provenance for this field, not the domain's latest update."""
+        receipt = self._field_receipts.get((domain, field))
+        metadata = receipt.metadata if receipt else None
+        return {
+            "source": metadata.source if metadata else None,
+            "timestamp_ms": metadata.timestamp_ms if metadata else None,
+            "confidence": metadata.confidence if metadata else None,
+            "age_seconds": (
+                max(0.0, self._clock() - receipt.received_at) if receipt else None
+            ),
+        }

@@ -37,6 +37,14 @@
 
 命令会产生真实 API 调用和费用；开发集预检可加 `--split dev --repetitions 1`。每个 trial 保存完整 trace 与机械评分。`needs_review` 表示回答语义尚未复核，不能直接算作 Task Success。
 
+独立 A2 策略集位于 `policy/`，其三条场景和哈希与上述 40 条冻结集分开。可用同一批量入口运行：
+
+```bash
+.venv/bin/python -m modules.vehicle_ai.evaluation.batch_cli --provider qwen --policy scenarios/agent_eval/policy --repetitions 1
+```
+
+报告分别给出 Recommendation Appropriateness（建议适配率）、Confirmation Compliance（确认合规率）、未经确认的敏感执行数和策略调度序列。零分母显示 N/A；事件建议的无工具请求与用户回合分开记录。A2-02 使用观测失效后的确定性策略探针，详见 [`policy/README.md`](policy/README.md)。
+
 运行完成后，可用在线模型辅助逐条语义审核（也会产生 API 费用）：
 
 ```bash

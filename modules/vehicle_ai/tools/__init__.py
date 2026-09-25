@@ -37,18 +37,45 @@ from modules.vehicle_ai.tools.vehicle import (
 
 def build_default_tool_registry(
     context_manager: ContextManager,
+    *,
+    extra_tools: tuple[ToolDefinition, ...] = (),
 ) -> ToolRegistry:
 
-    registry = ToolRegistry()
+    from modules.vehicle_ai.agent.policy import AgentPolicy, PolicyContext
+
+    def policy_context(user_intent: str) -> PolicyContext:
+        snapshot, qualities = context_manager.snapshot_with_quality(
+            (("driver", "risk"), ("vehicle", "speed_kmh"))
+        )
+        return PolicyContext(
+            driver_risk=snapshot.driver.risk,
+            driver_quality=qualities[("driver", "risk")],
+            vehicle_moving=(
+                qualities[("vehicle", "speed_kmh")] == "KNOWN"
+                and snapshot.vehicle.speed_kmh > 0
+            ),
+            user_intent=user_intent,
+        )
+
+    registry = ToolRegistry(AgentPolicy.from_yaml(), policy_context)
 
     all_tools = (
         build_climate_tools(context_manager)
         + build_media_tools(context_manager)
         + build_navigation_tools(context_manager)
         + build_vehicle_tools(context_manager)
+        + list(extra_tools)
     )
 
     for tool in all_tools:
+        tool.read_only = tool.name in {
+            "get_vehicle_status",
+            "get_climate_status",
+            "get_media_status",
+            "search_nearby_rest_area",
+            "search_vehicle_knowledge",
+            "query_trip_events",
+        }
         registry.register(tool)
 
     return registry
