@@ -4,6 +4,7 @@ tool_risks:
   get_climate_status: READ_ONLY
   get_media_status: READ_ONLY
   search_nearby_rest_area: READ_ONLY
+  search_vehicle_knowledge: READ_ONLY
   play_music: REVERSIBLE_WRITE
   pause_music: REVERSIBLE_WRITE
   set_volume: REVERSIBLE_WRITE

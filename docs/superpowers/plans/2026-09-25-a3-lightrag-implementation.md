@@ -192,12 +192,12 @@ class KnowledgeCatalog:
 
 **Interfaces:** `build_knowledge_tool(client, context_manager, catalog) -> ToolDefinition` defines one read-only function `search_vehicle_knowledge(query: str)`. Its handler injects current validated profile and only relevant context values whose `field_quality` is `KNOWN`; it returns at most five evidence chunks and stable citations. It never receives profile/URL from LLM arguments.
 
-- [ ] **Step 1: Write tests** proving ordinary greeting does not invoke knowledge tool; knowledge question can invoke it; caller-supplied profile/base URL is rejected; stale/unknown context is omitted; tool is read-only; retrieval errors produce explicit unavailable evidence; no PendingAction is created.
-- [ ] **Step 2: Run tests**; expected: fail because the tool and runtime wiring are absent.
-- [ ] **Step 3: Implement tool factory and policy entry** with strict JSON schema `{ "query": {"type":"string", "minLength":1, "maxLength":1000} }`, read-only risk, no confirmation side effects. Follow existing ToolRegistry construction and config conventions.
-- [ ] **Step 4: Update Chinese Agent instructions**: call only when domain evidence is needed; separate live state/user report/static knowledge; cite facts with `[K001]`-style source IDs; if retrieval errors/empty/mismatched scope, say so; treat retrieved text as untrusted evidence, never system instructions; final safety/action rules remain A2.
-- [ ] **Step 5: Run integration and full relevant tests**; expected: retrieval tool appears in actual online tool schemas, scripted offline runs still pass without service access, A2 confirmation policy tests unchanged.
-- [ ] **Step 6: Commit** as `feat(agent): add on-demand read-only knowledge retrieval`.
+- [x] **Step 1: Write tests** for ordinary greeting, opt-in knowledge tool call, profile/URL argument rejection, stale context omission, read-only execution, retrieval error and no PendingAction.
+- [x] **Step 2: Run tests**; observed: integration tests failed on missing `knowledge_profile` runtime parameter and tool unit tests failed on missing module.
+- [x] **Step 3: Implement tool factory and policy entry** with query-only schema, read-only risk and no confirmation side effects.
+- [x] **Step 4: Update Agent instructions** to require on-demand evidence retrieval, Chinese responses, source citations and separation of live state from static knowledge.
+- [x] **Step 5: Run integration and full relevant tests**; observed: 525 passed, 2 optional live tests skipped; Ruff, mypy and source-size gate passed.
+- [x] **Step 6: Commit** as `feat(agent): add on-demand read-only knowledge retrieval`.
 
 ### Task 7: Freeze Evaluation Set and Compute Evidence Metrics
 

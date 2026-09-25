@@ -37,6 +37,8 @@ from modules.vehicle_ai.tools.vehicle import (
 
 def build_default_tool_registry(
     context_manager: ContextManager,
+    *,
+    extra_tools: tuple[ToolDefinition, ...] = (),
 ) -> ToolRegistry:
 
     from modules.vehicle_ai.agent.policy import AgentPolicy, PolicyContext
@@ -62,6 +64,7 @@ def build_default_tool_registry(
         + build_media_tools(context_manager)
         + build_navigation_tools(context_manager)
         + build_vehicle_tools(context_manager)
+        + list(extra_tools)
     )
 
     for tool in all_tools:
@@ -70,6 +73,7 @@ def build_default_tool_registry(
             "get_climate_status",
             "get_media_status",
             "search_nearby_rest_area",
+            "search_vehicle_knowledge",
         }
         registry.register(tool)
 

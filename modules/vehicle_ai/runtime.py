@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from collections.abc import Callable
+from pathlib import Path
 from threading import Lock
 
 from modules.vehicle_ai.agent import (
@@ -30,8 +31,13 @@ from modules.vehicle_ai.integration import (
 from modules.vehicle_ai.llm import (
     BaseLLMClient,
 )
+from modules.vehicle_ai.knowledge.catalog import KnowledgeCatalog
+from modules.vehicle_ai.knowledge.lightrag_client import LightRAGClient
+from modules.vehicle_ai.knowledge.profile_router import ProfileRouter
+from modules.vehicle_ai.knowledge.tool import KnowledgeClient, build_knowledge_tool
 
 from modules.vehicle_ai.tools import (
+    ToolDefinition,
     ToolRegistry,
     build_default_tool_registry,
 )
@@ -64,6 +70,8 @@ class VehicleMindRuntime:
         max_tool_calls: int = 10,
         max_task_trace_events: int = 200,
         enable_event_recommendations: bool = True,
+        knowledge_profile: str | None = None,
+        knowledge_client: KnowledgeClient | None = None,
     ):
         # ====================================================
         # Shared context
@@ -91,7 +99,27 @@ class VehicleMindRuntime:
         # Vehicle tools
         # ====================================================
 
-        self.tools: ToolRegistry = build_default_tool_registry(self.context_manager)
+        knowledge_tools: tuple[ToolDefinition, ...] = ()
+        if knowledge_profile is not None:
+            router = ProfileRouter()
+            effective_profile, _ = router.resolve(knowledge_profile)
+            if knowledge_client is None:
+                catalog_path = (
+                    Path(__file__).resolve().parents[2]
+                    / "config"
+                    / "knowledge"
+                    / "source_catalog.yaml"
+                )
+                sources = KnowledgeCatalog().load(catalog_path)
+                knowledge_client = LightRAGClient(router, sources)
+            knowledge_tools = (
+                build_knowledge_tool(
+                    knowledge_client, self.context_manager, effective_profile
+                ),
+            )
+        self.tools: ToolRegistry = build_default_tool_registry(
+            self.context_manager, extra_tools=knowledge_tools
+        )
 
         # ====================================================
         # Vehicle Agent
