@@ -35,6 +35,9 @@ class ObservationQualityTracker:
         self._field_receipts: dict[tuple[str, str], Receipt] = {}
         self._clock = clock
 
+    def now(self) -> float:
+        return self._clock()
+
     def record(
         self,
         domain: str,

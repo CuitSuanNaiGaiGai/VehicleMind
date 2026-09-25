@@ -29,11 +29,11 @@
 
 **Interfaces:** `ActionRisk(StrEnum)` 为 `READ_ONLY`、`REVERSIBLE_WRITE`、`CONFIRMATION_REQUIRED`；`PolicyDecision(StrEnum)` 为 `ALLOW`、`REQUIRE_CONFIRMATION`、`DENY`；`PolicyContext` 保存 `driver_risk`、`driver_quality`、`vehicle_moving`、`user_intent`；`PolicyResult` 保存 decision、reason、risk、warnings。`AgentPolicy.evaluate(tool, context) -> PolicyResult` 是无副作用决策入口，`AgentPolicy.from_yaml(path)` 加载工具风险和风险策略。
 
-- [ ] 写参数化测试：只读/可逆/需确认三类动作分别得出正确结果；缺失/过期状态不伪造风险；高风险音乐返回允许但带疲劳警告；导航保持需确认；错误配置拒绝加载。
-- [ ] 运行 `pytest tests/vehicle_ai/test_agent_policy.py -q`，确认 API 不存在或断言失败。
-- [ ] 实现 Enum/dataclass、严格 YAML 字段校验、风险策略和工具定义映射。
-- [ ] 运行该测试及 Ruff/mypy。
-- [ ] 提交 `feat(agent): add state-aware policy model`。
+- [x] 写参数化测试：只读/可逆/需确认三类动作分别得出正确结果；缺失/过期状态不伪造风险；高风险音乐返回允许但带疲劳警告；导航保持需确认；错误配置拒绝加载；复审补充工具标志双向错配及警示配置注入测试。
+- [x] 运行 `pytest tests/vehicle_ai/test_agent_policy.py -q`，确认 API 不存在或断言失败。
+- [x] 实现 Enum/dataclass、严格 YAML 字段校验、风险策略和工具定义映射；警示文案改为固定安全代码。
+- [x] 运行该测试及 Ruff/mypy。
+- [x] 提交 `feat(agent): add state-aware policy model` 与复审修复 `fix(agent): fail closed on policy metadata mismatches`；Task 1 复审通过。
 
 ### Task 2: ToolRegistry 门禁与用户意图策略证据
 
@@ -48,11 +48,13 @@
 
 **Interfaces:** Runtime 构建 Registry 时注入策略和当前 `ContextManager` 快照提供器；`ToolRegistry.execute(name, arguments, *, confirmation=None, user_intent="")` 在 handler 前调用策略并写入执行记录。`DENY` 返回失败且不调用 handler；`REQUIRE_CONFIRMATION` 只能经现有 controller 的有效 grant 执行；每次决策均记录结果/原因。Agent 在每轮请求设置当前用户意图；`ActionConfirmationController.stage(..., user_intent="")` 把原始意图写入待确认动作 metadata；确认时用该意图在 handler 执行前重新评估当前状态。
 
-- [ ] 写集成测试：拒绝策略不运行 handler；高风险播放音乐仍可运行但产出 warning；敏感工具无授权不执行，有效 grant 仅可消费一次；状态变化后确认时重新评估；策略判定进入 Agent trace。
-- [ ] 运行新测试确认失败。
-- [ ] 实现 registry 注入、handler 前置门禁和策略记录；不改变 LLM provider function schema。
-- [ ] 运行策略/Registry/确认相关测试、Ruff/mypy。
-- [ ] 提交 `feat(agent): enforce policy at tool execution boundary`。
+- [x] 写集成测试：拒绝策略不运行 handler；高风险播放音乐仍可运行但产出 warning；敏感工具无授权不执行，有效 grant 仅可消费一次；状态变化后确认时重新评估；策略判定进入 Agent trace。
+- [x] 运行新测试确认失败。
+- [x] 实现 registry 注入、handler 前置门禁和策略记录；不改变 LLM provider function schema。
+- [x] 实现高风险音乐固定安全回复；保留后续暂停、失败与待确认状态，不让模型矛盾表述覆盖真实执行状态。
+- [x] 原子读取策略所需上下文与字段质量；任何拒绝分支都回收提交的有效授权。
+- [x] 运行策略/Registry/确认相关测试、Ruff/mypy。
+- [x] 提交 `feat(agent): enforce policy at tool execution boundary` 及评审修复；更新记录待复审确认。
 
 ### Task 3: 高风险事件建议与冷却去重
 

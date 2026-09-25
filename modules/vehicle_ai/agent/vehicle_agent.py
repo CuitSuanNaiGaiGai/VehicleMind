@@ -68,6 +68,7 @@ class VehicleAgent:
         self.tool_registry = tool_registry
         self.current_user_intent = ""
         self._turn_music_warning = ""
+        self._turn_music_paused = False
 
         self.max_tool_rounds = max_tool_rounds
         self.turn_timeout_seconds = turn_timeout_seconds
@@ -315,7 +316,21 @@ class VehicleAgent:
 
     def _record_final_response(self, user_text: str, answer: str) -> str:
         if self._turn_music_warning:
-            answer = f"已开始播放音乐。音乐不能消除疲劳。{self._turn_music_warning}"
+            music_status = (
+                "本轮音乐播放成功，随后已暂停。"
+                if self._turn_music_paused
+                else "本轮音乐播放成功。"
+            )
+            if self.task.status is TaskStatus.AWAITING_CONFIRMATION:
+                outcome = "待确认操作尚未执行，待确认后才会执行。"
+            elif self.task.status is TaskStatus.COMPLETED:
+                outcome = ""
+            else:
+                reason = self.task.reason or self.task.status.value
+                outcome = f"本轮任务未完成（{reason}）。"
+            answer = (
+                f"{music_status}{outcome}音乐不能消除疲劳。{self._turn_music_warning}"
+            )
         self.history.extend(
             [
                 {"role": "user", "content": user_text},
@@ -338,6 +353,7 @@ class VehicleAgent:
             return ""
         self.current_user_intent = user_text
         self._turn_music_warning = ""
+        self._turn_music_paused = False
 
         pending = self.pending_actions.get()
         expired = self.task.pending_action is not None and pending is None
@@ -440,3 +456,4 @@ class VehicleAgent:
         self.trace_sequence = 0
         self.current_user_intent = ""
         self._turn_music_warning = ""
+        self._turn_music_paused = False

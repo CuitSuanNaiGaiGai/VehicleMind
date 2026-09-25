@@ -162,6 +162,29 @@ class ContextManager:
         with self._lock:
             return deepcopy(self._context)
 
+    def snapshot_with_quality(
+        self, fields: tuple[tuple[str, str], ...]
+    ) -> tuple[VehicleContext, dict[tuple[str, str], QualityStatus]]:
+        """Capture values and field quality under one lock and clock reading."""
+        for domain, field in fields:
+            if domain not in CONTEXT_FIELD_CONTRACTS:
+                raise ValueError(f"unknown context domain: {domain}")
+            if field not in CONTEXT_FIELD_CONTRACTS[domain]:
+                raise ValueError(f"unknown context field: {domain}.{field}")
+        with self._lock:
+            now = self._quality.now()
+            snapshot = deepcopy(self._context)
+            qualities = {
+                (domain, field): self._quality.field_status(
+                    domain,
+                    field,
+                    getattr(getattr(snapshot, domain), field),
+                    now=now,
+                )
+                for domain, field in fields
+            }
+            return snapshot, qualities
+
     def get_agent_context(
         self,
     ) -> dict[str, Any]:

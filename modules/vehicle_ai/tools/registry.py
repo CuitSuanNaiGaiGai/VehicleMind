@@ -167,6 +167,14 @@ class ToolRegistry:
     def execution_history(self) -> tuple[ToolExecutionRecord, ...]:
         return tuple(deepcopy(self._execution_history))
 
+    def _retire_live_confirmation(self, confirmation: object | None) -> None:
+        if (
+            isinstance(confirmation, _ConfirmationGrant)
+            and self._issued_confirmations.get(confirmation.action_id) is confirmation
+        ):
+            self._issued_confirmations.pop(confirmation.action_id)
+            self._used_confirmation_ids.add(confirmation.action_id)
+
     def _record(
         self,
         *,
@@ -211,6 +219,7 @@ class ToolRegistry:
             arguments = {}
 
         if name not in self._tools:
+            self._retire_live_confirmation(confirmation)
             return self._record(
                 name=name,
                 arguments=arguments,
@@ -250,13 +259,7 @@ class ToolRegistry:
         record = partial(self._record, user_intent=user_intent, policy=policy)
 
         if policy["decision"] == "DENY":
-            if (
-                isinstance(confirmation, _ConfirmationGrant)
-                and self._issued_confirmations.get(confirmation.action_id)
-                is confirmation
-            ):
-                self._issued_confirmations.pop(confirmation.action_id)
-                self._used_confirmation_ids.add(confirmation.action_id)
+            self._retire_live_confirmation(confirmation)
             return record(
                 name=name,
                 arguments=arguments,
@@ -325,6 +328,7 @@ class ToolRegistry:
                 confirmation.tool_name != name
                 or dict(confirmation.arguments) != arguments
             ):
+                self._retire_live_confirmation(confirmation)
                 return record(
                     name=name,
                     arguments=arguments,

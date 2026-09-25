@@ -42,12 +42,14 @@ def build_default_tool_registry(
     from modules.vehicle_ai.agent.policy import AgentPolicy, PolicyContext
 
     def policy_context(user_intent: str) -> PolicyContext:
-        snapshot = context_manager.get_context()
+        snapshot, qualities = context_manager.snapshot_with_quality(
+            (("driver", "risk"), ("vehicle", "speed_kmh"))
+        )
         return PolicyContext(
             driver_risk=snapshot.driver.risk,
-            driver_quality=context_manager.field_quality("driver", "risk"),
+            driver_quality=qualities[("driver", "risk")],
             vehicle_moving=(
-                context_manager.field_quality("vehicle", "speed_kmh") == "KNOWN"
+                qualities[("vehicle", "speed_kmh")] == "KNOWN"
                 and snapshot.vehicle.speed_kmh > 0
             ),
             user_intent=user_intent,
