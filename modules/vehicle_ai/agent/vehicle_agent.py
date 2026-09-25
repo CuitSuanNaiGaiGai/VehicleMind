@@ -35,6 +35,7 @@ from modules.vehicle_ai.context import (
     ContextManager,
     ContextSelector,
 )
+from modules.vehicle_ai.events import VehicleEvent
 
 from modules.vehicle_ai.llm import (
     BaseLLMClient,
@@ -443,6 +444,44 @@ class VehicleAgent:
     # ========================================================
     # Reset
     # ========================================================
+
+    def recommend_from_event(self, event: VehicleEvent) -> str:
+        """Generate one advisory reply without entering the task or tool workflow."""
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a vehicle safety assistant. Give one brief, calm safety "
+                    "recommendation for the current high driver-risk event. "
+                    "Do not suggest that music treats fatigue. Do not claim an "
+                    "action has been performed."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Event {event.event_id}: {event.message} "
+                    "Suggest a safe next step for the driver."
+                ),
+            },
+        ]
+        response = self.llm.chat_with_timeout(
+            messages, tools=[], timeout_seconds=self.turn_timeout_seconds
+        )
+        text = response.content or ""
+        self.trace.append(
+            {
+                "sequence": self.trace_sequence,
+                "kind": "event_recommendation",
+                "event_id": event.event_id,
+                "event_time": event.timestamp,
+                "text": text,
+                "tool_calls_ignored": len(response.tool_calls),
+            }
+        )
+        self.trace_sequence += 1
+        del self.trace[: -self.max_task_trace_events]
+        return text
 
     def reset(
         self,

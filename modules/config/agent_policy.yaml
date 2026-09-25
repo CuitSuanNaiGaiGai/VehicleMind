@@ -16,3 +16,6 @@ risk_policy:
   high_driver_risk: HIGH
   fatigue_warning_code: REST_REQUIRED
   unknown_driver_warning_code: STATE_UNAVAILABLE
+recommendation:
+  enabled: true
+  cooldown_ms: 60000

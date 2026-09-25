@@ -216,7 +216,11 @@ class ReplayRunner:
         agent_seconds = 0.0
         confirmation_seconds = 0.0
         llm = ScriptedLLMClient(scenario.responses)
-        runtime = VehicleMindRuntime(llm=llm, event_timing=self.event_timing)
+        runtime = VehicleMindRuntime(
+            llm=llm,
+            event_timing=self.event_timing,
+            enable_event_recommendations=False,
+        )
         recorder = TraceRecorder()
         tool_index = 0
         observation_sequences = {"vehicle": 0, "cabin": 0, "road": 0}

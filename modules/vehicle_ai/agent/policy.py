@@ -48,6 +48,12 @@ class RiskPolicy:
     unknown_driver_warning: str
 
 
+@dataclass(frozen=True)
+class RecommendationPolicy:
+    enabled: bool = False
+    cooldown_ms: int = 60000
+
+
 _FATIGUE_WARNING = "检测到高疲劳风险，请优先安全停车休息；音乐不能替代休息。"
 _UNKNOWN_DRIVER_WARNING = "驾驶员风险状态未知或不可用，无法依据当前观测判断风险。"
 
@@ -56,6 +62,7 @@ _UNKNOWN_DRIVER_WARNING = "驾驶员风险状态未知或不可用，无法依�
 class AgentPolicy:
     tool_risks: dict[str, ActionRisk]
     risk_policy: RiskPolicy
+    recommendation: RecommendationPolicy = RecommendationPolicy()
 
     @classmethod
     def from_yaml(cls, path: Path | str | None = None) -> AgentPolicy:
@@ -65,11 +72,21 @@ class AgentPolicy:
             else (Path(__file__).parents[2] / "config" / "agent_policy.yaml")
         )
         data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict) or set(data) != {
-            "schema_version",
-            "tool_risks",
-            "risk_policy",
-        }:
+        if (
+            not isinstance(data, dict)
+            or not {
+                "schema_version",
+                "tool_risks",
+                "risk_policy",
+            }.issubset(data)
+            or set(data)
+            - {
+                "schema_version",
+                "tool_risks",
+                "risk_policy",
+                "recommendation",
+            }
+        ):
             raise ValueError("agent policy configuration has invalid fields")
         if type(data["schema_version"]) is not int or data["schema_version"] != 2:
             raise ValueError("unsupported agent policy schema version")
@@ -99,12 +116,33 @@ class AgentPolicy:
             raise ValueError("unsupported fatigue warning code")
         if raw_policy["unknown_driver_warning_code"] != "STATE_UNAVAILABLE":
             raise ValueError("unsupported unknown driver warning code")
+        raw_recommendation = data.get("recommendation")
+        if raw_recommendation is None and "recommendation" in data:
+            raise ValueError("recommendation must be a mapping")
+        if raw_recommendation is not None:
+            if not isinstance(raw_recommendation, dict) or set(raw_recommendation) != {
+                "enabled",
+                "cooldown_ms",
+            }:
+                raise ValueError("recommendation has invalid fields")
+            if type(raw_recommendation["enabled"]) is not bool:
+                raise ValueError("recommendation.enabled must be boolean")
+            if (
+                type(raw_recommendation["cooldown_ms"]) is not int
+                or raw_recommendation["cooldown_ms"] <= 0
+            ):
+                raise ValueError("recommendation.cooldown_ms must be positive")
         return cls(
             tool_risks=risks,
             risk_policy=RiskPolicy(
                 high_driver_risk=RiskLevel.HIGH,
                 fatigue_warning=_FATIGUE_WARNING,
                 unknown_driver_warning=_UNKNOWN_DRIVER_WARNING,
+            ),
+            recommendation=(
+                RecommendationPolicy(**raw_recommendation)
+                if raw_recommendation is not None
+                else RecommendationPolicy()
             ),
         )
 

@@ -6,6 +6,8 @@ from collections.abc import Callable
 from modules.vehicle_ai.agent import (
     VehicleAgent,
 )
+from modules.vehicle_ai.agent.policy import AgentPolicy, RecommendationPolicy
+from modules.vehicle_ai.agent.recommendation import RecommendationCoordinator
 
 from modules.vehicle_ai.context import (
     ContextManager,
@@ -14,6 +16,8 @@ from modules.vehicle_ai.context import (
 from modules.vehicle_ai.events import (
     EventBus,
     EventDetector,
+    EventType,
+    VehicleEvent,
 )
 
 from modules.vehicle_ai.integration import (
@@ -57,6 +61,7 @@ class VehicleMindRuntime:
         turn_timeout_seconds: float = 90.0,
         max_tool_calls: int = 10,
         max_task_trace_events: int = 200,
+        enable_event_recommendations: bool = True,
     ):
         # ====================================================
         # Shared context
@@ -100,6 +105,25 @@ class VehicleMindRuntime:
             max_tool_calls=max_tool_calls,
             max_task_trace_events=max_task_trace_events,
         )
+        recommendation = AgentPolicy.from_yaml().recommendation
+        if not enable_event_recommendations:
+            recommendation = RecommendationPolicy(
+                enabled=False, cooldown_ms=recommendation.cooldown_ms
+            )
+        self.recommendation_coordinator = RecommendationCoordinator(
+            self.agent,
+            self.context_manager,
+            recommendation,
+        )
+        self.event_bus.subscribe(
+            EventType.HIGH_RISK_DETECTED, self._recommend_from_event
+        )
+
+    def _recommend_from_event(self, event: VehicleEvent) -> None:
+        try:
+            self.recommendation_coordinator.on_event(event)
+        except Exception as error:
+            self.recommendation_coordinator.record_failure(event, error)
 
     # ========================================================
     # Context-change processing

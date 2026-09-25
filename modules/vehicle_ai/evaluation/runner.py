@@ -99,6 +99,7 @@ def run_trial(
         turn_timeout_seconds=turn_timeout_seconds,
         max_tool_calls=max_tool_calls,
         max_task_trace_events=max_task_trace_events,
+        enable_event_recommendations=False,
     )
     schema_hash = hashlib.sha256(
         json.dumps(runtime.tools.llm_schemas(), sort_keys=True).encode()
