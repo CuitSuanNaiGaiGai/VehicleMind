@@ -11,6 +11,9 @@ from modules.vehicle_ai.context import (
 )
 
 
+_UNSET = object()
+
+
 class CabinContextAdapter:
     """
     Bridge Cabin Intelligence semantic outputs into
@@ -118,25 +121,30 @@ class CabinContextAdapter:
         presence: Any,
         driver_state: Any,
         risk: Any,
-        perclos: float | None = None,
-        eye_closed: bool | None = None,
-        eye_closure_seconds: float = 0.0,
-        recent_yawns: int = 0,
-        blink_count: int = 0,
+        perclos: Any = _UNSET,
+        eye_closed: Any = _UNSET,
+        eye_closure_seconds: Any = _UNSET,
+        recent_yawns: Any = _UNSET,
+        blink_count: Any = _UNSET,
     ):
         """
         Update DriverContext using semantic outputs from
         CabinPerceptionService.
         """
 
-        return self.context_manager.update_driver(
-            observation=observation,
-            presence=(self._presence(presence)),
-            state=(self._driver_state(driver_state)),
-            risk=(self._risk_level(risk)),
-            perclos=perclos,
-            eye_closed=(None if eye_closed is None else bool(eye_closed)),
-            eye_closure_seconds=float(eye_closure_seconds),
-            recent_yawns=int(recent_yawns),
-            blink_count=int(blink_count),
-        )
+        updates: dict[str, Any] = {
+            "presence": self._presence(presence),
+            "state": self._driver_state(driver_state),
+            "risk": self._risk_level(risk),
+        }
+        if perclos is not _UNSET:
+            updates["perclos"] = perclos
+        if eye_closed is not _UNSET:
+            updates["eye_closed"] = None if eye_closed is None else bool(eye_closed)
+        if eye_closure_seconds is not _UNSET:
+            updates["eye_closure_seconds"] = float(eye_closure_seconds)
+        if recent_yawns is not _UNSET:
+            updates["recent_yawns"] = int(recent_yawns)
+        if blink_count is not _UNSET:
+            updates["blink_count"] = int(blink_count)
+        return self.context_manager.update_driver(observation=observation, **updates)

@@ -6,6 +6,7 @@ from modules.observation import ObservationMetadata
 from modules.vehicle_ai.context import ContextManager, DriverState, RiskLevel
 from modules.vehicle_ai.context.context_selector import ContextSelector
 from modules.vehicle_ai.events import EventDetector
+from modules.vehicle_ai.integration.cabin_adapter import CabinContextAdapter
 from modules.vehicle_ai.runtime import VehicleMindRuntime
 
 
@@ -35,6 +36,39 @@ def test_partial_update_does_not_mark_untouched_defaults_as_observed() -> None:
 
     assert manager.field_quality("road", "vehicle_count") == "KNOWN"
     assert manager.field_quality("road", "lane_detected") == "MISSING"
+
+
+def test_cabin_adapter_only_receipts_explicit_fields_including_zero() -> None:
+    manager = ContextManager()
+    adapter = CabinContextAdapter(manager)
+
+    adapter.update(presence="PRESENT", driver_state="DROWSY", risk="HIGH")
+
+    assert manager.field_quality("driver", "risk") == "KNOWN"
+    for field in (
+        "perclos",
+        "eye_closed",
+        "eye_closure_seconds",
+        "recent_yawns",
+        "blink_count",
+    ):
+        assert manager.field_quality("driver", field) == "MISSING"
+    assert manager.get_context().driver.eye_closure_seconds == 0.0
+    assert manager.get_context().driver.recent_yawns == 0
+    assert manager.field_quality("vehicle", "speed_kmh") == "MISSING"
+
+    adapter.update(
+        presence="PRESENT",
+        driver_state="DROWSY",
+        risk="HIGH",
+        eye_closure_seconds=0.0,
+        recent_yawns=0,
+        blink_count=0,
+    )
+    for field in ("eye_closure_seconds", "recent_yawns", "blink_count"):
+        assert manager.field_quality("driver", field) == "KNOWN"
+    manager.update_vehicle(speed_kmh=0.0)
+    assert manager.field_quality("vehicle", "speed_kmh") == "KNOWN"
 
 
 def test_selector_excludes_unobserved_fields_after_partial_update() -> None:

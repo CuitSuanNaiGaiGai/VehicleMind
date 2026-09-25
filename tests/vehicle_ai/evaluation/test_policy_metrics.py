@@ -233,6 +233,41 @@ def test_policy_batch_persists_trace_and_chinese_report(tmp_path):
     assert "建议适配率" in (tmp_path / "run" / "summary.md").read_text(encoding="utf-8")
 
 
+def test_runner_risk_state_only_does_not_send_implicit_cabin_zeros():
+    case = replace(
+        load_policy_cases(ROOT)[0],
+        steps=(
+            {
+                "at_ms": 0,
+                "cabin": {
+                    "presence": "PRESENT",
+                    "driver_state": "DROWSY",
+                    "risk": "HIGH",
+                },
+            },
+            {
+                "at_ms": 300,
+                "cabin": {
+                    "presence": "PRESENT",
+                    "driver_state": "DROWSY",
+                    "risk": "HIGH",
+                },
+            },
+            {"at_ms": 400, "user_text": "当前情况如何？"},
+        ),
+    )
+    trial = run_trial(case, ReplyClient(), provider="test", model="stub", trial_index=1)
+
+    assert trial.policy_trace[0]["reason"] == "TRIGGERED"
+    assert trial.policy_trace[0]["evidence"] == {
+        "risk": "HIGH",
+        "driver_state": "DROWSY",
+    }
+    prompt = str(trial.requests[0]["messages"][-1]["content"])
+    for field in ("eye_closure_seconds", "recent_yawns", "vehicle_speed_kmh"):
+        assert field not in prompt
+
+
 def test_event_advice_tool_call_is_ignored_by_user_tool_grading():
     class RogueAdviceClient(BaseLLMClient):
         def chat(self, messages, tools=None):
