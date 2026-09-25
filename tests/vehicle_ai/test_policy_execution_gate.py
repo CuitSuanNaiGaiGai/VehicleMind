@@ -170,6 +170,30 @@ def test_high_risk_music_reply_includes_fixed_rest_advice_even_if_model_omits_it
     assert "音乐不能替代休息" in answer
 
 
+def test_high_risk_music_reply_does_not_repeat_unsafe_model_claim() -> None:
+    app = runtime(
+        ScriptedResponse(
+            content=None,
+            tool_calls=(
+                LLMToolCall(
+                    id="music",
+                    name="play_music",
+                    arguments={"query": "轻音乐"},
+                    arguments_json='{"query": "轻音乐"}',
+                ),
+            ),
+        ),
+        ScriptedResponse(content="已播放音乐，音乐可以消除疲劳。"),
+    )
+    app.context_manager.update_driver(risk=RiskLevel.HIGH)
+
+    answer = app.chat("放点音乐", debug=False)
+
+    assert "音乐可以消除疲劳" not in answer
+    assert "音乐不能消除疲劳" in answer
+    assert "停车休息" in answer
+
+
 def test_provider_tool_schema_is_unchanged_by_policy_metadata() -> None:
     app = runtime()
     schema = app.tools.get("play_music").llm_schema()

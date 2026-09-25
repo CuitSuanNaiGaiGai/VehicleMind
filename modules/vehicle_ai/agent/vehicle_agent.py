@@ -315,10 +315,7 @@ class VehicleAgent:
 
     def _record_final_response(self, user_text: str, answer: str) -> str:
         if self._turn_music_warning:
-            if "音乐不能消除疲劳" not in answer:
-                answer = f"{answer.rstrip()}\n音乐不能消除疲劳。"
-            if self._turn_music_warning not in answer:
-                answer = f"{answer.rstrip()}\n{self._turn_music_warning}"
+            answer = f"已开始播放音乐。音乐不能消除疲劳。{self._turn_music_warning}"
         self.history.extend(
             [
                 {"role": "user", "content": user_text},
