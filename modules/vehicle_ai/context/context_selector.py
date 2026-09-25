@@ -257,7 +257,9 @@ class ContextSelector:
         # ----------------------------------------------------
 
         if topics & {ContextTopic.MEDIA, ContextTopic.NAVIGATION, ContextTopic.DRIVER}:
-            topics.update({ContextTopic.DRIVER, ContextTopic.ROAD, ContextTopic.VEHICLE})
+            topics.update(
+                {ContextTopic.DRIVER, ContextTopic.ROAD, ContextTopic.VEHICLE}
+            )
 
         # Driver fatigue questions frequently involve whether
         # the vehicle is moving.

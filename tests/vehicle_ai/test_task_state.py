@@ -139,7 +139,9 @@ def test_clarification_and_short_followup_have_sourced_task_context():
 
 
 def test_new_topic_during_waiting_input_starts_a_separate_task():
-    agent = agent_for(LLMResponse("您想听什么音乐？", []), LLMResponse("道路观测不可用。", []))
+    agent = agent_for(
+        LLMResponse("您想听什么音乐？", []), LLMResponse("道路观测不可用。", [])
+    )
     agent.chat("放音乐", debug=False)
     first_id = agent.task.task_id
     agent.chat("现在路况如何？", debug=False)

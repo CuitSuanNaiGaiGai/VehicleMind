@@ -42,9 +42,7 @@ def test_trip_memory_tool_returns_scoped_history_not_current_context(tmp_path) -
             ScriptedResponse(content="刚才取消的是导航到北区服务区。"),
         )
     )
-    runtime = VehicleMindRuntime(
-        llm=llm, trip_event_store=store, trip_id="trip-a"
-    )
+    runtime = VehicleMindRuntime(llm=llm, trip_event_store=store, trip_id="trip-a")
 
     answer = runtime.agent.chat("刚才取消了哪个操作？", debug=False)
 
@@ -98,8 +96,7 @@ def test_runtime_persists_semantic_risk_and_user_cancellation(tmp_path) -> None:
     assert cancellation.payload["action"]["tool_name"] == "start_navigation"
     assert [event.event_type for event in events].count("USER_REQUEST") == 1
     assert "ACTION_CANCELLED" not in {
-        event.event_type
-        for event in store.query(trip_id="trip-b", limit=20)
+        event.event_type for event in store.query(trip_id="trip-b", limit=20)
     }
 
 
@@ -109,14 +106,12 @@ def test_old_risk_memory_is_not_injected_as_current_vehicle_context(tmp_path) ->
         TripEvent("old-risk", "trip-a", "RISK", time.time(), "event", {"risk": "HIGH"})
     )
     llm = ScriptedLLMClient((ScriptedResponse(content="当前驾驶员状态正常。"),))
-    runtime = VehicleMindRuntime(
-        llm=llm, trip_event_store=store, trip_id="trip-a"
-    )
-    runtime.update_cabin(
-        presence="PRESENT", driver_state="NORMAL", risk="LOW"
-    )
+    runtime = VehicleMindRuntime(llm=llm, trip_event_store=store, trip_id="trip-a")
+    runtime.update_cabin(presence="PRESENT", driver_state="NORMAL", risk="LOW")
 
-    assert runtime.agent.chat("当前驾驶状态如何？", debug=False) == "当前驾驶员状态正常。"
+    assert (
+        runtime.agent.chat("当前驾驶状态如何？", debug=False) == "当前驾驶员状态正常。"
+    )
     contents = "\n".join(
         message["content"]
         for message in llm.requests[0].messages
@@ -236,7 +231,9 @@ def test_target_change_is_saved_as_user_selection(tmp_path) -> None:
         trip_id="trip-a",
     )
     runtime.agent.pending_actions.set(
-        PendingAction("start_navigation", {"poi_id": "rest_area_001"}, "导航到西湖服务区")
+        PendingAction(
+            "start_navigation", {"poi_id": "rest_area_001"}, "导航到西湖服务区"
+        )
     )
 
     runtime.agent.chat("换成河滨服务区", debug=False)

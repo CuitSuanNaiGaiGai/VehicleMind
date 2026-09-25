@@ -15,9 +15,7 @@ def handle_trip_memory_command(
             print("本次行程暂无持久化事件。")
         else:
             for event in history:
-                timestamp = time.strftime(
-                    "%H:%M:%S", time.localtime(event.occurred_at)
-                )
+                timestamp = time.strftime("%H:%M:%S", time.localtime(event.occurred_at))
                 print(
                     f"{timestamp} {event.event_type} · {event.source} · {event.payload}"
                 )

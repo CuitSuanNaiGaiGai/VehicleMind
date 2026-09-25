@@ -89,13 +89,17 @@ def test_rejected_upload_never_publishes_manifest(tmp_path: Path) -> None:
             raise RuntimeError("upload rejected")
 
     with pytest.raises(RuntimeError, match="rejected"):
-        IndexBuilder(RejectedClient(), tmp_path / "stage").build("vehicle_common", SOURCES)
+        IndexBuilder(RejectedClient(), tmp_path / "stage").build(
+            "vehicle_common", SOURCES
+        )
     assert not (tmp_path / "stage/index_manifest.json").exists()
 
 
 def test_unknown_profile_cannot_build_index(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unknown profile"):
-        IndexBuilder(FakeDocumentClient(), tmp_path / "stage").build("unexpected", SOURCES)
+        IndexBuilder(FakeDocumentClient(), tmp_path / "stage").build(
+            "unexpected", SOURCES
+        )
 
 
 def test_pending_upload_times_out_without_publishing(tmp_path: Path) -> None:

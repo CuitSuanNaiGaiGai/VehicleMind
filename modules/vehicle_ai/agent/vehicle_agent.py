@@ -275,7 +275,9 @@ class VehicleAgent:
 
     def confirm_pending(self, action_id: str) -> ToolResult:
         pending = self.pending_actions.get()
-        action = pending.to_dict() if pending and pending.action_id == action_id else None
+        action = (
+            pending.to_dict() if pending and pending.action_id == action_id else None
+        )
         result = self.confirmations.confirm(action_id)
         if result.error != "INVALID_CONFIRMATION":
             self.task.last_tool_result = result.to_dict()
@@ -309,7 +311,9 @@ class VehicleAgent:
 
     def reject_pending(self, action_id: str) -> ToolResult:
         pending = self.pending_actions.get()
-        action = pending.to_dict() if pending and pending.action_id == action_id else None
+        action = (
+            pending.to_dict() if pending and pending.action_id == action_id else None
+        )
         result = self.confirmations.reject(action_id)
         if result.success:
             self.task.transition(TaskStatus.CANCELLED, "USER_CANCELLED")
@@ -328,9 +332,7 @@ class VehicleAgent:
     ) -> None:
         print_pending_action(self.pending_actions)
 
-    # ========================================================
     # Chat
-    # ========================================================
 
     def _record_final_response(self, user_text: str, answer: str) -> str:
         return record_final_response(self, user_text, answer)

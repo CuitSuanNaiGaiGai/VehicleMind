@@ -20,9 +20,7 @@ EVENT_TYPES = (
 )
 
 
-def build_trip_memory_tool(
-    store: TripEventStore, trip_id: str
-) -> ToolDefinition:
+def build_trip_memory_tool(store: TripEventStore, trip_id: str) -> ToolDefinition:
     """Expose only bounded filters; trip identity is fixed by the runtime."""
 
     def query_trip_events(
@@ -33,12 +31,22 @@ def build_trip_memory_tool(
     ) -> ToolResult:
         if event_type is not None and event_type not in EVENT_TYPES:
             return ToolResult(False, "事件类型不受支持。", error="INVALID_EVENT_TYPE")
-        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 50:
-            return ToolResult(False, "历史查询条数需为 1 至 50。", error="INVALID_LIMIT")
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or not 1 <= limit <= 50
+        ):
+            return ToolResult(
+                False, "历史查询条数需为 1 至 50。", error="INVALID_LIMIT"
+            )
         if since is not None and not isinstance(since, int | float):
-            return ToolResult(False, "起始时间必须为 Unix 秒时间戳。", error="INVALID_TIME")
+            return ToolResult(
+                False, "起始时间必须为 Unix 秒时间戳。", error="INVALID_TIME"
+            )
         if until is not None and not isinstance(until, int | float):
-            return ToolResult(False, "结束时间必须为 Unix 秒时间戳。", error="INVALID_TIME")
+            return ToolResult(
+                False, "结束时间必须为 Unix 秒时间戳。", error="INVALID_TIME"
+            )
         try:
             events = store.query(
                 trip_id=trip_id,
@@ -94,8 +102,14 @@ def build_trip_memory_tool(
             "type": "object",
             "properties": {
                 "event_type": {"type": "string", "enum": list(EVENT_TYPES)},
-                "since": {"type": "number", "description": "起始 Unix 秒时间戳，含边界"},
-                "until": {"type": "number", "description": "结束 Unix 秒时间戳，含边界"},
+                "since": {
+                    "type": "number",
+                    "description": "起始 Unix 秒时间戳，含边界",
+                },
+                "until": {
+                    "type": "number",
+                    "description": "结束 Unix 秒时间戳，含边界",
+                },
                 "limit": {"type": "integer", "minimum": 1, "maximum": 50},
             },
             "required": [],
