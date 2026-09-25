@@ -157,11 +157,11 @@ class KnowledgeCatalog:
 
 **Interfaces:** `IndexBuilder.build(profile: str, sources: Sequence[KnowledgeSource]) -> IndexBuildResult`; only the two configured profiles are accepted. `IndexBuildResult` contains profile, source count, manifest SHA-256, indexed timestamp, LightRAG version and success status. Sidecar databases, graph/vector storage and process logs are ignored by Git.
 
-- [ ] **Step 1: Write fake-HTTP tests** for correct profile corpus, upload metadata with source ID/file path, processing status polling, timeout, rejected upload, mixed-profile refusal, and preservation of prior successful manifest after rebuild failure.
-- [ ] **Step 2: Run tests**; expected: fail because builder is absent.
-- [ ] **Step 3: Implement build flow** to validate catalog, post each document to its fixed sidecar, poll status with bounded timeout, verify every uploaded source reaches completed state, then atomically replace the profile's active build manifest. Failed builds never mark a partial index active.
-- [ ] **Step 4: Run tests and size check** with `pytest tests/vehicle_ai/knowledge/test_index_builder.py -q` and `python scripts/check_source_size.py`; expected: pass and new module/script limits respected.
-- [ ] **Step 5: Commit** as `feat(rag): add reproducible atomic index builds`.
+- [x] **Step 1: Write fake-HTTP tests** for profile corpus, upload, status, timeout, rejected upload, unknown profile and preservation of old published index.
+- [x] **Step 2: Run tests**; observed: collection failed because the index builder module was absent.
+- [x] **Step 3: Implement build flow** in a staging LightRAG service; publish the entire completed storage/input generation only after every source is processed, retaining a recoverable prior generation.
+- [x] **Step 4: Run tests and size check**; observed: 8 focused tests passed, Ruff/mypy/source-size passed. Real common index processed 10/10; real demo index processed 20/20. Both formal services started and returned catalog-mapped evidence (`vehicle_common`: K004/K008/K007/K001/K005; `vehiclemind_demo`: K019/K011/K013/K015/K020).
+- [x] **Step 5: Commit** as `feat(rag): add reproducible atomic index builds`.
 
 ### Task 5: Implement Context-Only HTTP Adapter and Retrieval Trace
 
