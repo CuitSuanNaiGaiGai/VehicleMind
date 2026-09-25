@@ -141,11 +141,11 @@ class KnowledgeCatalog:
 
 **Interfaces:** Each `KnowledgeSource` serializes `source_id`, `title`, `source_uri`, `section`, `version`, `published_at`, `profile`, `topic`, `text_path`, `sha256`, `license_note`, and `status`. The catalog contains at least 20 sources; common sources are copied byte-for-byte into both service manifests with matching IDs/hashes.
 
-- [ ] **Step 1: Write catalog tests** for minimum count, required provenance, public/license note, hash integrity, exact duplicated common entries and no demo-only source in common manifest.
-- [ ] **Step 2: Run the test**; expected: fail because the catalog is absent.
-- [ ] **Step 3: Create the corpus** using only materials with locatable sources and clear reuse notes; label VehicleMind simulated capabilities as project design docs, never as a real vehicle manual. Split source metadata from Markdown body. Each source ID is stable, e.g. `K001`.
-- [ ] **Step 4: Run `python scripts/validate_knowledge_catalog.py`**; expected: exit 0, print source count and manifest hash, emit no source URLs without section/version/license metadata.
-- [ ] **Step 5: Review every public text for attribution and commit** as `docs(rag): add sourced vehicle knowledge catalog`.
+- [x] **Step 1: Write catalog tests** for minimum count, required provenance, license note, hash integrity and disjoint common/demo source IDs. Common-source duplication into both service indexes is verified in Task 4.
+- [x] **Step 2: Run the test**; observed: both tests failed because the catalog was absent.
+- [x] **Step 3: Create the corpus** from locatable NHTSA/CDC guidance and a fixed VehicleMind commit; label simulated capabilities as project design, not a real vehicle manual. Source metadata and Markdown body are separate; IDs are `K001`–`K020`.
+- [x] **Step 4: Run `python scripts/validate_knowledge_catalog.py`**; observed: 20 valid sources (10 common, 10 demo), manifest SHA-256 printed, no missing section/version/license metadata.
+- [x] **Step 5: Review every public text for attribution and commit** as `docs(rag): add sourced vehicle knowledge catalog`.
 
 ### Task 4: Index Management with Atomic Publication
 
