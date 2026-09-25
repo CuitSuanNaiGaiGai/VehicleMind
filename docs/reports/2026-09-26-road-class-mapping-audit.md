@@ -36,7 +36,7 @@
 
 ## 复现与来源
 
-原有预处理、检测头解码与 NMS 代码基线为 Git commit `6620419d7128dd00622049435485511ac34ebd56`；本次新增的可复跑 CLI 将随本审计分支一起提交。视频 SHA-256 为 `b2b8117bc07ea61d4c9c3aeb056d0798b0998145dd4ca5350c5905d34f9457ef`，模型 SHA-256 见上文。诊断脚本会输出这些摘要，但不写本机绝对路径、帧图像或检测框坐标。
+本次可复跑诊断工具版本为 Git commit `448b300ab699fdae142246e58bdcabd7908e9875`，其预处理、检测头解码与 NMS 基线来自 `6620419d7128dd00622049435485511ac34ebd56`。视频 SHA-256 为 `b2b8117bc07ea61d4c9c3aeb056d0798b0998145dd4ca5350c5905d34f9457ef`，模型 SHA-256 见上文。诊断脚本会输出这些摘要，但不写本机绝对路径、帧图像或检测框坐标。
 
 ```bash
 uv run --extra perception --group dev python scripts/audit_yolopv2_class_ids.py \
