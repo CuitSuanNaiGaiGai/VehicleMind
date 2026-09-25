@@ -28,12 +28,100 @@ REASONS = {
     "USER_CANCELLED": "用户取消",
     "CLARIFICATION_REQUESTED": "需要补充信息",
     "NO_REFERENT": "缺少可关联目标",
+    "NO_RESULTS": "没有可行地点",
+    "ALTERNATIVE_PENDING": "替代地点待重新确认",
+    "PLAN_VERIFIED": "结果回读通过",
+    "UNGROUNDED_POI_ID": "地点不在本次搜索候选中",
+    "RECOVERY_BUDGET_EXCEEDED": "恢复次数达到上限",
 }
+PLAN_STATUS_LABELS = {
+    "RUNNING": "进行中",
+    "COMPLETED": "已完成",
+    "FAILED": "失败",
+    "CANCELLED": "已取消",
+    "STOPPED_NO_RESULT": "无结果并停止",
+}
+PLAN_STEP_STATUS_LABELS = {
+    "PENDING": "未开始",
+    "RUNNING": "进行中",
+    "SUCCEEDED": "已完成",
+    "FAILED": "失败",
+    "SKIPPED": "已跳过",
+}
+PLAN_STEP_LABELS = {
+    "UNDERSTAND": "理解需求",
+    "KNOWLEDGE": "查询知识",
+    "SEARCH": "搜索地点",
+    "SELECT": "选择候选",
+    "AWAIT_CONFIRMATION": "等待确认",
+    "EXECUTE": "执行导航",
+    "VERIFY": "回读核验",
+    "RECOVER": "失败恢复",
+}
+
+
+def _plan_panel(plan: dict) -> str:
+    used_steps = len(plan.get("steps", []))
+    max_steps = plan.get("max_steps", "未记录")
+    remaining_steps = plan.get("remaining_step_budget")
+    if isinstance(remaining_steps, int) and isinstance(max_steps, int):
+        used_steps = max_steps - remaining_steps
+    recoveries = plan.get("recovery_count", 0)
+    max_recoveries = plan.get("max_recoveries", "未记录")
+    state = plan.get("status", "未知")
+    rows = []
+    for index, step in enumerate(plan.get("steps", []), 1):
+        name = str(step.get("name", "未知步骤"))
+        status = str(step.get("status", "未知"))
+        evidence = step.get("evidence_summary") or "暂无步骤摘要"
+        error = step.get("error_code")
+        error_html = f"<p>失败码：{escape(str(error))}</p>" if error else ""
+        rows.append(
+            "<div class='turn'><span>"
+            f"{index}. {escape(PLAN_STEP_LABELS.get(name, name))} · "
+            f"{escape(PLAN_STEP_STATUS_LABELS.get(status, status))}</span><p>{escape(evidence)}</p>"
+            f"{error_html}</div>"
+        )
+    candidates = []
+    for candidate in plan.get("candidates", []):
+        if not isinstance(candidate, dict):
+            continue
+        display_name = str(
+            candidate.get("display_name_zh") or candidate.get("name") or "休息地点"
+        )
+        poi_id = candidate.get("poi_id", "未记录")
+        simulated = "模拟候选" if candidate.get("simulated", True) else "未标记模拟"
+        candidates.append(
+            f"<li>{escape(display_name)} · <code>{escape(poi_id)}</code> · {simulated}</li>"
+        )
+    selected = plan.get("selected_poi_id")
+    return (
+        "<details class='plan-details' open><summary>查看受限计划步骤</summary>"
+        f"<p>计划状态：{escape(PLAN_STATUS_LABELS.get(state, state))} · "
+        f"步骤预算：{escape(str(used_steps))} / {escape(str(max_steps))} · "
+        f"恢复预算：{escape(str(recoveries))} / {escape(str(max_recoveries))}</p>"
+        f"<p>已选择地点：<code>{escape(selected or '尚未选择')}</code></p>"
+        f"{''.join(rows) or '<p>暂无步骤记录。</p>'}"
+        f"{'<p>当前模拟候选</p><ul>' + ''.join(candidates) + '</ul>' if candidates else ''}"
+        "</details>"
+    )
 
 
 def task_panel(trial) -> str:
     rows = []
+    latest_plan = None
     for event in trial.agent_trace:
+        if event["kind"] == "event_recommendation":
+            label = (
+                "确定性降级安全建议"
+                if event.get("source") == "deterministic_fallback"
+                else "事件主动建议"
+            )
+            rows.append(
+                f"<div class='turn'><span>{label}</span>"
+                f"<p>{escape(str(event.get('text') or '无建议文本'))}</p></div>"
+            )
+            continue
         if event["kind"] not in {
             "agent_reply",
             "confirmation",
@@ -42,6 +130,8 @@ def task_panel(trial) -> str:
         }:
             continue
         task = event["task"]
+        if isinstance(task.get("plan"), dict):
+            latest_plan = task["plan"]
         status = task["status"]
         reason = task.get("reason")
         rows.append(
@@ -52,9 +142,17 @@ def task_panel(trial) -> str:
     for call in trial.tool_calls:
         if call.get("data", {}).get("outcome_unknown"):
             rows.append("<p>已阻止自动重试；已读取车机状态供人工核对。</p>")
+    if latest_plan is None:
+        for event in reversed(trial.agent_trace):
+            plan = event.get("task", {}).get("plan")
+            if isinstance(plan, dict):
+                latest_plan = plan
+                break
+    plan_html = _plan_panel(latest_plan) if latest_plan is not None else ""
     return (
         "<section class='card'><h2>任务进度与停止原因</h2>"
         + ("".join(rows) or "<p>旧报告未记录任务状态</p>")
+        + plan_html
         + "</section>"
     )
 

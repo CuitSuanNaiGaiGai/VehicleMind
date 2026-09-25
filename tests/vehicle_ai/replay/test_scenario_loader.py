@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from pathlib import Path
 
 import pytest
@@ -83,6 +85,14 @@ def test_repository_showcase_scenario_loads() -> None:
     assert scenario.media["cabin"] == ROOT / "assets/demo/cabin_demo.gif"
     assert scenario.media["road"] == ROOT / "assets/demo/driving_perception.gif"
     assert scenario.expected.unauthorized_sensitive_executions == 0
+
+
+def test_tool_call_arguments_are_encoded_as_json() -> None:
+    scenario_path = ROOT / "assets/scenarios/normal_driver_music.yaml"
+    scenario = load_replay_scenario(scenario_path, repository_root=ROOT)
+
+    encoded = scenario.responses[0].tool_calls[0].arguments_json
+    assert json.loads(encoded) == {"query": "轻松驾驶歌单"}
 
 
 @pytest.mark.parametrize(

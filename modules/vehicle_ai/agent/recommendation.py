@@ -24,6 +24,7 @@ class RecommendationTrigger:
     model_result: str | None = None
     error: str | None = None
     evidence: dict[str, object] | None = None
+    fallback_message: str | None = None
 
 
 _EVIDENCE_FIELDS = (
@@ -77,6 +78,7 @@ class RecommendationCoordinator:
         result: str | None = None,
         error: str | None = None,
         evidence: dict[str, object] | None = None,
+        fallback_message: str | None = None,
     ) -> RecommendationTrigger:
         trigger = RecommendationTrigger(
             event_id=event.event_id,
@@ -86,6 +88,7 @@ class RecommendationCoordinator:
             model_result=result,
             error=error,
             evidence=evidence,
+            fallback_message=fallback_message,
         )
         with self._lock:
             self.trace.append(trigger)
@@ -95,8 +98,22 @@ class RecommendationCoordinator:
     def record_failure(
         self, event: VehicleEvent, error: Exception
     ) -> RecommendationTrigger:
-        """Preserve a failure when a subscriber catches an unexpected exception."""
-        return self._record(event, None, "RECOMMENDATION_ERROR", error=str(error))
+        """Preserve failures and a bounded deterministic fallback for high risk."""
+        risk = event.data.get("risk")
+        risk_value = getattr(risk, "value", risk)
+        fallback = (
+            "检测到高风险驾驶状态。请在确保行车安全的前提下驶入可安全停车的位置并休息；"
+            "系统未执行导航或其他车机操作。"
+            if event.type is EventType.HIGH_RISK_DETECTED and risk_value == "HIGH"
+            else None
+        )
+        return self._record(
+            event,
+            None,
+            "RECOMMENDATION_ERROR",
+            error=type(error).__name__,
+            fallback_message=fallback,
+        )
 
     def record_suppressed(
         self, event: VehicleEvent, reason: str
@@ -159,8 +176,12 @@ class RecommendationCoordinator:
                 event,
                 quality,
                 "RECOMMENDATION_ERROR",
-                error=str(error),
+                error=type(error).__name__,
                 evidence=evidence,
+                fallback_message=(
+                    "检测到高风险驾驶状态。请在确保行车安全的前提下驶入可安全停车的位置并休息；"
+                    "系统未执行导航或其他车机操作。"
+                ),
             )
         return self._record(
             event, quality, "TRIGGERED", result=result, evidence=evidence

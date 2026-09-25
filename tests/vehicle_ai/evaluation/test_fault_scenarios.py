@@ -41,7 +41,8 @@ def test_pending_navigation_expires_on_evaluation_timeline() -> None:
                 LLMResponse("找到西湖服务区。", []),
                 call("start_navigation", {"poi_id": "rest_area_001"}),
                 LLMResponse("等待确认。", []),
-                LLMResponse("确认已超时，导航未启动。", []),
+                call("start_navigation", {"poi_id": "rest_area_001"}),
+                LLMResponse("导航未启动；过期计划不能继续执行。", []),
             ]
         ),
         provider="test",
@@ -50,9 +51,19 @@ def test_pending_navigation_expires_on_evaluation_timeline() -> None:
     )
     assert trial.error is None
     assert trial.final_context["vehicle"]["navigation_state"] == "IDLE"
+    assert trial.interaction_events[-1]["kind"] == "agent_reply"
+    assert trial.interaction_events[-2]["error"] == "NO_PENDING_ACTION"
     assert any(
         event.get("error") == "NO_PENDING_ACTION" for event in trial.interaction_events
     )
+    stopped = [
+        event
+        for event in trial.agent_trace
+        if event.get("kind") == "plan_step" and event.get("event") == "PLAN_STOPPED"
+    ]
+    assert stopped[-1]["plan"]["status"] == "CANCELLED"
+    assert stopped[-1]["plan"]["terminal_reason"] == "PENDING_EXPIRED"
+    assert trial.agent_trace[-1]["task"]["pending_action"] is None
     assert not any(
         call["name"] == "start_navigation" and call["success"]
         for call in trial.tool_calls

@@ -13,6 +13,7 @@ import pytest
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SCENARIO = Path("assets/scenarios/drowsy_rest_stop.yaml")
 CANCEL_SCENARIO = Path("assets/scenarios/drowsy_rest_stop_cancel.yaml")
+MUSIC_SCENARIO = Path("assets/scenarios/normal_driver_music.yaml")
 
 
 def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -89,6 +90,36 @@ def test_replay_demo_keeps_navigation_idle_after_user_cancels(tmp_path: Path) ->
         item["kind"] == "tool_result" and item["data"]["name"] == "start_navigation"
         for item in trace
     )
+
+
+def test_replay_demo_plays_music_for_a_normal_driver_and_reports_it(
+    tmp_path: Path,
+) -> None:
+    result = _run_cli(
+        "--scenario",
+        str(MUSIC_SCENARIO),
+        "--output-root",
+        str(tmp_path / "runs"),
+        "--allow-dirty",
+    )
+
+    assert result.returncode == 0, result.stderr
+    result_dir = tmp_path / "runs" / "normal-driver-music"
+    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
+    trace = json.loads((result_dir / "trace.json").read_text(encoding="utf-8"))
+    report = (result_dir / "report.html").read_text(encoding="utf-8")
+    assert summary["passed"] is True
+    assert summary["final_context"]["driver"]["state"] == "NORMAL"
+    assert summary["final_context"]["vehicle"]["media_playing"] is True
+    assert summary["final_context"]["vehicle"]["media_title"] == "轻松驾驶歌单"
+    assert summary["successful_tools"] == ["play_music"]
+    assert any(
+        item["kind"] == "tool_result"
+        and item["data"]["name"] == "play_music"
+        and item["data"]["success"]
+        for item in trace
+    )
+    assert "正常驾驶状态下播放音乐" in report
 
 
 def test_replay_demo_reports_invalid_scenario_without_traceback(

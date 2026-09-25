@@ -3,6 +3,7 @@ import json
 import pytest
 
 from modules.vehicle_ai.agent.vehicle_agent import VehicleAgent
+from modules.vehicle_ai.agent.budget import BudgetExceeded, TurnBudget
 from modules.vehicle_ai.context import ContextManager
 from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse, LLMToolCall
 from modules.vehicle_ai.tools import build_default_tool_registry
@@ -115,3 +116,21 @@ def test_uncertain_write_gets_reserved_readback_at_tool_budget_limit():
         "play_music",
         "get_media_status",
     ]
+
+
+def test_turn_budget_allows_exactly_one_reserved_read_retry():
+    budget = TurnBudget(10.0, 3, lambda: 0.0)
+    budget.claim("search_nearby_rest_area", {})
+    budget.claim_retry("search_nearby_rest_area", {})
+
+    assert budget.calls == 2
+    with pytest.raises(BudgetExceeded, match="REPEATED_CALL"):
+        budget.claim_retry("search_nearby_rest_area", {})
+
+
+def test_turn_budget_retry_counts_against_total_tool_limit():
+    budget = TurnBudget(10.0, 1, lambda: 0.0)
+    budget.claim("search_nearby_rest_area", {})
+
+    with pytest.raises(BudgetExceeded, match="TOOL_BUDGET"):
+        budget.claim_retry("search_nearby_rest_area", {})

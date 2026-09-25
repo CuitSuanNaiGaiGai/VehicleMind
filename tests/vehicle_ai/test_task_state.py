@@ -6,6 +6,10 @@ from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse, LLMToolCall
 from modules.vehicle_ai.tools import build_default_tool_registry
 
 
+class RateLimitError(Exception):
+    """Provider-style rate limit for an offline failure-path test."""
+
+
 class Replies(BaseLLMClient):
     def __init__(self, *responses):
         self.responses = iter(responses)
@@ -59,6 +63,7 @@ def test_cancellation_is_recorded_and_does_not_execute_navigation():
     [
         (LLMResponse(" ", []), "EMPTY_RESPONSE"),
         (TimeoutError("secret detail"), "MODEL_TIMEOUT"),
+        (RateLimitError("429 rate limit"), "MODEL_ERROR"),
         (RuntimeError("secret detail"), "MODEL_ERROR"),
     ],
 )
@@ -122,6 +127,27 @@ def test_expired_pointer_waits_for_input_instead_of_reusing_history():
     assert agent.task.reason == "PENDING_EXPIRED"
     assert "过期" in answer
     assert agent.pending_actions.get() is None
+    assert agent.task.plan.status == "CANCELLED"
+    assert agent.task.plan.terminal_reason == "PENDING_EXPIRED"
+
+
+def test_expired_confirmation_api_closes_the_plan_before_recording_expiry():
+    clock = [0.0]
+    agent = agent_for(
+        search(), LLMResponse("请确认导航。", []), action_clock=lambda: clock[0]
+    )
+    agent.chat("找服务区", debug=False)
+    pending = agent.pending_actions.get()
+    assert pending is not None
+
+    clock[0] = 130.0
+    result = agent.confirm_pending(pending.action_id)
+
+    assert result.error == "INVALID_CONFIRMATION"
+    assert agent.task.status == "AWAITING_INPUT"
+    assert agent.task.pending_action is None
+    assert agent.task.plan.status == "CANCELLED"
+    assert agent.task.plan.terminal_reason == "PENDING_EXPIRED"
 
 
 def test_clarification_and_short_followup_have_sourced_task_context():

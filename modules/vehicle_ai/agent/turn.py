@@ -4,6 +4,7 @@ import json
 from typing import TYPE_CHECKING
 
 from modules.vehicle_ai.agent.budget import BudgetExceeded, TurnBudget
+from modules.vehicle_ai.agent.plan import PlanTransitionError
 from modules.vehicle_ai.agent.task_state import TaskStatus
 from modules.vehicle_ai.agent.session import record
 from modules.vehicle_ai.tools.validation import valid_arguments
@@ -74,6 +75,7 @@ def run_turn(
                 text = response.content or ""
                 if not text.strip():
                     return stop("EMPTY_RESPONSE", "模型未返回有效回复，本轮已停止。")
+                agent.plan_flow.finish_turn(agent, text)
                 current = agent.pending_actions.get()
                 if target is not None and (
                     current is None or current.tool_name != "start_navigation"
@@ -112,21 +114,53 @@ def run_turn(
                     )
                 arguments = agent._ground_tool_arguments(call.name, call.arguments)
                 try:
-                    schema = agent.tool_registry.get(call.name).parameters
+                    definition = agent.tool_registry.get(call.name)
+                    schema = definition.parameters
                 except KeyError:
+                    definition = None
                     schema = None
                 if schema is not None and not valid_arguments(arguments, schema):
                     return stop(
                         "INVALID_ARGUMENTS",
                         "工具参数不符合要求，本轮已停止，未执行该操作。",
                     )
+                try:
+                    plan_error = agent.plan_flow.before_tool(
+                        agent, call.name, arguments, target=target
+                    )
+                except PlanTransitionError:
+                    return agent._record_final_response(
+                        user_text,
+                        "当前计划已达到步骤预算，已停止且未执行后续操作。",
+                    )
+                if plan_error is not None:
+                    return agent._record_final_response(user_text, plan_error)
                 budget.claim(call.name, arguments)
                 pending = agent.pending_actions.get()
-                if call.name != "start_navigation" or (
-                    pending and pending.tool_name == "start_navigation"
+                if (
+                    definition is not None
+                    and definition.requires_confirmation
+                    and (
+                        call.name != "start_navigation"
+                        or (pending and pending.tool_name == "start_navigation")
+                        or agent.plan_flow.candidate_for(
+                            agent, str(arguments.get("poi_id", ""))
+                        )
+                    )
                 ):
+                    candidate = agent.plan_flow.candidate_for(
+                        agent, str(arguments.get("poi_id", ""))
+                    )
                     agent.confirmations.stage(
-                        call.name, arguments, user_intent=user_text
+                        call.name,
+                        arguments,
+                        user_intent=user_text,
+                        display_text=(
+                            f"确认导航至{agent.plan_flow.display_name(candidate)}"
+                            if call.name == "start_navigation" and candidate
+                            else None
+                        ),
+                        metadata={"candidate": candidate} if candidate else None,
                     )
                 result = agent.tool_registry.execute(
                     call.name, arguments, user_intent=user_text
@@ -155,10 +189,63 @@ def run_turn(
                     arguments=arguments,
                     result=result.to_dict(),
                 )
+                retry_allowed = False
+                if (
+                    definition is not None
+                    and definition.read_only
+                    and result.data.get("retryable")
+                ):
+                    try:
+                        budget.claim_retry(call.name, arguments)
+                    except BudgetExceeded as exc:
+                        agent.plan_flow.stop_current(agent, str(exc))
+                        raise
+                    retry_allowed = agent.plan_flow.claim_read_retry(
+                        agent, call.name, result
+                    )
+                try:
+                    agent.plan_flow.observe_tool(
+                        agent,
+                        call.name,
+                        arguments,
+                        result,
+                        target=target,
+                        allow_retry=retry_allowed,
+                    )
+                except PlanTransitionError:
+                    return agent._record_final_response(
+                        user_text,
+                        "当前计划已达到步骤预算，已停止继续执行。",
+                    )
+                if retry_allowed:
+                    retry_result = agent.tool_registry.execute(
+                        call.name, arguments, user_intent=user_text
+                    )
+                    agent.task.last_tool_result = retry_result.to_dict()
+                    agent.task.tool_results.append(retry_result.to_dict())
+                    record(
+                        agent,
+                        "tool_result",
+                        source=call.name,
+                        quality="TOOL_RESULT",
+                        arguments=arguments,
+                        attempt=2,
+                        result=retry_result.to_dict(),
+                    )
+                    result = retry_result
+                    try:
+                        agent.plan_flow.observe_tool(
+                            agent, call.name, arguments, result, target=target
+                        )
+                    except PlanTransitionError:
+                        return agent._record_final_response(
+                            user_text,
+                            "当前计划已达到步骤预算，已停止继续执行。",
+                        )
                 if result.data.get("outcome_unknown"):
                     text = reconcile(agent, call.name, result)
                     return agent._record_final_response(user_text, text)
-                agent._update_action_state(call.name, result, target)
+                agent._update_action_state(call.name, result)
                 budget.remaining()
                 messages.append(
                     {

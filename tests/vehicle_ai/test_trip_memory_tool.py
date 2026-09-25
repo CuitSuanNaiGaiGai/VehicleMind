@@ -11,6 +11,7 @@ from modules.vehicle_ai.events import EventPriority, EventType, VehicleEvent
 from modules.vehicle_ai.replay.models import ScriptedResponse
 from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
 from modules.vehicle_ai.runtime import VehicleMindRuntime
+from modules.vehicle_ai.tools import NavigationConfig
 
 
 def test_trip_memory_tool_returns_scoped_history_not_current_context(tmp_path) -> None:
@@ -100,6 +101,42 @@ def test_runtime_persists_semantic_risk_and_user_cancellation(tmp_path) -> None:
     }
 
 
+def test_runtime_persists_bounded_plan_steps_as_trip_history(tmp_path) -> None:
+    store = TripEventStore(tmp_path / "events.sqlite3")
+    arguments = {}
+    response = ScriptedResponse(
+        content=None,
+        tool_calls=(
+            LLMToolCall(
+                "search-1",
+                "search_nearby_rest_area",
+                arguments,
+                json.dumps(arguments),
+            ),
+        ),
+    )
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient(
+            (response, ScriptedResponse(content="已找到模拟地点，请选择是否导航。"))
+        ),
+        trip_event_store=store,
+        trip_id="trip-a",
+        navigation_config=NavigationConfig(),
+    )
+
+    runtime.chat("帮我找附近服务区", debug=False)
+
+    steps = store.query(trip_id="trip-a", event_type="TASK_STEP", limit=20)
+    assert steps
+    assert any(event.payload["step"]["name"] == "SEARCH" for event in steps)
+    assert (
+        "TASK_STEP"
+        in runtime.tools.get("query_trip_events").parameters["properties"][
+            "event_type"
+        ]["enum"]
+    )
+
+
 def test_old_risk_memory_is_not_injected_as_current_vehicle_context(tmp_path) -> None:
     store = TripEventStore(tmp_path / "events.sqlite3")
     store.append(
@@ -144,6 +181,31 @@ def test_triggered_agent_reminder_is_saved_once(tmp_path) -> None:
     reminders = store.query(trip_id="trip-a", event_type="REMINDER")
     assert len(reminders) == 1
     assert reminders[0].payload["message"] == "请尽快安全停车休息。"
+
+
+def test_model_failure_saves_deterministic_safety_fallback(tmp_path) -> None:
+    store = TripEventStore(tmp_path / "events.sqlite3")
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient((ScriptedResponse(content="unused"),)),
+        trip_event_store=store,
+        trip_id="trip-fallback",
+    )
+
+    def fail(_event):
+        raise RuntimeError("model unavailable")
+
+    runtime.agent.recommend_from_event = fail  # type: ignore[method-assign]
+    values = {"presence": "PRESENT", "driver_state": "DROWSY", "risk": "HIGH"}
+    runtime.update_cabin(at_ms=1000, **values)
+    runtime.update_cabin(at_ms=1300, **values)
+    runtime.wait_for_recommendations(timeout_seconds=5)
+
+    reminders = store.query(trip_id="trip-fallback", event_type="REMINDER")
+
+    assert len(reminders) == 1
+    assert reminders[0].source == "deterministic_safety_fallback"
+    assert reminders[0].payload["recommendation_source"] == "deterministic_fallback"
+    assert "安全停车" in reminders[0].payload["message"]
 
 
 def test_new_safety_reminder_can_reference_prior_trip_interaction(tmp_path) -> None:

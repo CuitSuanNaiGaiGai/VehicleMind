@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import math
 from copy import deepcopy
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from modules.vehicle_ai.context import (
     ContextManager,
@@ -36,6 +40,16 @@ MOCK_REST_AREAS = [
 ]
 
 
+@dataclass(frozen=True)
+class NavigationConfig:
+    """Injectable simulated POIs and deterministic faults for replay tests."""
+
+    poi_catalog: Sequence[Mapping[str, Any]] | None = None
+    unavailable_poi_ids: frozenset[str] = frozenset()
+    transient_search_failures: int = 0
+    max_candidates: int = 3
+
+
 # ============================================================
 # Navigation Tools
 # ============================================================
@@ -45,8 +59,22 @@ class NavigationTools:
     def __init__(
         self,
         context_manager: ContextManager,
+        *,
+        poi_catalog: Sequence[Mapping[str, Any]] | None = None,
+        unavailable_poi_ids: frozenset[str] = frozenset(),
+        transient_search_failures: int = 0,
+        max_candidates: int = 3,
     ):
         self.context_manager = context_manager
+        catalog = MOCK_REST_AREAS if poi_catalog is None else poi_catalog
+        self.poi_catalog = tuple(deepcopy(dict(item)) for item in catalog)
+        self.unavailable_poi_ids = unavailable_poi_ids
+        if type(transient_search_failures) is not int or transient_search_failures < 0:
+            raise ValueError("transient_search_failures must be a non-negative integer")
+        self._transient_search_failures = transient_search_failures
+        if type(max_candidates) is not int or max_candidates < 1:
+            raise ValueError("max_candidates must be a positive integer")
+        self.max_candidates = max_candidates
 
     # ========================================================
     # POI lookup
@@ -57,9 +85,15 @@ class NavigationTools:
         poi_id: str,
     ) -> dict | None:
 
-        for poi in MOCK_REST_AREAS:
+        for poi in self.poi_catalog:
             if poi["poi_id"] == poi_id:
-                return deepcopy(poi)
+                resolved = deepcopy(poi)
+                aliases = resolved.get("aliases", ())
+                resolved["display_name_zh"] = next(
+                    (str(alias) for alias in aliases if str(alias).strip()),
+                    str(resolved.get("name", "休息地点")),
+                )
+                return resolved
 
         return None
 
@@ -69,6 +103,8 @@ class NavigationTools:
 
     def search_nearby_rest_area(
         self,
+        max_distance_km: float | None = None,
+        preferred_area: str | None = None,
     ) -> ToolResult:
         """
         Mock POI search.
@@ -80,12 +116,73 @@ class NavigationTools:
         name is only a human-readable display label.
         """
 
-        result = deepcopy(MOCK_REST_AREAS[0])
+        if max_distance_km is not None and (
+            isinstance(max_distance_km, bool)
+            or not isinstance(max_distance_km, int | float)
+            or not math.isfinite(max_distance_km)
+            or max_distance_km <= 0
+        ):
+            return ToolResult(
+                False,
+                "最大距离必须为正数。",
+                error="INVALID_SEARCH_FILTER",
+                data={"candidates": [], "simulated": True},
+            )
+        if preferred_area is not None and not isinstance(preferred_area, str):
+            return ToolResult(
+                False,
+                "区域偏好必须为文本。",
+                error="INVALID_SEARCH_FILTER",
+                data={"candidates": [], "simulated": True},
+            )
 
+        if self._transient_search_failures:
+            self._transient_search_failures -= 1
+            return ToolResult(
+                False,
+                "模拟地点查询暂时失败；允许进行一次只读重试。",
+                error="TRANSIENT_ERROR",
+                data={"retryable": True, "simulated": True},
+            )
+
+        preference = preferred_area.strip().casefold() if preferred_area else ""
+        matches = []
+        for poi in self.poi_catalog:
+            name = str(poi.get("name", ""))
+            aliases = poi.get("aliases", ())
+            labels = (name, *(str(alias) for alias in aliases))
+            if max_distance_km is not None and poi["distance_km"] > max_distance_km:
+                continue
+            if preference and not any(
+                preference in label.casefold() for label in labels
+            ):
+                continue
+            candidate = deepcopy(poi)
+            candidate["display_name_zh"] = next(
+                (str(alias) for alias in aliases if str(alias).strip()), name
+            )
+            candidate["available_at_search"] = True
+            candidate["simulated"] = True
+            matches.append(candidate)
+        candidates = sorted(matches, key=lambda item: item["distance_km"])[
+            : self.max_candidates
+        ]
+        if not candidates:
+            return ToolResult(
+                False,
+                "没有找到符合条件的模拟休息地点。",
+                error="NO_RESULTS",
+                data={"candidates": [], "simulated": True},
+            )
         return ToolResult(
-            success=True,
-            message=("Nearby rest area found."),
-            data=result,
+            True,
+            "已找到模拟休息地点候选；导航前仍需明确确认。",
+            data={
+                **deepcopy(candidates[0]),
+                "candidates": candidates,
+                "candidate_count": len(candidates),
+                "simulated": True,
+            },
         )
 
     # ========================================================
@@ -124,6 +221,18 @@ class NavigationTools:
                 },
             )
 
+        if poi_id in self.unavailable_poi_ids:
+            return ToolResult(
+                False,
+                "该模拟地点在确认后不可用；可重新选择其他候选地点。",
+                error="POI_UNAVAILABLE",
+                data={
+                    "poi_id": poi_id,
+                    "recoverable": True,
+                    "simulated": True,
+                },
+            )
+
         self.context_manager.update_vehicle(
             navigation_destination_id=(poi["poi_id"]),
             navigation_destination=(poi["name"]),
@@ -132,10 +241,13 @@ class NavigationTools:
 
         return ToolResult(
             success=True,
-            message=(f"Navigation started to '{poi['name']}'."),
+            message=(
+                f"模拟导航已开始，目的地：{poi.get('display_name_zh', poi['name'])}。"
+            ),
             data={
                 "poi_id": poi["poi_id"],
                 "destination": poi["name"],
+                "destination_display_zh": poi.get("display_name_zh", poi["name"]),
                 "distance_km": poi["distance_km"],
                 "eta_minutes": poi["eta_minutes"],
                 "navigation_state": NavigationState.ACTIVE,
@@ -172,25 +284,49 @@ class NavigationTools:
 
 def build_navigation_tools(
     context_manager: ContextManager,
+    *,
+    poi_catalog: Sequence[Mapping[str, Any]] | None = None,
+    unavailable_poi_ids: frozenset[str] = frozenset(),
+    transient_search_failures: int = 0,
+    max_candidates: int = 3,
+    config: NavigationConfig | None = None,
 ) -> list[ToolDefinition]:
 
-    tools = NavigationTools(context_manager)
+    if config is not None:
+        poi_catalog = config.poi_catalog
+        unavailable_poi_ids = config.unavailable_poi_ids
+        transient_search_failures = config.transient_search_failures
+        max_candidates = config.max_candidates
+
+    tools = NavigationTools(
+        context_manager,
+        poi_catalog=poi_catalog,
+        unavailable_poi_ids=unavailable_poi_ids,
+        transient_search_failures=transient_search_failures,
+        max_candidates=max_candidates,
+    )
 
     return [
         ToolDefinition(
             name=("search_nearby_rest_area"),
             description=(
-                "Find a nearby rest area "
-                "where the driver can stop "
-                "and rest. "
-                "The result includes a "
-                "canonical poi_id which "
-                "must be used for navigation."
+                "查询周边模拟休息地点，最多返回三个候选；结果含规范 poi_id、中文名称、距离和预计时间。"
+                "只能使用本次 candidates 中的精确 poi_id；默认按距离从近到远。"
+                "这是模拟目录，不是实时地图或实时可用性数据。"
             ),
             category="navigation",
             parameters={
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "max_distance_km": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                    },
+                    "preferred_area": {
+                        "type": "string",
+                        "description": "可选区域偏好，例如服务区别名",
+                    },
+                },
                 "required": [],
                 "additionalProperties": False,
             },
@@ -199,13 +335,8 @@ def build_navigation_tools(
         ToolDefinition(
             name="start_navigation",
             description=(
-                "Start navigation to a "
-                "previously resolved POI. "
-                "Use the exact canonical "
-                "poi_id returned by a search "
-                "tool or pending action. "
-                "Never translate, rewrite, "
-                "or invent the poi_id."
+                "对搜索结果中的规范地点启动模拟导航。必须使用搜索候选或有效待确认动作提供的精确 poi_id；"
+                "不得翻译、改写或编造 ID。此动作必须经过单次用户确认。"
             ),
             category="navigation",
             parameters={
@@ -213,13 +344,7 @@ def build_navigation_tools(
                 "properties": {
                     "poi_id": {
                         "type": "string",
-                        "description": (
-                            "Canonical POI ID "
-                            "returned by a "
-                            "search tool, for "
-                            "example "
-                            "'rest_area_001'."
-                        ),
+                        "description": "搜索候选或待确认动作返回的规范地点 ID。",
                     },
                 },
                 "required": ["poi_id"],

@@ -439,7 +439,16 @@ def test_runtime_subscriber_failure_does_not_break_perception_update() -> None:
 
     assert EventType.HIGH_RISK_DETECTED in [event.type for event in events]
     assert runtime.recommendation_coordinator.trace[-1].reason == "RECOMMENDATION_ERROR"
+    fallback = runtime.recommendation_coordinator.trace[-1].fallback_message
+    assert fallback is not None and "安全停车" in fallback
     assert runtime.context_manager.get_context().driver.risk == RiskLevel.HIGH
+    assert any(
+        item.get("kind") == "event_recommendation"
+        and item.get("source") == "deterministic_fallback"
+        and "安全停车" in item.get("text", "")
+        for item in runtime.agent.trace
+    )
+    assert not runtime.tools.execution_history()
 
 
 def agent_trace_contains_event(agent: VehicleAgent, event_id: str) -> bool:

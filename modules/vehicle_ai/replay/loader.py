@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 
 from collections.abc import Mapping
@@ -103,7 +104,9 @@ def _tool_call(value: Any, field: str) -> LLMToolCall:
         id=_text(document.get("id"), f"{field}.id"),
         name=_text(document.get("name"), f"{field}.name"),
         arguments=dict(arguments),
-        arguments_json=yaml.safe_dump(arguments, sort_keys=True).strip(),
+        arguments_json=json.dumps(
+            arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ),
     )
 
 

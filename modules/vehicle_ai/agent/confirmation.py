@@ -20,7 +20,13 @@ class ActionConfirmationController:
         self.__confirmation_issuer = confirmation_issuer
 
     def stage(
-        self, tool_name: str, arguments: dict[str, Any], user_intent: str = ""
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        user_intent: str = "",
+        *,
+        display_text: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         try:
             tool = self.tool_registry.get(tool_name)
@@ -40,8 +46,8 @@ class ActionConfirmationController:
             PendingAction(
                 tool_name=tool_name,
                 arguments=dict(arguments),
-                display_text=f"Confirm vehicle action: {tool_name}",
-                metadata={"user_intent": user_intent},
+                display_text=display_text or f"确认车机操作：{tool_name}",
+                metadata={"user_intent": user_intent, **(metadata or {})},
                 created_at=self.pending_actions.now(),
             )
         )

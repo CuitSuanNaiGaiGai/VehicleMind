@@ -1,0 +1,102 @@
+schema_version: 1
+suite_id: a5_bounded_plan_recovery_v1
+evaluation_mode: deterministic_scripted_llm
+cases:
+  - id: A5_SUCCESS
+    title: 正常候选与确认导航
+    expected:
+      plan_status: COMPLETED
+      confirmed_navigation_writes: 1
+      search_attempts: 1
+      recovery_count: 0
+      pending_action: false
+      safe_stop: false
+      recovery: false
+      reconciliation_tool: null
+      reconciliation_navigation_state: null
+      reconciliation_success: null
+      reconciliation_deferred: null
+  - id: A5_ALTERNATE_CONFIRM
+    title: 首选地点不可用后重新确认替代地点
+    expected:
+      plan_status: COMPLETED
+      confirmed_navigation_writes: 2
+      search_attempts: 1
+      recovery_count: 1
+      pending_action: false
+      safe_stop: false
+      recovery: true
+      reconciliation_tool: null
+      reconciliation_navigation_state: null
+      reconciliation_success: null
+      reconciliation_deferred: null
+  - id: A5_NO_RESULT
+    title: 无可行地点时停止
+    expected:
+      plan_status: STOPPED_NO_RESULT
+      confirmed_navigation_writes: 0
+      search_attempts: 1
+      recovery_count: 0
+      pending_action: false
+      safe_stop: true
+      recovery: false
+      reconciliation_tool: null
+      reconciliation_navigation_state: null
+      reconciliation_success: null
+      reconciliation_deferred: null
+  - id: A5_CANCEL
+    title: 用户取消待确认操作
+    expected:
+      plan_status: CANCELLED
+      confirmed_navigation_writes: 0
+      search_attempts: 1
+      recovery_count: 0
+      pending_action: false
+      safe_stop: true
+      recovery: false
+      reconciliation_tool: null
+      reconciliation_navigation_state: null
+      reconciliation_success: null
+      reconciliation_deferred: null
+  - id: A5_UNKNOWN_WRITE
+    title: 写入结果未知时只核对不重放
+    expected:
+      plan_status: FAILED
+      confirmed_navigation_writes: 1
+      search_attempts: 1
+      recovery_count: 0
+      pending_action: false
+      safe_stop: true
+      recovery: false
+      reconciliation_tool: get_vehicle_status
+      reconciliation_navigation_state: IDLE
+      reconciliation_success: true
+      reconciliation_deferred: false
+  - id: A5_INVALID_TARGET
+    title: 非候选地点 ID 被拒绝
+    expected:
+      plan_status: FAILED
+      confirmed_navigation_writes: 0
+      search_attempts: 1
+      recovery_count: 0
+      pending_action: false
+      safe_stop: true
+      recovery: false
+      reconciliation_tool: null
+      reconciliation_navigation_state: null
+      reconciliation_success: null
+      reconciliation_deferred: null
+  - id: A5_READ_RETRY
+    title: 只读地点查询瞬时失败后重试一次
+    expected:
+      plan_status: COMPLETED
+      confirmed_navigation_writes: 1
+      search_attempts: 2
+      recovery_count: 1
+      pending_action: false
+      safe_stop: false
+      recovery: false
+      reconciliation_tool: null
+      reconciliation_navigation_state: null
+      reconciliation_success: null
+      reconciliation_deferred: null

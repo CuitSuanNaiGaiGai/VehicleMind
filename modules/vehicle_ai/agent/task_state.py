@@ -6,6 +6,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
+from modules.vehicle_ai.agent.plan import TaskPlan
+
 
 class TaskStatus(StrEnum):
     IDLE = "IDLE"
@@ -28,13 +30,16 @@ class AgentTask:
     pending_action: dict[str, Any] | None = None
     tool_results: list[dict[str, Any]] = field(default_factory=list)
     transitions: list[dict[str, Any]] = field(default_factory=list)
+    plan: TaskPlan | None = None
 
     def transition(self, status: TaskStatus, reason: str | None = None) -> None:
         self.transitions.append({"from": self.status, "to": status, "reason": reason})
         self.status, self.reason = status, reason
 
     def to_dict(self) -> dict[str, Any]:
-        return deepcopy(asdict(self))
+        result = asdict(self)
+        result["plan"] = self.plan.to_dict() if self.plan is not None else None
+        return deepcopy(result)
 
     def finish(self, pending: bool) -> None:
         if self.status in {TaskStatus.FAILED, TaskStatus.AWAITING_INPUT}:

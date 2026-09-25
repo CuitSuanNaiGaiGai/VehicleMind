@@ -63,6 +63,7 @@ class TurnBudget:
     calls: int = 0
     signatures: set[str] = field(default_factory=set)
     used_calls: set[str] = field(default_factory=set)
+    retry_signatures: set[str] = field(default_factory=set)
 
     def __post_init__(self):
         if not math.isfinite(self.seconds) or self.seconds <= 0 or self.max_calls < 1:
@@ -84,4 +85,15 @@ class TurnBudget:
             raise BudgetExceeded("REPEATED_CALL")
         self.signatures.add(signature)
         self.used_calls.add(signature)
+        self.calls += 1
+
+    def claim_retry(self, name: str, arguments: dict) -> None:
+        """Reserve one additional call for a retryable read-only operation."""
+        self.remaining()
+        if self.calls >= self.max_calls:
+            raise BudgetExceeded("TOOL_BUDGET")
+        signature = json.dumps([name, arguments], sort_keys=True, ensure_ascii=False)
+        if signature not in self.signatures or signature in self.retry_signatures:
+            raise BudgetExceeded("REPEATED_CALL")
+        self.retry_signatures.add(signature)
         self.calls += 1
