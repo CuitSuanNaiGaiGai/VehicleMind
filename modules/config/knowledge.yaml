@@ -1,5 +1,5 @@
 instances:
   vehicle_common: http://127.0.0.1:9621
   vehiclemind_demo: http://127.0.0.1:9622
-timeout_seconds: 12
+timeout_seconds: 120
 top_k: 5

@@ -88,3 +88,7 @@ def test_router_rejects_shared_endpoint(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="distinct"):
         ProfileRouter(config)
+
+
+def test_default_query_timeout_covers_observed_online_retrieval() -> None:
+    assert ProfileRouter().timeout_seconds >= 90

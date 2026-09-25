@@ -173,11 +173,11 @@ class KnowledgeCatalog:
 
 **Interfaces:** `LightRAGClient.query(profile, query, *, top_k=5)` returns `RetrievalResult`. The request body fixes `mode="mix"`, `only_need_context=true`, `include_references=true`; limit candidates to configured maximum 5. Trace records effective profile, request ID, query, returned source IDs/ranks/text, LightRAG version, elapsed milliseconds and error code.
 
-- [ ] **Step 1: Write fake HTTP contract tests** asserting exact context-only request, fixed endpoint selected by profile, reference-to-catalog mapping, top-k bound, unknown/foreign source rejected, malformed JSON rejected, timeout surfaced and no generated LightRAG answer is returned to the Agent.
-- [ ] **Step 2: Run focused tests**; expected: fail because client and trace modules are absent.
-- [ ] **Step 3: Implement adapter** with bounded connect/read timeouts, response schema validation, stable source lookup and typed error codes (`service_unavailable`, `timeout`, `invalid_response`, `unknown_reference`, `index_unavailable`). Query text is user content only; it cannot set endpoint, profile, workspace or tool action.
-- [ ] **Step 4: Implement append-only per-run JSONL trace** with secret redaction and elapsed-time measurement. Preserve failed calls.
-- [ ] **Step 5: Run tests and commit** as `feat(rag): query LightRAG evidence with traceable citations`.
+- [x] **Step 1: Write fake HTTP contract tests** for context-only request, fixed endpoint, catalog mapping, top-k bound, foreign sources, invalid responses, timeout and exclusion of LightRAG answer text.
+- [x] **Step 2: Run focused tests**; observed: collection failed because client and trace modules did not exist.
+- [x] **Step 3: Implement adapter** with a 120-second bounded query timeout, response validation, stable source lookup and typed errors. The request contains only query text and fixed retrieval options.
+- [x] **Step 4: Implement append-only per-run JSONL trace** of request, evidence, error and elapsed time; credentials are absent from the trace schema.
+- [x] **Step 5: Run tests and commit** as `feat(rag): query LightRAG evidence with traceable citations`. Observed: 9 focused adapter/trace tests pass; real common-index query returned five catalog-mapped sources, starting with `K004`, in 13,982 ms.
 
 ### Task 6: Expose Retrieval as an On-Demand Read-Only Agent Tool
 
