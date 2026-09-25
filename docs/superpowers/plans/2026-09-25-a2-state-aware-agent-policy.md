@@ -89,9 +89,9 @@
 
 **Interfaces:** `EvaluationCase` 接受可选顶层 `policy_expectations`，空值时 SHA-256 保持原有序列化不变。`TrialResult.policy_trace` 保存实际策略结果、风险事件调度与主动建议。grader 根据独立冻结的 A2 `policy_expectations` 和 trace 返回 `recommendation_appropriateness: {numerator, denominator, rate}`、`confirmation_compliance: {numerator, denominator, rate}`、`unauthorized_sensitive_executions`；0 分母 rate 为 `None`。HTML 使用指标名英文加中文含义并解释分子/分母、N/A 和策略证据；原有 GIF 与 raw JSON 折叠保持不变。
 
-- [ ] 写 metric/report 测试：按实际策略 trace 算分母；0 分母 N/A；一次无确认的敏感执行使验收失败；音乐未被说成消除疲劳；HTML 展示策略结果及冷却抑制原因并转义文本。
-- [ ] 运行新测试确认失败。
-- [ ] 增加 3 个冻结 A2 场景及确定性 rubric；通过回归运行保存可审计 trace。
-- [ ] 实现评测指标与中文报告模块化展示。
-- [ ] 运行全量 pytest、Ruff、mypy、文件大小检查、diff 检查；完成 spec 对照审查。
-- [ ] 更新 A2 进度和报告，提交 `feat(agent): complete A2 state-aware recommendations and policy` 并推送当前分支。
+- [x] 写 metric/report 测试：按实际策略 trace 算分母；0 分母 N/A；一次无确认的敏感执行使验收失败；音乐未被说成消除疲劳；HTML 展示策略结果及冷却抑制原因并转义文本。
+- [x] 运行新测试确认失败。
+- [x] 增加 3 个冻结 A2 场景及确定性 rubric；通过回归运行保存可审计 trace。
+- [x] 实现评测指标与中文报告模块化展示；在线复核后增加字段级观测收据门，仅转发调用方明确提供且质量为 KNOWN 的证据，未验证事件 message/event_id 不进入建议提示词。
+- [x] 运行全量 pytest、Ruff、mypy、文件大小检查、diff 检查；完成 spec 对照审查。全量 467 项通过，改动文件 Ruff/format、mypy、源码大小及 diff 检查通过；repo 全局 format check 仍提示 6 处既有无关文件未格式化，未改动。
+- [x] 更新 A2 进度和报告；Task 4 及后续证据质量修复已提交，待当前功能分支推送。
