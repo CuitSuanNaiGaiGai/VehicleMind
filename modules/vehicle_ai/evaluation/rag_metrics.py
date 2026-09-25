@@ -28,6 +28,15 @@ class CitationReview:
     review_note: str
 
 
+@dataclass(frozen=True)
+class AbstentionReview:
+    case_id: str
+    reason: str
+    adequate: bool
+    reviewer_type: str
+    review_note: str
+
+
 def compute_recall_at_k(
     cases: Sequence[RagCase], retrieved: Mapping[str, Sequence[str]], k: int = 5
 ) -> Metric:
@@ -72,3 +81,20 @@ def compute_citation_support(reviews: Sequence[CitationReview]) -> Metric:
     if any(review.reviewer_type not in {"ai_assisted", "human"} for review in reviews):
         raise ValueError("citation reviewer type must be disclosed")
     return Metric(sum(review.supported for review in reviews), len(reviews))
+
+
+def compute_reviewed_abstention_metrics(
+    cases: Sequence[RagCase], reviews: Sequence[AbstentionReview]
+) -> dict[str, Metric]:
+    by_case = {review.case_id: review for review in reviews}
+    metrics: dict[str, Metric] = {}
+    for group in ("no_answer", "profile_mismatch"):
+        selected = [case for case in cases if case.expected_abstention_reason == group]
+        metrics[group] = Metric(
+            sum(
+                bool(by_case.get(case.case_id) and by_case[case.case_id].adequate)
+                for case in selected
+            ),
+            len(selected),
+        )
+    return metrics

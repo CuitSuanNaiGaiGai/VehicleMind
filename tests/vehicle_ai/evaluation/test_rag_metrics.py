@@ -1,10 +1,12 @@
 from modules.vehicle_ai.evaluation.rag_cases import RagCase
 from modules.vehicle_ai.evaluation.rag_metrics import (
+    AbstentionReview,
     CitationReview,
     compute_abstention_metrics,
     compute_citation_support,
     compute_profile_leaks,
     compute_recall_at_k,
+    compute_reviewed_abstention_metrics,
 )
 
 
@@ -51,3 +53,15 @@ def test_citation_support_is_fact_level_and_ai_tagged() -> None:
     )
     metric = compute_citation_support(reviews)
     assert (metric.numerator, metric.denominator, metric.value) == (1, 2, 0.5)
+
+
+def test_semantic_abstention_counts_failed_reviews_in_fixed_denominator() -> None:
+    cases = (
+        _case("A", False, (), "profile_mismatch"),
+        _case("B", False, (), "profile_mismatch"),
+    )
+    reviews = (
+        AbstentionReview("A", "profile_mismatch", True, "ai_assisted", "明确边界"),
+    )
+    metric = compute_reviewed_abstention_metrics(cases, reviews)["profile_mismatch"]
+    assert (metric.numerator, metric.denominator) == (1, 2)

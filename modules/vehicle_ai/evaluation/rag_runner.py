@@ -33,6 +33,8 @@ class AgentOutcome:
     knowledge_tool_called: bool
     abstained: bool
     usage: dict[str, int] | None
+    knowledge_retrieval: RetrievalResult | None = None
+    live_context: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,8 @@ class RagTrial:
     agent_usage: dict[str, int] | None
     elapsed_ms: float
     error: str | None
+    agent_retrieval: RetrievalResult | None = None
+    live_context: dict[str, object] | None = None
 
 
 def _metric(metric: Metric) -> dict[str, int | float | None]:
@@ -68,6 +72,8 @@ def run_cases(
 ) -> tuple[tuple[RagTrial, ...], dict]:
     """Evaluate each case once; all denominators include failed trials."""
     output_dir.mkdir(parents=True, exist_ok=True)
+    trial_path = output_dir / "trial.jsonl"
+    trial_path.write_text("", encoding="utf-8")
     trials: list[RagTrial] = []
     for case in cases:
         started = time.perf_counter()
@@ -104,11 +110,12 @@ def run_cases(
                 agent_usage=outcome.usage if outcome else None,
                 elapsed_ms=round((time.perf_counter() - started) * 1000, 3),
                 error=error,
+                agent_retrieval=outcome.knowledge_retrieval if outcome else None,
+                live_context=outcome.live_context if outcome else None,
             )
         )
-    with (output_dir / "trial.jsonl").open("w", encoding="utf-8") as output:
-        for trial in trials:
-            output.write(json.dumps(asdict(trial), ensure_ascii=False) + "\n")
+        with trial_path.open("a", encoding="utf-8") as output:
+            output.write(json.dumps(asdict(trials[-1]), ensure_ascii=False) + "\n")
     retrieved = {trial.case_id: trial.retrieved_source_ids for trial in trials}
     abstained = {trial.case_id: trial.abstained for trial in trials}
     summary = {

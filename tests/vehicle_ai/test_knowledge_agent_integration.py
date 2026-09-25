@@ -7,6 +7,7 @@ from modules.vehicle_ai.llm.base import LLMToolCall
 from modules.vehicle_ai.replay.models import ScriptedResponse
 from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
 from modules.vehicle_ai.runtime import VehicleMindRuntime
+from modules.vehicle_ai.agent.prompts import SYSTEM_PROMPT
 
 
 class FakeKnowledgeClient:
@@ -77,3 +78,8 @@ def test_model_cannot_select_profile_or_endpoint() -> None:
         "search_vehicle_knowledge", {"query": "疲劳", "profile": "vehiclemind_demo"}
     )
     assert not result.success and result.error == "UNKNOWN_ARGUMENTS"
+
+
+def test_project_implementation_questions_require_retrieval() -> None:
+    assert "must retrieve evidence before answering" in SYSTEM_PROMPT
+    assert "Do not answer those implementation" in SYSTEM_PROMPT
