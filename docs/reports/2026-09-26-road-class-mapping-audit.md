@@ -30,13 +30,14 @@
 - 本地权重与转换来源：[model_manifest.yaml](../../assets/model_manifest.yaml)
 - 三个模型文件的 SHA-256 均与 `assets/model_manifest.yaml` 一致。
 - ONNX Runtime 1.30.0 CPU 会话记录了三个原始检测头 shape、解码 shape、三个采样帧的 NMS 类别 ID 与框数；环境为 Python 3.13 / OpenCV 4.14.0。
+- 代码审查后再次用本机视频和三份真实权重复跑：数值输出与上表一致；stdout 仅有 JSON，ONNX symbolic 输入维度规范化为 `dynamic`，不暴露原始输入名或本机路径。
 - 动态与静态 640 在这三个帧上的 NMS 类别和框数一致；静态 512 均输出 ID 3，但因输入分辨率不同，框数在中间帧有差异。
 - 官方 BDD100K 格式文档说明其类别 `category_id` 从 1 开始；YOLOPv2 的未解决 issue #53 也报告 class 3 被解释为 car。两者恰恰说明不能把原始 ID 直接按当前 0-based BDD100K 名称数组称作 `truck`。
 - 现有 README 和自动核验报告继续把舱外类别输出明确列为异常，不用于简历中的类别识别成绩。
 
 ## 复现与来源
 
-本次可复跑诊断工具版本为 Git commit `448b300ab699fdae142246e58bdcabd7908e9875`，其预处理、检测头解码与 NMS 基线来自 `6620419d7128dd00622049435485511ac34ebd56`。视频 SHA-256 为 `b2b8117bc07ea61d4c9c3aeb056d0798b0998145dd4ca5350c5905d34f9457ef`，模型 SHA-256 见上文。诊断脚本会输出这些摘要，但不写本机绝对路径、帧图像或检测框坐标。
+诊断工具的推理/解码实现始于 Git commit `448b300ab699fdae142246e58bdcabd7908e9875`，预处理、检测头解码与 NMS 基线来自 `6620419d7128dd00622049435485511ac34ebd56`；本分支后续仅增加 JSON 输出隔离及元数据路径清理，不改变推理参数。视频 SHA-256 为 `b2b8117bc07ea61d4c9c3aeb056d0798b0998145dd4ca5350c5905d34f9457ef`，模型 SHA-256 见上文。诊断脚本会输出这些摘要，但不写本机绝对路径、帧图像或检测框坐标。
 
 ```bash
 uv run --extra perception --group dev python scripts/audit_yolopv2_class_ids.py \

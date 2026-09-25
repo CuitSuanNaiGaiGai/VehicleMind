@@ -355,7 +355,7 @@
 
 - [x] 核心 Agent 业务范围（`agent/`、`context/`、`events/`、`tools/`）行覆盖率 92.7%（2110/2275），达到 ≥80%；全 `modules/` 为 76.1%（6313/8085）。覆盖率 JSON 留在本机临时目录，未纳入仓库。
 - [x] 安全相关选定路径行覆盖率 96.4%（726/753），达到 ≥95%。口径固定为 `agent/action_state.py`、`confirmation.py`、`pending_intent.py`、`plan.py`、`plan_actions.py`、`plan_flow.py`、`task_state.py` 与 `tools/navigation.py`、`registry.py`、`validation.py`。
-- [x] 本次离线测试命令排除标记为 `online`/`hardware` 的用例；625 passed、2 deselected。
+- [x] 离线测试命令排除标记为 `online`/`hardware` 的用例；A6 历史验收批次 625 passed、2 deselected，本轮道路类别审计分支含新增审查回归后为 633 passed、2 deselected。
 - [x] 本轮新增缺陷均有对应回归测试；历史已修复缺陷由其原测试覆盖。
 - [ ] 任意图表和简历数字可以从保存的结果文件重新生成；部分历史在线原始 trace 位于本机忽略目录，公开仓库不是完整可复算数据包。
 

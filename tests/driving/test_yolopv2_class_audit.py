@@ -7,7 +7,9 @@ import pytest
 from scripts.audit_yolopv2_class_ids import (
     count_class_ids,
     safe_asset_reference,
+    safe_input_shape,
     sample_frame_indices,
+    run_non_max_suppression,
 )
 
 
@@ -50,3 +52,32 @@ def test_safe_asset_reference_keeps_basename_without_local_path() -> None:
 
     assert reference == {"filename": "road_test.mp4", "sha256": "a" * 64}
     assert "/private/data" not in str(reference)
+
+
+def test_safe_input_shape_hides_symbolic_metadata() -> None:
+    assert safe_input_shape([1, 3, "/private/user/model.onnx", "width"]) == [
+        1,
+        3,
+        "dynamic",
+        "dynamic",
+    ]
+
+
+def test_nms_warning_does_not_pollute_json_stdout(monkeypatch, capsys) -> None:
+    expected = [["detections"]]
+
+    def noisy_nms(*args, **kwargs):
+        print("WARNING: NMS time limit exceeded")
+        return expected
+
+    monkeypatch.setattr(
+        "scripts.audit_yolopv2_class_ids.yolopv2_utils.non_max_suppression",
+        noisy_nms,
+    )
+
+    result = run_non_max_suppression("prediction")
+
+    captured = capsys.readouterr()
+    assert result is expected
+    assert captured.out == ""
+    assert "WARNING: NMS time limit exceeded" in captured.err

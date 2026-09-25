@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import redirect_stdout
 import hashlib
+import sys
 import json
 import platform
 from collections import Counter
@@ -38,6 +40,24 @@ def count_class_ids(detections: Sequence[Sequence[float]]) -> dict[str, int]:
 def safe_asset_reference(path: Path, sha256: str) -> dict[str, str]:
     """Expose a stable asset identity without serializing its local path."""
     return {"filename": path.name, "sha256": sha256}
+
+
+def safe_input_shape(input_shape: Sequence[Any]) -> list[int | str]:
+    """Keep numeric dimensions but suppress arbitrary symbolic ONNX metadata."""
+    return [
+        dimension if type(dimension) is int and dimension > 0 else "dynamic"
+        for dimension in input_shape
+    ]
+
+
+def run_non_max_suppression(prediction: Any) -> Any:
+    """Keep third-party NMS warnings on stderr, leaving stdout machine-readable."""
+    with redirect_stdout(sys.stderr):
+        return yolopv2_utils.non_max_suppression(
+            prediction,
+            conf_thres=CONFIDENCE_THRESHOLD,
+            iou_thres=NMS_IOU_THRESHOLD,
+        )
 
 
 def _sha256(path: Path) -> str:
@@ -131,11 +151,7 @@ def _inspect_model(
             [head.copy() for head in heads],
             [outputs[index] for index in range(1, 4)],
         )
-        detections = yolopv2_utils.non_max_suppression(
-            prediction,
-            conf_thres=CONFIDENCE_THRESHOLD,
-            iou_thres=NMS_IOU_THRESHOLD,
-        )[0]
+        detections = run_non_max_suppression(prediction)[0]
         observed_head_shapes = [list(head.shape) for head in heads]
         decoded_shape = list(prediction.shape)
         output_samples.append(
@@ -148,8 +164,7 @@ def _inspect_model(
 
     return {
         "asset": safe_asset_reference(model_path, _sha256(model_path)),
-        "input_name": input_meta.name,
-        "input_shape": list(input_meta.shape),
+        "input_shape": safe_input_shape(input_meta.shape),
         "inference_size": [input_height, input_width],
         "providers": session.get_providers(),
         "raw_head_shapes": observed_head_shapes,

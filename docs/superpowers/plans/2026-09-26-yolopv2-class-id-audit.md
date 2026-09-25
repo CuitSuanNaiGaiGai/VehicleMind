@@ -49,5 +49,6 @@
 - [x] 实现 CLI；动态输入默认 640，静态模型使用模型元数据中的固定输入尺寸；输出模型和视频 SHA-256。
 - [x] 用本地三份真实权重与 `assets/driving/road_test.mp4` 运行；三个模型各三个样帧均只输出 ID 3，不把画面解释成人工标签。
 - [x] 更新运行时审计报告与 `todolist.md`：运行时采集标完成，语义映射仍未验证。
-- [x] 相关验证：定向 6 passed；全量离线 631 passed、2 skipped；Ruff check/format、mypy、source-size、资产清单 schema 均通过。
+- [x] 审查修复：NMS 的第三方提示只写 stderr；ONNX symbolic input metadata 统一输出为 `dynamic`，不输出原始 input name。
+- [x] 相关验证：定向 8 passed；修复后全量离线 633 passed、2 deselected；Ruff check/format、mypy、source-size、资产清单 schema 均通过。三模型真实 ONNX 审计已在安全输出修复后复跑，NMS class ID 分布与原记录一致。
 - [ ] 提交并推送功能分支，CI 通过后按既有项目流程合并 `main`。
