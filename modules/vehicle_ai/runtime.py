@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from collections.abc import Callable
+from threading import Lock
 
 from modules.vehicle_ai.agent import (
     VehicleAgent,
@@ -118,12 +120,41 @@ class VehicleMindRuntime:
         self.event_bus.subscribe(
             EventType.HIGH_RISK_DETECTED, self._recommend_from_event
         )
+        self._recommendation_executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="vehiclemind-recommendation"
+        )
+        self._recommendation_lock = Lock()
+        self._recommendation_future: Future[None] | None = None
 
     def _recommend_from_event(self, event: VehicleEvent) -> None:
+        if not self.recommendation_coordinator.policy.enabled:
+            self.recommendation_coordinator.on_event(event)
+            return
+        with self._recommendation_lock:
+            if (
+                self._recommendation_future is not None
+                and not self._recommendation_future.done()
+            ):
+                self.recommendation_coordinator.record_suppressed(
+                    event, "IN_FLIGHT_SUPPRESSED"
+                )
+                return
+            self._recommendation_future = self._recommendation_executor.submit(
+                self._run_recommendation, event
+            )
+
+    def _run_recommendation(self, event: VehicleEvent) -> None:
         try:
             self.recommendation_coordinator.on_event(event)
         except Exception as error:
             self.recommendation_coordinator.record_failure(event, error)
+
+    def wait_for_recommendations(self, timeout_seconds: float | None = None) -> None:
+        """Wait for the currently scheduled recommendation, mainly for replay/tests."""
+        with self._recommendation_lock:
+            future = self._recommendation_future
+        if future is not None:
+            future.result(timeout=timeout_seconds)
 
     # ========================================================
     # Context-change processing

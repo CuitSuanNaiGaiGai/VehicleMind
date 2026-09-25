@@ -16,6 +16,7 @@ from modules.vehicle_ai.agent.decision_context import (
     GROUNDING_NOTE,
     attach_field_evidence,
 )
+from modules.vehicle_ai.agent.event_advice import build_event_advice_messages
 from modules.vehicle_ai.agent.pending_intent import (
     classify_pending_intent,
     requested_target,
@@ -447,24 +448,7 @@ class VehicleAgent:
 
     def recommend_from_event(self, event: VehicleEvent) -> str:
         """Generate one advisory reply without entering the task or tool workflow."""
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a vehicle safety assistant. Give one brief, calm safety "
-                    "recommendation for the current high driver-risk event. "
-                    "Do not suggest that music treats fatigue. Do not claim an "
-                    "action has been performed."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"Event {event.event_id}: {event.message} "
-                    "Suggest a safe next step for the driver."
-                ),
-            },
-        ]
+        messages, evidence = build_event_advice_messages(event)
         response = self.llm.chat_with_timeout(
             messages, tools=[], timeout_seconds=self.turn_timeout_seconds
         )
@@ -475,6 +459,7 @@ class VehicleAgent:
                 "kind": "event_recommendation",
                 "event_id": event.event_id,
                 "event_time": event.timestamp,
+                "evidence": evidence,
                 "text": text,
                 "tool_calls_ignored": len(response.tool_calls),
             }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from threading import Event, Thread
 from pathlib import Path
 
 import pytest
@@ -73,6 +74,39 @@ def test_first_event_triggers_exactly_one_no_tools_request_and_evidence() -> Non
     assert agent.trace[-1]["text"] == "请安全停车休息。"
 
 
+def test_recommendation_prompt_includes_allowlisted_perception_evidence() -> None:
+    coordinator, agent, llm, _ = setup_coordinator()
+    event = VehicleEvent(
+        type=EventType.HIGH_RISK_DETECTED,
+        priority=EventPriority.CRITICAL,
+        source="cabin_perception",
+        message="High driver-risk state detected.",
+        data={
+            "risk": "HIGH",
+            "driver_state": "DROWSY",
+            "perclos": 0.42,
+            "eye_closure_seconds": 2.4,
+            "recent_yawns": 2,
+            "vehicle_speed_kmh": 80.0,
+            "untrusted_extra": "must not be sent",
+        },
+        event_id="evidence-event",
+    )
+
+    coordinator.on_event(event)
+
+    prompt = llm.requests[0].messages[-1]["content"]
+    assert "eye_closure_seconds" in prompt and "2.4" in prompt
+    assert "recent_yawns" in prompt and "2" in prompt
+    assert "untrusted_extra" not in prompt
+    assert agent_trace_contains_event(coordinator.agent, "evidence-event")
+    trace = next(
+        item for item in agent.trace if item.get("event_id") == "evidence-event"
+    )
+    assert trace["evidence"]["eye_closure_seconds"] == 2.4
+    assert "untrusted_extra" not in trace["evidence"]
+
+
 def test_duplicate_and_cooldown_then_new_event_after_cooldown() -> None:
     now = [0.0]
     coordinator, _, llm, context = setup_coordinator(
@@ -97,6 +131,17 @@ def test_duplicate_and_cooldown_then_new_event_after_cooldown() -> None:
         "COOLDOWN_SUPPRESSED",
         "TRIGGERED",
     ]
+
+
+def test_failed_model_request_still_starts_cooldown() -> None:
+    coordinator, agent, _, _ = setup_coordinator()
+
+    def fail(_: VehicleEvent) -> str:
+        raise RuntimeError("temporary provider error")
+
+    agent.recommend_from_event = fail  # type: ignore[method-assign]
+    assert coordinator.on_event(high_event("failed-1")).reason == "RECOMMENDATION_ERROR"
+    assert coordinator.on_event(high_event("failed-2")).reason == "COOLDOWN_SUPPRESSED"
 
 
 @pytest.mark.parametrize("state", ["MISSING", "INVALID", "STALE", "UNKNOWN", "LOW"])
@@ -195,6 +240,7 @@ def test_runtime_subscription_triggers_recommendation_and_records_trace() -> Non
     runtime.update_cabin(at_ms=1000, **values)
     runtime.update_cabin(at_ms=1300, **values)
 
+    runtime.wait_for_recommendations(timeout_seconds=1.0)
     assert len(llm.requests) == 1
     assert llm.requests[0].tools == []
     assert runtime.recommendation_coordinator.trace[-1].reason == "TRIGGERED"
@@ -225,7 +271,80 @@ def test_runtime_subscriber_failure_does_not_break_perception_update() -> None:
     values = {"presence": "PRESENT", "driver_state": "DROWSY", "risk": "HIGH"}
     runtime.update_cabin(at_ms=1000, **values)
     events = runtime.update_cabin(at_ms=1300, **values)
+    runtime.wait_for_recommendations(timeout_seconds=1.0)
 
     assert EventType.HIGH_RISK_DETECTED in [event.type for event in events]
     assert runtime.recommendation_coordinator.trace[-1].reason == "RECOMMENDATION_ERROR"
     assert runtime.context_manager.get_context().driver.risk == RiskLevel.HIGH
+
+
+def agent_trace_contains_event(agent: VehicleAgent, event_id: str) -> bool:
+    return any(
+        item.get("kind") == "event_recommendation" and item.get("event_id") == event_id
+        for item in agent.trace
+    )
+
+
+def test_runtime_recommendation_does_not_block_perception_update() -> None:
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient((ScriptedResponse(content="unused"),))
+    )
+    model_started = Event()
+    release_model = Event()
+    update_returned = Event()
+
+    def blocked_recommendation(_: VehicleEvent) -> str:
+        model_started.set()
+        release_model.wait(timeout=2.0)
+        return "safe reply"
+
+    runtime.agent.recommend_from_event = blocked_recommendation  # type: ignore[method-assign]
+    values = {"presence": "PRESENT", "driver_state": "DROWSY", "risk": "HIGH"}
+
+    def update() -> None:
+        runtime.update_cabin(at_ms=1000, **values)
+        runtime.update_cabin(at_ms=1300, **values)
+        update_returned.set()
+
+    thread = Thread(target=update)
+    thread.start()
+    try:
+        assert model_started.wait(timeout=1.0)
+        assert update_returned.wait(timeout=0.5)
+    finally:
+        release_model.set()
+        thread.join(timeout=1.0)
+
+    runtime.wait_for_recommendations(timeout_seconds=1.0)
+
+
+def test_concurrent_events_cannot_both_pass_cooldown_gate() -> None:
+    coordinator, agent, _, _ = setup_coordinator()
+    model_started = Event()
+    release_model = Event()
+    calls: list[str] = []
+
+    def blocked_recommendation(event: VehicleEvent) -> str:
+        calls.append(event.event_id)
+        model_started.set()
+        release_model.wait(timeout=1.0)
+        return "safe advice"
+
+    agent.recommend_from_event = blocked_recommendation  # type: ignore[method-assign]
+    first = Thread(target=coordinator.on_event, args=(high_event("concurrent-1"),))
+    second_result: list[str] = []
+
+    def submit_second() -> None:
+        second_result.append(coordinator.on_event(high_event("concurrent-2")).reason)
+
+    first.start()
+    try:
+        assert model_started.wait(timeout=1.0)
+        second = Thread(target=submit_second)
+        second.start()
+        second.join(timeout=1.0)
+        assert second_result == ["COOLDOWN_SUPPRESSED"]
+    finally:
+        release_model.set()
+        first.join(timeout=1.0)
+    assert calls == ["concurrent-1"]

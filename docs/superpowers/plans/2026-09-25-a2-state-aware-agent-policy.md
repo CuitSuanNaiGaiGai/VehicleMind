@@ -67,11 +67,12 @@
 
 **Interfaces:** `RecommendationCoordinator.on_event(VehicleEvent) -> RecommendationTrigger` 仅处理已通过配置的 `HIGH_RISK_DETECTED`，按风险键及 YAML 冷却时间返回 `TRIGGERED`、`COOLDOWN_SUPPRESSED`、`DUPLICATE_SUPPRESSED` 或 `INVALID_CONTEXT`；其 `trace` 保存事件 ID、时间、上下文质量、原因及模型调用结果。`VehicleAgent.recommend_from_event(event) -> str` 发起一次不带任何工具 schema 的模型请求，生成建议和证据 trace，不创建 PendingAction、不执行写操作。
 
-- [ ] 写可控时钟 fake-client 测试：首次高风险事件调用一次模型；冷却期相同风险不调用；冷却后新风险可再调用；未知/失效 driver context 不调用；建议模型返回 tool call 时不执行。
-- [ ] 运行新测试确认失败。
-- [ ] 接入 EventBus 订阅和 coordinator；将事件调用、抑制原因与 Agent 建议统一序列化。
-- [ ] 运行 EventDetector/Runtime/Agent 相关测试及 Ruff/mypy。
-- [ ] 提交 `feat(agent): add cooled risk-event recommendations`。
+- [x] 写可控时钟 fake-client 测试：首次高风险事件调用一次模型；冷却期相同风险不调用；冷却后新风险可再调用；未知/失效 driver context 不调用；建议模型返回 tool call 时不执行。
+- [x] 运行新测试确认失败。
+- [x] 接入 EventBus 订阅和 coordinator；将事件调用、抑制原因与 Agent 建议统一序列化。
+- [x] 根据独立 review 改为后台单线程推荐请求；显式白名单化感知证据；锁保护去重/冷却并限制 seen-ID 数量；请求失败也启动冷却。
+- [x] 运行 EventDetector/Runtime/Agent 相关测试及 Ruff/mypy。
+- [x] 提交 `feat(agent): recommend on trusted high-risk events with cooldown` 与 review fixes；独立复审通过，分字段质量追踪留给 Task 4 报告呈现。
 
 ### Task 4: 策略评测、可视化报告与验收
 
