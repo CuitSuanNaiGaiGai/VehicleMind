@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 tool_risks:
   get_vehicle_status: READ_ONLY
   get_climate_status: READ_ONLY
@@ -14,5 +14,5 @@ tool_risks:
   set_driver_window: CONFIRMATION_REQUIRED
 risk_policy:
   high_driver_risk: HIGH
-  fatigue_warning: "检测到高疲劳风险，请优先安全停车休息；音乐不能替代休息。"
-  unknown_driver_warning: "驾驶员风险状态未知或不可用，无法依据当前观测判断风险。"
+  fatigue_warning_code: REST_REQUIRED
+  unknown_driver_warning_code: STATE_UNAVAILABLE

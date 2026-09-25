@@ -48,6 +48,10 @@ class RiskPolicy:
     unknown_driver_warning: str
 
 
+_FATIGUE_WARNING = "检测到高疲劳风险，请优先安全停车休息；音乐不能替代休息。"
+_UNKNOWN_DRIVER_WARNING = "驾驶员风险状态未知或不可用，无法依据当前观测判断风险。"
+
+
 @dataclass(frozen=True)
 class AgentPolicy:
     tool_risks: dict[str, ActionRisk]
@@ -67,7 +71,7 @@ class AgentPolicy:
             "risk_policy",
         }:
             raise ValueError("agent policy configuration has invalid fields")
-        if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+        if type(data["schema_version"]) is not int or data["schema_version"] != 2:
             raise ValueError("unsupported agent policy schema version")
 
         raw_risks = data["tool_risks"]
@@ -85,22 +89,22 @@ class AgentPolicy:
         raw_policy = data["risk_policy"]
         if not isinstance(raw_policy, dict) or set(raw_policy) != {
             "high_driver_risk",
-            "fatigue_warning",
-            "unknown_driver_warning",
+            "fatigue_warning_code",
+            "unknown_driver_warning_code",
         }:
             raise ValueError("risk_policy has invalid fields")
         if raw_policy["high_driver_risk"] != RiskLevel.HIGH:
             raise ValueError("high_driver_risk must be HIGH")
-        for key in ("fatigue_warning", "unknown_driver_warning"):
-            value = raw_policy[key]
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{key} must be a nonempty string")
+        if raw_policy["fatigue_warning_code"] != "REST_REQUIRED":
+            raise ValueError("unsupported fatigue warning code")
+        if raw_policy["unknown_driver_warning_code"] != "STATE_UNAVAILABLE":
+            raise ValueError("unsupported unknown driver warning code")
         return cls(
             tool_risks=risks,
             risk_policy=RiskPolicy(
                 high_driver_risk=RiskLevel.HIGH,
-                fatigue_warning=raw_policy["fatigue_warning"],
-                unknown_driver_warning=raw_policy["unknown_driver_warning"],
+                fatigue_warning=_FATIGUE_WARNING,
+                unknown_driver_warning=_UNKNOWN_DRIVER_WARNING,
             ),
         )
 
@@ -108,7 +112,13 @@ class AgentPolicy:
         risk = self.tool_risks.get(tool.name)
         if risk is None:
             return PolicyResult(PolicyDecision.DENY, "Tool is not configured.", None)
-        if tool.requires_confirmation and risk is not ActionRisk.CONFIRMATION_REQUIRED:
+        if tool.read_only != (risk is ActionRisk.READ_ONLY):
+            return PolicyResult(
+                PolicyDecision.DENY,
+                "Configured risk conflicts with the tool's read-only flag.",
+                risk,
+            )
+        if tool.requires_confirmation != (risk is ActionRisk.CONFIRMATION_REQUIRED):
             return PolicyResult(
                 PolicyDecision.DENY,
                 "Configured risk conflicts with the tool's confirmation requirement.",

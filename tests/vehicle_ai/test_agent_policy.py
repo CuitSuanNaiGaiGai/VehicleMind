@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from modules.vehicle_ai.agent.policy import (
     ActionRisk,
@@ -114,6 +115,77 @@ def test_tool_confirmation_flag_cannot_be_downgraded_by_config() -> None:
         tool("play_music", confirmed=True), context()
     )
     assert result.decision is PolicyDecision.DENY
+
+
+def test_writable_tool_reclassified_as_read_only_is_denied(tmp_path: Path) -> None:
+    data = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    data["tool_risks"]["play_music"] = "READ_ONLY"
+    path = tmp_path / "policy.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    result = AgentPolicy.from_yaml(path).evaluate(tool("play_music"), context())
+    assert result.decision is PolicyDecision.DENY
+    assert "Read-only action is allowed" not in result.reason
+
+
+def test_read_only_tool_reclassified_as_write_is_denied(tmp_path: Path) -> None:
+    data = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    data["tool_risks"]["get_media_status"] = "REVERSIBLE_WRITE"
+    path = tmp_path / "policy.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    result = AgentPolicy.from_yaml(path).evaluate(
+        tool("get_media_status", read_only=True), context()
+    )
+    assert result.decision is PolicyDecision.DENY
+
+
+def test_confirmation_required_tool_downgraded_in_yaml_is_denied(
+    tmp_path: Path,
+) -> None:
+    data = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    data["tool_risks"]["start_navigation"] = "REVERSIBLE_WRITE"
+    path = tmp_path / "policy.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    result = AgentPolicy.from_yaml(path).evaluate(
+        tool("start_navigation", confirmed=True), context()
+    )
+    assert result.decision is PolicyDecision.DENY
+
+
+def test_non_confirmation_tool_upgraded_in_yaml_is_denied(tmp_path: Path) -> None:
+    data = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    data["tool_risks"]["play_music"] = "CONFIRMATION_REQUIRED"
+    path = tmp_path / "policy.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    result = AgentPolicy.from_yaml(path).evaluate(tool("play_music"), context())
+    assert result.decision is PolicyDecision.DENY
+
+
+@pytest.mark.parametrize("warning_key", ["fatigue_warning", "unknown_driver_warning"])
+def test_warning_prose_cannot_be_injected_from_yaml(
+    tmp_path: Path, warning_key: str
+) -> None:
+    data = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    data["risk_policy"][warning_key] = "音乐可以消除疲劳"
+    path = tmp_path / "policy.yaml"
+    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        AgentPolicy.from_yaml(path)
+
+
+def test_default_warning_policy_uses_versioned_codes() -> None:
+    data = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    assert data["schema_version"] == 2
+    assert data["risk_policy"] == {
+        "high_driver_risk": "HIGH",
+        "fatigue_warning_code": "REST_REQUIRED",
+        "unknown_driver_warning_code": "STATE_UNAVAILABLE",
+    }
+    AgentPolicy.from_yaml(CONFIG)
 
 
 @pytest.mark.parametrize(
