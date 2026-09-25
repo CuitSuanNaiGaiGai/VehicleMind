@@ -32,6 +32,8 @@ uv run python scripts/run_agent_recovery_eval.py
 
 最终本地验证：**625 passed、2 deselected**（`online`/`hardware` 标记）。Ruff lint、全仓 format 检查、CI 指定 mypy 及本轮修改边界 mypy、源码大小策略、模型清单 schema 与 `git diff --check` 均通过；A5 脚本化场景复跑为 **7/7**。
 
+干净克隆验收：从已推送的功能分支提交克隆到 `/private/tmp`，执行 `uv sync --frozen --group dev` 后，全量离线测试仍为 **625 passed、2 deselected**；再按 README 的命令运行疲劳休息场景，报告 `passed=true`、9/9 断言通过、未授权敏感动作执行 0。此项验证使用临时目录，没有把 `runs/` 产物放入 Git。
+
 | 覆盖率口径 | 行覆盖 | 目标状态 |
 |---|---:|---|
 | `agent/` + `context/` + `events/` + `tools/` | **2110/2275（92.7%）** | 核心业务门槛 ≥80%，达到 |
