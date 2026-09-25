@@ -246,10 +246,19 @@ class ReplayRunner:
                 stage_started = time.perf_counter()
                 answer = runtime.chat(step.user_text, debug=False)
                 agent_seconds += time.perf_counter() - stage_started
+                task = runtime.agent.task.to_dict()
                 recorder.add(
                     at_ms=step.at_ms,
                     kind="agent_response",
-                    data={"summary": answer},
+                    data={
+                        "goal": task["goal"],
+                        "status": task["status"],
+                        "reason": task["reason"],
+                        "summary": answer,
+                        "last_tool_result": task["last_tool_result"],
+                        "pending_action": bool(task["pending_action"]),
+                        "transitions": task["transitions"],
+                    },
                 )
                 pending = runtime.agent.pending_actions.get()
                 if pending is not None:
@@ -286,6 +295,14 @@ class ReplayRunner:
                         "arguments": plain_value(pending.arguments),
                         "success": result.success,
                         "error": result.error,
+                        "task": {
+                            "goal": runtime.agent.task.goal,
+                            "status": runtime.agent.task.status,
+                            "reason": runtime.agent.task.reason,
+                            "last_tool_result": runtime.agent.task.last_tool_result,
+                            "pending_action": bool(runtime.agent.task.pending_action),
+                            "transitions": runtime.agent.task.transitions,
+                        },
                     },
                 )
                 tool_index = self._record_new_tools(

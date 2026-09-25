@@ -49,6 +49,12 @@ def build_default_tool_registry(
     )
 
     for tool in all_tools:
+        tool.read_only = tool.name in {
+            "get_vehicle_status",
+            "get_climate_status",
+            "get_media_status",
+            "search_nearby_rest_area",
+        }
         registry.register(tool)
 
     return registry

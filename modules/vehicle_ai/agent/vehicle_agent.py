@@ -10,6 +10,8 @@ from modules.vehicle_ai.agent.action_state import (
 )
 from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
 from modules.vehicle_ai.agent.task_state import AgentTask, TaskStatus
+from modules.vehicle_ai.agent.turn import run_turn, reconcile
+from modules.vehicle_ai.agent.session import record, evidence_message, is_pointer
 from modules.vehicle_ai.agent.decision_context import (
     GROUNDING_NOTE,
     attach_field_evidence,
@@ -54,6 +56,10 @@ class VehicleAgent:
         tool_registry: ToolRegistry,
         max_tool_rounds: int = 5,
         action_clock: Callable[[], float] = time.time,
+        turn_timeout_seconds: float = 90.0,
+        max_tool_calls: int = 10,
+        budget_clock: Callable[[], float] = time.monotonic,
+        max_task_trace_events: int = 200,
     ):
         self.llm = llm
 
@@ -62,9 +68,17 @@ class VehicleAgent:
         self.tool_registry = tool_registry
 
         self.max_tool_rounds = max_tool_rounds
+        self.turn_timeout_seconds = turn_timeout_seconds
+        self.max_tool_calls = max_tool_calls
+        self.budget_clock = budget_clock
+        if max_task_trace_events < 1:
+            raise ValueError("max_task_trace_events must be positive")
+        self.max_task_trace_events = max_task_trace_events
 
         self.history: list[dict] = []
         self.task = AgentTask()
+        self.trace: list[dict] = []
+        self.trace_sequence = 0
 
         self.pending_actions = PendingActionStore(clock=action_clock)
         self.confirmations = ActionConfirmationController(
@@ -247,16 +261,44 @@ class VehicleAgent:
         result = self.confirmations.confirm(action_id)
         if result.error != "INVALID_CONFIRMATION":
             self.task.last_tool_result = result.to_dict()
+            self.task.tool_results.append(result.to_dict())
             self.task.transition(
                 TaskStatus.COMPLETED if result.success else TaskStatus.FAILED,
                 result.error,
             )
+            if result.data.get("outcome_unknown"):
+                reconcile(
+                    self,
+                    self.task.pending_action.get("tool_name", "")
+                    if self.task.pending_action
+                    else "",
+                    result,
+                )
+        elif (
+            self.task.status is TaskStatus.AWAITING_CONFIRMATION
+            and self.pending_actions.get() is None
+        ):
+            self.task.transition(TaskStatus.AWAITING_INPUT, "PENDING_EXPIRED")
+        record(
+            self,
+            "confirmation",
+            source="confirmation_controller",
+            quality="TOOL_RESULT",
+            result=result.to_dict(),
+        )
         return result
 
     def reject_pending(self, action_id: str) -> ToolResult:
         result = self.confirmations.reject(action_id)
         if result.success:
             self.task.transition(TaskStatus.CANCELLED, "USER_CANCELLED")
+        record(
+            self,
+            "rejection",
+            source="confirmation_controller",
+            quality="TOOL_RESULT",
+            result=result.to_dict(),
+        )
         return result
 
     def _print_pending_action(
@@ -276,6 +318,7 @@ class VehicleAgent:
             ]
         )
         self.history = self.history[-12:]
+        record(self, "agent_reply", source="agent", quality="GENERATED", text=answer)
         return answer
 
     def chat(
@@ -290,13 +333,56 @@ class VehicleAgent:
             return ""
 
         pending = self.pending_actions.get()
-        if pending is None:
+        expired = self.task.pending_action is not None and pending is None
+        if expired:
+            self.task.transition(TaskStatus.AWAITING_INPUT, "PENDING_EXPIRED")
+            record(self, "pending_expired", source="pending_store", quality="EXPIRED")
+        if is_pointer(user_text) and pending is None:
+            self.task.transition(
+                TaskStatus.AWAITING_INPUT,
+                "PENDING_EXPIRED" if expired else "NO_REFERENT",
+            )
+            record(
+                self,
+                "user_request",
+                source="user",
+                quality="SELF_REPORTED",
+                text=user_text,
+            )
+            return self._record_final_response(
+                user_text,
+                "待确认操作已过期，请重新选择目标。"
+                if expired
+                else "目前没有可确认的目标，请说明要执行什么操作。",
+            )
+        if pending is None and self.task.status is TaskStatus.AWAITING_INPUT:
+            previous_topics, previous_matches = self.context_selector.detect_topics(
+                self.task.goal
+            )
+            current_topics, current_matches = self.context_selector.detect_topics(
+                user_text
+            )
+            previous_primary = set(previous_matches)
+            current_primary = set(current_matches)
+            if previous_topics and current_topics and previous_primary.isdisjoint(
+                current_primary
+            ):
+                self.task = AgentTask(goal=user_text)
+        elif pending is None and self.task.status is not TaskStatus.AWAITING_INPUT:
+            self.task = AgentTask(goal=user_text)
+        elif expired and not is_pointer(user_text):
             self.task = AgentTask(goal=user_text)
         self.task.transition(TaskStatus.RUNNING)
-        intent = classify_pending_intent(user_text) if pending is not None else None
+        record(
+            self, "user_request", source="user", quality="SELF_REPORTED", text=user_text
+        )
+        intent = classify_pending_intent(user_text)
         if pending is not None and intent in {"reject", "change_target"}:
             if not self.confirmations.reject(pending.action_id).success:
-                return "待确认操作已变更，请重新确认当前操作。"
+                self.task.transition(TaskStatus.AWAITING_INPUT, "PENDING_CHANGED")
+                return self._record_final_response(
+                    user_text, "待确认操作已变更，请重新确认当前操作。"
+                )
         if intent == "reject":
             self.task.transition(TaskStatus.CANCELLED, "USER_CANCELLED")
             return self._record_final_response(user_text, "已取消待确认操作。")
@@ -315,10 +401,11 @@ class VehicleAgent:
                 "content": SYSTEM_PROMPT,
             },
             self._context_message(
-                user_text=user_text,
+                user_text=f"{self.task.goal} {user_text}",
                 debug=debug,
             ),
             self._pending_action_message(),
+            evidence_message(self),
             *self.history,
             {
                 "role": "user",
@@ -326,158 +413,7 @@ class VehicleAgent:
             },
         ]
 
-        tools = self.tool_registry.llm_schemas()
-
-        # ====================================================
-        # Agent Loop
-        # ====================================================
-
-        for _ in range(self.max_tool_rounds):
-            try:
-                response = self.llm.chat(messages=messages, tools=tools)
-            except Exception as exc:
-                reason = (
-                    "MODEL_TIMEOUT" if isinstance(exc, TimeoutError) else "MODEL_ERROR"
-                )
-                self.task.transition(TaskStatus.FAILED, reason)
-                return self._record_final_response(
-                    user_text, "模型请求失败，本轮已停止；已执行的操作不会自动撤销。"
-                )
-
-            # =================================================
-            # Final natural-language response
-            # =================================================
-
-            if not response.tool_calls:
-                final_text = response.content or ""
-                if not final_text.strip():
-                    self.task.transition(TaskStatus.FAILED, "EMPTY_RESPONSE")
-                    final_text = "模型未返回有效回复，本轮已停止。"
-                current = self.pending_actions.get()
-                if target is not None and (
-                    current is None or current.tool_name != "start_navigation"
-                ):
-                    self.task.transition(TaskStatus.FAILED, "TARGET_NOT_FOUND")
-                    final_text = "未找到与新目标匹配的地点，未创建待确认导航。"
-
-                self.task.finish(current is not None)
-                return self._record_final_response(user_text, final_text)
-
-            # =================================================
-            # Tool Calls
-            # =================================================
-
-            messages.append(self._assistant_tool_message(response))
-
-            for call in response.tool_calls:
-                # --------------------------------------------
-                # Deterministic grounding
-                # --------------------------------------------
-
-                grounded_arguments = self._ground_tool_arguments(
-                    tool_name=(call.name),
-                    arguments=(call.arguments),
-                )
-                pending = self.pending_actions.get()
-                if call.name != "start_navigation" or (
-                    pending is not None and pending.tool_name == "start_navigation"
-                ):
-                    self.confirmations.stage(call.name, grounded_arguments)
-
-                if debug:
-                    print()
-                    print("[Agent Tool Call]")
-
-                    print(f"  {call.name}")
-
-                    print(
-                        json.dumps(
-                            call.arguments,
-                            ensure_ascii=False,
-                            indent=2,
-                        )
-                    )
-
-                    if grounded_arguments != call.arguments:
-                        print("[Grounded Arguments]")
-
-                        print(
-                            json.dumps(
-                                grounded_arguments,
-                                ensure_ascii=False,
-                                indent=2,
-                            )
-                        )
-
-                # --------------------------------------------
-                # Execute
-                # --------------------------------------------
-
-                tool_result = self.tool_registry.execute(
-                    name=(call.name),
-                    arguments=(grounded_arguments),
-                )
-                self.task.last_tool_result = tool_result.to_dict()
-
-                # --------------------------------------------
-                # Update deterministic action state
-                # --------------------------------------------
-
-                self._update_action_state(
-                    tool_name=(call.name),
-                    tool_result=(tool_result),
-                    target=target,
-                )
-                staged = self.pending_actions.get()
-                pending_confirmation_matches = bool(
-                    tool_result.error == "CONFIRMATION_REQUIRED"
-                    and staged is not None
-                    and staged.tool_name == call.name
-                    and dict(staged.arguments) == grounded_arguments
-                )
-
-                if debug:
-                    print("[Tool Result]")
-
-                    print(
-                        json.dumps(
-                            tool_result.to_dict(),
-                            ensure_ascii=False,
-                            indent=2,
-                            default=str,
-                        )
-                    )
-
-                    self._print_pending_action()
-
-                result_json = json.dumps(
-                    tool_result.to_dict(),
-                    ensure_ascii=False,
-                    default=str,
-                )
-
-                # --------------------------------------------
-                # Tool response
-                # --------------------------------------------
-
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": call.id,
-                        "content": result_json,
-                    }
-                )
-                if pending_confirmation_matches:
-                    self.task.transition(TaskStatus.AWAITING_CONFIRMATION)
-                    return self._record_final_response(
-                        user_text,
-                        "车机操作已准备好，尚未执行，待确认后才会执行。",
-                    )
-
-        self.task.transition(TaskStatus.FAILED, "ROUND_LIMIT")
-        return self._record_final_response(
-            user_text, "本次请求涉及过多连续工具调用，已停止执行。"
-        )
+        return run_turn(self, user_text, messages, target)
 
     # ========================================================
     # Reset
@@ -491,3 +427,5 @@ class VehicleAgent:
 
         self.pending_actions.clear()
         self.task = AgentTask()
+        self.trace.clear()
+        self.trace_sequence = 0

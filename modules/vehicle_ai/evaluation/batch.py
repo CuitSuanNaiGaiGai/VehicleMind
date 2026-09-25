@@ -8,6 +8,7 @@ import statistics
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -78,7 +79,7 @@ def _trial_record(
     }
 
 
-def _total_usage(responses: list[dict]) -> dict[str, int | None]:
+def _total_usage(responses: Sequence[dict[str, Any]]) -> dict[str, int | None]:
     def total(field: str) -> int | None:
         provider_field = {
             "prompt_tokens": "input_tokens",
@@ -92,7 +93,7 @@ def _total_usage(responses: list[dict]) -> dict[str, int | None]:
         ]
         if not values or any(value is None for value in values):
             return None
-        return sum(values)
+        return sum(int(value) for value in values if value is not None)
 
     return {
         "prompt_tokens": total("prompt_tokens"),
@@ -122,12 +123,12 @@ def reconcile_usage_from_traces(run_root: Path) -> dict:
     return run
 
 
-def _summary(result: dict) -> str:
+def _summary(result: dict[str, Any]) -> str:
     trials = result["trials"]
     total = len(trials)
-    successes = sum(item["tool_selection"] for item in trials)
-    arguments = sum(item["argument_match"] for item in trials)
-    states = sum(item["final_state"] for item in trials)
+    successes = sum(bool(item["tool_selection"]) for item in trials)
+    arguments = sum(bool(item["argument_match"]) for item in trials)
+    states = sum(bool(item["final_state"]) for item in trials)
     errors = sum(item["error"] is not None for item in trials)
     latencies = [item["latency_ms"] for item in trials]
     p50 = statistics.median(latencies) if latencies else 0.0
@@ -136,7 +137,9 @@ def _summary(result: dict) -> str:
     def usage_total(field: str) -> str:
         values = [item["usage"][field] for item in trials]
         return (
-            "未完整报告" if any(value is None for value in values) else str(sum(values))
+            "未完整报告"
+            if any(value is None for value in values)
+            else str(sum(int(value) for value in values if value is not None))
         )
 
     return (
@@ -164,11 +167,14 @@ def run_batch(
     repetitions: int,
     output: Path,
     max_tool_rounds: int = 5,
+    turn_timeout_seconds: float = 90.0,
+    max_tool_calls: int = 10,
+    max_task_trace_events: int = 200,
 ) -> dict:
     if repetitions < 1 or not cases:
         raise ValueError("batch requires cases and positive repetitions")
     output.mkdir(parents=True, exist_ok=False)
-    result = {
+    result: dict[str, Any] = {
         "schema_version": 1,
         "provider": provider,
         "model": model,
@@ -195,6 +201,9 @@ def run_batch(
                 model=model,
                 trial_index=trial_index,
                 max_tool_rounds=max_tool_rounds,
+                turn_timeout_seconds=turn_timeout_seconds,
+                max_tool_calls=max_tool_calls,
+                max_task_trace_events=max_task_trace_events,
             )
             grade = grade_trial(case, trial)
             relative = Path(case.id) / f"trial-{trial_index}"

@@ -35,6 +35,7 @@ class TrialResult:
     requests: tuple[dict[str, Any], ...]
     settings: dict[str, Any]
     interaction_events: tuple[dict[str, Any], ...]
+    agent_trace: tuple[dict[str, Any], ...] = ()
 
 
 class RecordingClient(BaseLLMClient):
@@ -45,6 +46,14 @@ class RecordingClient(BaseLLMClient):
         self.latencies_ms: list[float] = []
 
     def chat(self, messages, tools=None) -> LLMResponse:
+        return self._chat(messages, tools)
+
+    def chat_with_timeout(
+        self, messages, tools=None, *, timeout_seconds: float
+    ) -> LLMResponse:
+        return self._chat(messages, tools, timeout_seconds)
+
+    def _chat(self, messages, tools=None, timeout_seconds=None) -> LLMResponse:
         self.requests.append(
             {
                 "at_ms": int(time.time() * 1000),
@@ -54,7 +63,13 @@ class RecordingClient(BaseLLMClient):
         )
         started = time.perf_counter()
         try:
-            response = self.inner.chat(messages, tools)
+            response = (
+                self.inner.chat(messages, tools)
+                if timeout_seconds is None
+                else self.inner.chat_with_timeout(
+                    messages, tools, timeout_seconds=timeout_seconds
+                )
+            )
         finally:
             self.latencies_ms.append((time.perf_counter() - started) * 1000)
         self.responses.append(response)
@@ -69,6 +84,9 @@ def run_trial(
     model: str,
     trial_index: int,
     max_tool_rounds: int = 5,
+    turn_timeout_seconds: float = 90.0,
+    max_tool_calls: int = 10,
+    max_task_trace_events: int = 200,
 ) -> TrialResult:
     """Run one isolated trial; only the supplied client may access a provider."""
     recording = RecordingClient(client)
@@ -78,6 +96,9 @@ def run_trial(
         max_tool_rounds=max_tool_rounds,
         quality_clock=lambda: logical_time[0],
         action_clock=lambda: logical_time[0],
+        turn_timeout_seconds=turn_timeout_seconds,
+        max_tool_calls=max_tool_calls,
+        max_task_trace_events=max_task_trace_events,
     )
     schema_hash = hashlib.sha256(
         json.dumps(runtime.tools.llm_schemas(), sort_keys=True).encode()
@@ -170,6 +191,21 @@ def run_trial(
                     )
         if any(not reply.strip() for reply in replies):
             error = "EmptyResponse"
+        infrastructure_errors = {
+            "MODEL_TIMEOUT",
+            "MODEL_ERROR",
+            "EMPTY_RESPONSE",
+            "TIME_BUDGET",
+            "TOOL_BUDGET",
+            "ROUND_LIMIT",
+            "REPEATED_CALL",
+            "INVALID_ARGUMENTS",
+        }
+        for event in runtime.agent.trace:
+            reason = event.get("task", {}).get("reason")
+            if reason in infrastructure_errors:
+                error = reason
+                break
     except Exception as exc:
         error = type(exc).__name__
     elapsed = (time.perf_counter() - started) * 1000
@@ -221,7 +257,11 @@ def run_trial(
             "temperature": getattr(client, "temperature", None),
             "timeout_seconds": getattr(client, "timeout_seconds", None),
             "max_tool_rounds": max_tool_rounds,
+            "turn_timeout_seconds": turn_timeout_seconds,
+            "max_tool_calls": max_tool_calls,
+            "max_task_trace_events": max_task_trace_events,
             "client_max_retries": 0,
         },
         interaction_events=tuple(interaction_events),
+        agent_trace=tuple(plain_value(runtime.agent.trace)),
     )

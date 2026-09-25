@@ -1,0 +1,4 @@
+turn_timeout_seconds: 90
+max_tool_calls: 10
+max_tool_rounds: 5
+max_task_trace_events: 200

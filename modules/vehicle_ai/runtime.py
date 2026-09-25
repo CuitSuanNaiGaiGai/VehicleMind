@@ -54,6 +54,9 @@ class VehicleMindRuntime:
         max_tool_rounds: int = 5,
         quality_clock: Callable[[], float] = time.monotonic,
         action_clock: Callable[[], float] = time.time,
+        turn_timeout_seconds: float = 90.0,
+        max_tool_calls: int = 10,
+        max_task_trace_events: int = 200,
     ):
         # ====================================================
         # Shared context
@@ -93,6 +96,9 @@ class VehicleMindRuntime:
             tool_registry=(self.tools),
             max_tool_rounds=max_tool_rounds,
             action_clock=action_clock,
+            turn_timeout_seconds=turn_timeout_seconds,
+            max_tool_calls=max_tool_calls,
+            max_task_trace_events=max_task_trace_events,
         )
 
     # ========================================================

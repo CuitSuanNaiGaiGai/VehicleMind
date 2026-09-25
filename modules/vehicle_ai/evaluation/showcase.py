@@ -1,6 +1,7 @@
 """Human-readable projection of one recorded online Agent trial."""
 
 from __future__ import annotations
+from modules.vehicle_ai.evaluation.task_display import task_panel, evidence_panel
 
 import html
 import json
@@ -259,6 +260,7 @@ def render_showcase(
         "模型响应": trial.model_responses,
         "工具执行": trial.tool_calls,
         "评分": grade,
+        "任务轨迹": trial.agent_trace,
     }
     return f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -296,4 +298,5 @@ details{{margin-top:14px}}summary{{cursor:pointer;font-weight:700}}.flow{{color:
 <p class="note">高风险疲劳时，播放音乐不能等同于停车休息；本页只陈述模型实际输出，不自动认可建议安全性。</p>
 <details><summary>展开原始请求、响应、工具与评分</summary><pre>{_escape(_json(raw))}</pre></details>
 <p class="note">完整证据见同目录 trial.json；候选场景和 AI 自审场景均不是独立人工金标。</p></section>
+{task_panel(trial)}{evidence_panel(trial)}
 </body></html>"""

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import hashlib
 from pathlib import Path
+from typing import Any
 
 from modules.vehicle_ai.evaluation.batch import load_frozen_cases
 from modules.vehicle_ai.evaluation.batch_review import review_batch
@@ -67,13 +68,15 @@ def judge_batch(
     run_root: Path, golden_root: Path, client: BaseLLMClient, *, judge_model: str
 ) -> dict:
     """Review all replies against frozen rubrics, persisting after each case."""
-    run = json.loads((run_root / "run.json").read_text(encoding="utf-8"))
+    run: dict[str, Any] = json.loads(
+        (run_root / "run.json").read_text(encoding="utf-8")
+    )
     if run.get("status") != "completed":
         raise ValueError("cannot judge an incomplete run")
     frozen = {case.id: case for case in load_frozen_cases(golden_root)}
     source_sha256 = _source_sha256(run, golden_root)
     progress_path = run_root / "judge_progress.json"
-    progress = (
+    progress: dict[str, Any] = (
         json.loads(progress_path.read_text(encoding="utf-8"))
         if progress_path.exists()
         else {

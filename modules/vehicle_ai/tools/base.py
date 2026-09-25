@@ -78,6 +78,7 @@ class ToolDefinition:
     category: str = "general"
 
     requires_confirmation: bool = False
+    read_only: bool = False
 
     def llm_schema(
         self,

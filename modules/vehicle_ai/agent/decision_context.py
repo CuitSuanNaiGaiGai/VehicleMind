@@ -14,6 +14,11 @@ GROUNDING_NOTE = (
     "UNKNOWN, MISSING, INVALID and STALE do not establish a current fact. "
     "WARMING_UP is insufficient observation; SUSPECTED is suspicion, not confirmed fatigue. "
     "Traffic level describes observed traffic density, not verified congestion. "
+    "KNOWN only means the stored field passed current validation and age checks; "
+    "it does not prove sensor correctness, environmental safety, or causal inference. "
+    "Do not invent detection thresholds or clinical criteria absent from the supplied context. "
+    "Do not infer driver impairment solely from PERCLOS unless a configured threshold is supplied. "
+    "A detected lane does not establish that driving is safe. "
     "Music must not be described as eliminating fatigue."
 )
 

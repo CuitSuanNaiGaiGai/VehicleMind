@@ -12,10 +12,11 @@ from modules.vehicle_ai.evaluation.grader import grade_trial
 from modules.vehicle_ai.evaluation.models import EvaluationCase
 from modules.vehicle_ai.evaluation.report import write_report
 from modules.vehicle_ai.evaluation.runner import run_trial
+from modules.vehicle_ai.agent.budget import AgentBudgetConfig
 from modules.vehicle_ai.llm import build_llm_client
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="在线 Agent 候选场景评估")
     parser.add_argument("case", type=Path, help="结构化 YAML 场景")
     parser.add_argument("--provider", choices=("qwen", "glm"), required=True)
@@ -24,11 +25,22 @@ def main() -> int:
     parser.add_argument("--model")
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--timeout-seconds", type=float, default=30.0)
-    parser.add_argument("--max-tool-rounds", type=int, default=5)
-    args = parser.parse_args()
+    parser.add_argument("--max-tool-rounds", type=int)
+    parser.add_argument(
+        "--agent-config", type=Path, default=Path("modules/config/agent.yaml")
+    )
+    parser.add_argument("--turn-timeout-seconds", type=float)
+    parser.add_argument("--max-tool-calls", type=int)
+    args = parser.parse_args(argv)
     load_dotenv()
-    if args.timeout_seconds <= 0 or args.max_tool_rounds <= 0:
-        parser.error("timeout 和最大工具轮次必须为正数")
+    if args.timeout_seconds <= 0:
+        parser.error("timeout 必须为正数")
+    config = AgentBudgetConfig.load(args.agent_config)
+    turn_timeout = args.turn_timeout_seconds or config.turn_timeout_seconds
+    tool_calls = args.max_tool_calls or config.max_tool_calls
+    tool_rounds = args.max_tool_rounds or config.max_tool_rounds
+    if turn_timeout <= 0 or tool_calls <= 0 or tool_rounds <= 0:
+        parser.error("Agent 时间预算和工具次数预算必须为正数")
     document = yaml.safe_load(args.case.read_text(encoding="utf-8"))
     case = EvaluationCase.from_mapping(document)
     default_model = (
@@ -52,7 +64,10 @@ def main() -> int:
         provider=args.provider,
         model=str(getattr(client, "model")),
         trial_index=args.trial_index,
-        max_tool_rounds=args.max_tool_rounds,
+        max_tool_rounds=tool_rounds,
+        turn_timeout_seconds=turn_timeout,
+        max_tool_calls=tool_calls,
+        max_task_trace_events=config.max_task_trace_events,
     )
     grade = grade_trial(case, trial)
     write_report(destination, case, trial, grade)

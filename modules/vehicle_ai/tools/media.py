@@ -22,6 +22,18 @@ class MediaTools:
     ):
         self.context_manager = context_manager
 
+    def get_media_status(self) -> ToolResult:
+        vehicle = self.context_manager.get_context().vehicle
+        return ToolResult(
+            True,
+            "Media status retrieved.",
+            data={
+                "media_playing": vehicle.media_playing,
+                "media_title": vehicle.media_title,
+                "volume": vehicle.volume,
+            },
+        )
+
     # ========================================================
     # Play music
     # ========================================================
@@ -113,6 +125,18 @@ def build_media_tools(
     tools = MediaTools(context_manager)
 
     return [
+        ToolDefinition(
+            name="get_media_status",
+            description="Get current media playback and volume status.",
+            category="media",
+            parameters={
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False,
+            },
+            handler=tools.get_media_status,
+        ),
         ToolDefinition(
             name="play_music",
             description=("Play music matching the user's request."),

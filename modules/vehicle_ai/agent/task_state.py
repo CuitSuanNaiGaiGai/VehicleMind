@@ -10,6 +10,7 @@ from uuid import uuid4
 class TaskStatus(StrEnum):
     IDLE = "IDLE"
     RUNNING = "RUNNING"
+    AWAITING_INPUT = "AWAITING_INPUT"
     AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -23,6 +24,9 @@ class AgentTask:
     status: TaskStatus = TaskStatus.IDLE
     reason: str | None = None
     last_tool_result: dict[str, Any] | None = None
+    reconciliation: dict[str, Any] | None = None
+    pending_action: dict[str, Any] | None = None
+    tool_results: list[dict[str, Any]] = field(default_factory=list)
     transitions: list[dict[str, Any]] = field(default_factory=list)
 
     def transition(self, status: TaskStatus, reason: str | None = None) -> None:
@@ -33,13 +37,22 @@ class AgentTask:
         return deepcopy(asdict(self))
 
     def finish(self, pending: bool) -> None:
-        if self.status is TaskStatus.FAILED:
+        if self.status in {TaskStatus.FAILED, TaskStatus.AWAITING_INPUT}:
             return
         if pending:
             self.transition(TaskStatus.AWAITING_CONFIRMATION)
-        elif self.last_tool_result and not self.last_tool_result["success"]:
+        elif any(
+            not result["success"] and result.get("error") != "CONFIRMATION_REQUIRED"
+            for result in self.tool_results
+        ):
             self.transition(
-                TaskStatus.FAILED, self.last_tool_result.get("error") or "TOOL_ERROR"
+                TaskStatus.FAILED,
+                next(
+                    result.get("error") or "TOOL_ERROR"
+                    for result in self.tool_results
+                    if not result["success"]
+                    and result.get("error") != "CONFIRMATION_REQUIRED"
+                ),
             )
         else:
             self.transition(TaskStatus.COMPLETED)

@@ -355,7 +355,7 @@ class ToolRegistry:
                     message=(f"Tool '{name}' execution failed."),
                     error=(type(exc).__name__),
                     data={
-                        "detail": str(exc),
+                        "outcome_unknown": not tool.read_only,
                     },
                 ),
             )
@@ -364,7 +364,12 @@ class ToolRegistry:
             result,
             ToolResult,
         ):
-            raise TypeError(f"Tool '{name}' must return ToolResult.")
+            result = ToolResult(
+                False,
+                "Tool returned an invalid result.",
+                data={"outcome_unknown": not tool.read_only},
+                error="INVALID_TOOL_RESULT",
+            )
 
         return self._record(
             name=name,
