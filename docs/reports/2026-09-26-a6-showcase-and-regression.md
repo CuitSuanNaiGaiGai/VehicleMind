@@ -40,7 +40,7 @@ uv run python scripts/run_agent_recovery_eval.py
 | 选定执行/安全路径（`action_state`、`confirmation`、`pending_intent`、`plan`、`plan_actions`、`plan_flow`、`task_state`、`navigation`、`registry`、`validation`） | **726/753（96.4%）** | 门槛 ≥95%，达到 |
 | 全部 `modules/` | **6313/8085（76.1%）** | 包含离线套件没有调用的硬件感知路径，仅作参考 |
 
-覆盖率 JSON 只保存在当前本机 `/private/tmp/vehiclemind-cov-final.json`，没有纳入仓库。该行覆盖数字不替代分支覆盖或对抗安全审计。
+覆盖率 JSON 只保存在本机临时目录，没有纳入仓库或公开发布。该行覆盖数字不替代分支覆盖或对抗安全审计。
 
 ## 指标呈现原则
 
