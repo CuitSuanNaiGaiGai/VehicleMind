@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from threading import Event, Thread, current_thread
 
 import pytest
@@ -26,12 +27,7 @@ def runtime(*responses: ScriptedResponse) -> VehicleMindRuntime:
 
 def call(name: str, arguments: dict | None = None) -> LLMToolCall:
     arguments = arguments or {}
-    encoded = (
-        '{"query": "轻音乐"}'
-        if name == "play_music"
-        else ('{"open": true}' if name == "set_driver_window" else "{}")
-    )
-    return LLMToolCall(name, name, arguments, encoded)
+    return LLMToolCall(name, name, arguments, json.dumps(arguments, ensure_ascii=False))
 
 
 def test_registry_rechecks_tool_flags_and_denies_before_handler() -> None:
@@ -230,6 +226,48 @@ def test_high_risk_play_then_pause_reports_paused_terminal_state() -> None:
     assert "音乐不能消除疲劳" in answer
 
 
+def test_second_play_with_stale_state_does_not_clear_turn_safety_latch() -> None:
+    app = runtime(
+        ScriptedResponse(
+            content=None,
+            tool_calls=(call("play_music", {"query": "轻音乐"}),),
+        ),
+        ScriptedResponse(
+            content=None,
+            tool_calls=(call("play_music", {"query": "古典音乐"}),),
+        ),
+        ScriptedResponse(content="已经按要求播放。"),
+    )
+    app.context_manager.update_driver(risk=RiskLevel.HIGH)
+    original_chat = app.agent.llm.chat
+    calls = 0
+
+    def invalidate_before_second_request(messages, tools=None):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            app.context_manager.mark_invalid_observation(
+                "driver",
+                ObservationMetadata(
+                    timestamp_ms=1000,
+                    sequence=1,
+                    source="test",
+                    confidence=None,
+                    valid=False,
+                    processing_ms=0.0,
+                ),
+            )
+        return original_chat(messages, tools)
+
+    app.agent.llm.chat = invalidate_before_second_request
+
+    answer = app.chat("先放轻音乐再换古典音乐", debug=False)
+
+    assert app.agent.task.status == "COMPLETED"
+    assert "音乐不能消除疲劳" in answer
+    assert "停车休息" in answer
+
+
 def test_high_risk_play_then_second_tool_failure_reports_incomplete_turn() -> None:
     app = runtime(
         ScriptedResponse(
@@ -303,6 +341,19 @@ def test_unknown_tool_retires_live_grant_before_replay() -> None:
     replay = registry.execute("set_driver_window", {"open": True}, confirmation=grant)
 
     assert denied.error == "UNKNOWN_TOOL"
+    assert replay.error == "CONFIRMATION_REPLAY"
+    assert not registry._issued_confirmations
+
+
+def test_grant_passed_to_non_confirmation_tool_is_retired() -> None:
+    registry = build_default_tool_registry(ContextManager())
+    issuer = registry.take_confirmation_issuer()
+    grant = issuer.issue("misrouted", "set_driver_window", {"open": True})
+
+    result = registry.execute("play_music", {"query": "轻音乐"}, confirmation=grant)
+    replay = registry.execute("set_driver_window", {"open": True}, confirmation=grant)
+
+    assert result.success
     assert replay.error == "CONFIRMATION_REPLAY"
     assert not registry._issued_confirmations
 

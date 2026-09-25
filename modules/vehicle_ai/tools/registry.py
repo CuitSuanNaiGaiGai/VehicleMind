@@ -343,6 +343,10 @@ class ToolRegistry:
             self._issued_confirmations.pop(confirmation.action_id)
             self._used_confirmation_ids.add(confirmation.action_id)
             confirmed = True
+        else:
+            # A live capability presented to another tool is consumed even when
+            # that tool does not need confirmation; it cannot be replayed later.
+            self._retire_live_confirmation(confirmation)
 
         # ----------------------------------------------------
         # Basic required-field validation

@@ -132,7 +132,7 @@ def run_turn(
                     call.name, arguments, user_intent=user_text
                 )
                 if call.name == "play_music" and result.success and result.policy:
-                    agent._turn_music_warning = next(
+                    warning = next(
                         (
                             warning
                             for warning in result.policy["warnings"]
@@ -140,7 +140,8 @@ def run_turn(
                         ),
                         "",
                     )
-                    if agent._turn_music_warning:
+                    if warning:
+                        agent._turn_music_warning = warning
                         agent._turn_music_paused = False
                 elif call.name == "pause_music" and result.success:
                     agent._turn_music_paused = True
