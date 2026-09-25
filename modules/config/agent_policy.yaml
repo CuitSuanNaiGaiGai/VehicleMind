@@ -1,0 +1,18 @@
+schema_version: 1
+tool_risks:
+  get_vehicle_status: READ_ONLY
+  get_climate_status: READ_ONLY
+  get_media_status: READ_ONLY
+  search_nearby_rest_area: READ_ONLY
+  play_music: REVERSIBLE_WRITE
+  pause_music: REVERSIBLE_WRITE
+  set_volume: REVERSIBLE_WRITE
+  set_temperature: REVERSIBLE_WRITE
+  set_ac: REVERSIBLE_WRITE
+  start_navigation: CONFIRMATION_REQUIRED
+  cancel_navigation: CONFIRMATION_REQUIRED
+  set_driver_window: CONFIRMATION_REQUIRED
+risk_policy:
+  high_driver_risk: HIGH
+  fatigue_warning: "检测到高疲劳风险，请优先安全停车休息；音乐不能替代休息。"
+  unknown_driver_warning: "驾驶员风险状态未知或不可用，无法依据当前观测判断风险。"
