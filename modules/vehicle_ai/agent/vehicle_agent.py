@@ -11,7 +11,13 @@ from modules.vehicle_ai.agent.action_state import (
 from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
 from modules.vehicle_ai.agent.task_state import AgentTask, TaskStatus
 from modules.vehicle_ai.agent.turn import run_turn, reconcile
-from modules.vehicle_ai.agent.session import record, evidence_message, is_pointer
+from modules.vehicle_ai.agent.session import (
+    evidence_message,
+    is_pointer,
+    record,
+    record_final_response,
+    trip_memory_message,
+)
 from modules.vehicle_ai.agent.decision_context import (
     GROUNDING_NOTE,
     attach_field_evidence,
@@ -62,6 +68,8 @@ class VehicleAgent:
         max_tool_calls: int = 10,
         budget_clock: Callable[[], float] = time.monotonic,
         max_task_trace_events: int = 200,
+        trip_id: str | None = None,
+        historical_event_sink: Callable[[dict], None] | None = None,
     ):
         self.llm = llm
 
@@ -92,6 +100,8 @@ class VehicleAgent:
             self.tool_registry.take_confirmation_issuer(),
         )
         self.context_selector = ContextSelector()
+        self.trip_id = trip_id
+        self.historical_event_sink = historical_event_sink
 
     def _context_message(
         self,
@@ -264,6 +274,8 @@ class VehicleAgent:
             self.pending_actions.clear()
 
     def confirm_pending(self, action_id: str) -> ToolResult:
+        pending = self.pending_actions.get()
+        action = pending.to_dict() if pending and pending.action_id == action_id else None
         result = self.confirmations.confirm(action_id)
         if result.error != "INVALID_CONFIRMATION":
             self.task.last_tool_result = result.to_dict()
@@ -290,11 +302,14 @@ class VehicleAgent:
             "confirmation",
             source="confirmation_controller",
             quality="TOOL_RESULT",
+            action=action,
             result=result.to_dict(),
         )
         return result
 
     def reject_pending(self, action_id: str) -> ToolResult:
+        pending = self.pending_actions.get()
+        action = pending.to_dict() if pending and pending.action_id == action_id else None
         result = self.confirmations.reject(action_id)
         if result.success:
             self.task.transition(TaskStatus.CANCELLED, "USER_CANCELLED")
@@ -303,6 +318,7 @@ class VehicleAgent:
             "rejection",
             source="confirmation_controller",
             quality="TOOL_RESULT",
+            action=action,
             result=result.to_dict(),
         )
         return result
@@ -317,31 +333,7 @@ class VehicleAgent:
     # ========================================================
 
     def _record_final_response(self, user_text: str, answer: str) -> str:
-        if self._turn_music_warning:
-            music_status = (
-                "本轮音乐播放成功，随后已暂停。"
-                if self._turn_music_paused
-                else "本轮音乐播放成功。"
-            )
-            if self.task.status is TaskStatus.AWAITING_CONFIRMATION:
-                outcome = "待确认操作尚未执行，待确认后才会执行。"
-            elif self.task.status is TaskStatus.COMPLETED:
-                outcome = ""
-            else:
-                reason = self.task.reason or self.task.status.value
-                outcome = f"本轮任务未完成（{reason}）。"
-            answer = (
-                f"{music_status}{outcome}音乐不能消除疲劳。{self._turn_music_warning}"
-            )
-        self.history.extend(
-            [
-                {"role": "user", "content": user_text},
-                {"role": "assistant", "content": answer},
-            ]
-        )
-        self.history = self.history[-12:]
-        record(self, "agent_reply", source="agent", quality="GENERATED", text=answer)
-        return answer
+        return record_final_response(self, user_text, answer)
 
     def chat(
         self,
@@ -405,13 +397,32 @@ class VehicleAgent:
         )
         intent = classify_pending_intent(user_text)
         if pending is not None and intent in {"reject", "change_target"}:
+            previous_action = pending.to_dict()
             if not self.confirmations.reject(pending.action_id).success:
                 self.task.transition(TaskStatus.AWAITING_INPUT, "PENDING_CHANGED")
                 return self._record_final_response(
                     user_text, "待确认操作已变更，请重新确认当前操作。"
                 )
+            if intent == "change_target":
+                record(
+                    self,
+                    "selection",
+                    source="user",
+                    quality="SELF_REPORTED",
+                    action=previous_action,
+                    text=user_text,
+                    selected_target=requested_target(user_text),
+                )
         if intent == "reject":
             self.task.transition(TaskStatus.CANCELLED, "USER_CANCELLED")
+            record(
+                self,
+                "rejection",
+                source="user",
+                quality="SELF_REPORTED",
+                action=previous_action if pending is not None else None,
+                result={"success": True, "message": "用户取消待确认操作。"},
+            )
             return self._record_final_response(user_text, "已取消待确认操作。")
         target = requested_target(user_text) if intent == "change_target" else None
         if intent == "change_target":
@@ -439,6 +450,9 @@ class VehicleAgent:
                 "content": user_text,
             },
         ]
+        memory_message = trip_memory_message(self.tool_registry.names())
+        if memory_message is not None:
+            messages.insert(3, memory_message)
 
         return run_turn(self, user_text, messages, target)
 
@@ -460,6 +474,7 @@ class VehicleAgent:
                 "event_id": event.event_id,
                 "event_time": event.timestamp,
                 "evidence": evidence,
+                "historical_context": event.data.get("prior_trip_interactions", []),
                 "text": text,
                 "tool_calls_ignored": len(response.tool_calls),
             }

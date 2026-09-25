@@ -132,7 +132,12 @@ class RecommendationCoordinator:
         safe_event = replace(
             event,
             message=f"检测到可信驾驶员风险：{evidence['risk']}。",
-            data=evidence,
+            data={
+                **evidence,
+                "prior_trip_interactions": event.data.get(
+                    "prior_trip_interactions", []
+                ),
+            },
         )
 
         key = (event.type, str(event.data["risk"]))

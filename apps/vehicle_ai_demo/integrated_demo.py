@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import time
 
 from pathlib import Path
@@ -22,6 +23,7 @@ from apps.vehicle_ai_demo.video_pipelines import (
     build_cabin_pipeline,
     build_road_pipeline,
 )
+from apps.vehicle_ai_demo.trip_memory_display import handle_trip_memory_command
 
 from modules.vehicle_ai.context import (
     GearState,
@@ -34,6 +36,7 @@ from modules.vehicle_ai.llm import (
 from modules.vehicle_ai.runtime import (
     VehicleMindRuntime,
 )
+from modules.vehicle_ai.memory import TripEventStore
 from modules.vehicle_ai.replay.models import ScriptedResponse
 from modules.vehicle_ai.replay.scripted_llm import ScriptedLLMClient
 
@@ -63,6 +66,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--frame-capacity", type=_positive_int, default=2)
     parser.add_argument("--perception-only", action="store_true")
     parser.add_argument("--duration", type=_positive_float, default=5.0)
+    parser.add_argument(
+        "--trip-id",
+        default=os.environ.get("VEHICLEMIND_TRIP_ID"),
+        help="复用同一行程历史时指定固定 ID；不指定则创建新行程",
+    )
+    parser.add_argument(
+        "--trip-db",
+        type=Path,
+        default=Path("runs/state/trip_events.sqlite3"),
+        help="SQLite 行程事件库路径",
+    )
     return parser.parse_args(argv)
 
 
@@ -101,9 +115,8 @@ def _pipeline_errors(pipelines: tuple) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
 
-    args = parse_args(argv)
-
     load_dotenv()
+    args = parse_args(argv)
 
     print()
     print("========================================")
@@ -120,7 +133,12 @@ def main(argv: list[str] | None = None) -> int:
         else build_llm_client()
     )
 
-    runtime = VehicleMindRuntime(llm=llm)
+    event_store = TripEventStore(args.trip_db)
+    runtime = VehicleMindRuntime(
+        llm=llm,
+        trip_event_store=event_store,
+        trip_id=args.trip_id,
+    )
 
     # The vehicle state is simulated until a vehicle interface is available.
     runtime.context_manager.update_vehicle(
@@ -141,6 +159,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print()
     print("[VehicleMind] 已就绪。")
+    print(f"当前行程 ID：{runtime.trip_id}")
+    print(f"行程事件库：{event_store.path}")
 
     print("可用命令：")
 
@@ -149,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
     print("  fresh    - 查看感知新鲜度")
 
     print("  events   - 查看近期语义事件")
+
+    print("  history  - 查看本次行程 Agent 历史事件")
+
+    print("  clear-history - 清空本次行程持久化事件")
 
     print("  health   - 查看流水线健康状态与延迟")
 
@@ -217,6 +241,9 @@ def main(argv: list[str] | None = None) -> int:
                     for event in events:
                         print(format_event(event))
 
+                continue
+
+            if handle_trip_memory_command(command, event_store, runtime.trip_id):
                 continue
 
             if command == "health":

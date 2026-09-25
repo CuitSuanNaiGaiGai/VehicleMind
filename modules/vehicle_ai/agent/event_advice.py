@@ -22,6 +22,7 @@ def build_event_advice_messages(
 ) -> tuple[list[dict[str, str]], dict[str, object]]:
     """Build a prompt from event text and explicitly approved evidence fields."""
     evidence = {key: event.data[key] for key in EVIDENCE_FIELDS if key in event.data}
+    prior_interactions = event.data.get("prior_trip_interactions", [])
     messages = [
         {
             "role": "system",
@@ -36,7 +37,13 @@ def build_event_advice_messages(
                 f"事件说明：{event.message}\n"
                 "白名单感知证据（JSON）："
                 f"{json.dumps(evidence, ensure_ascii=False, sort_keys=True)}\n"
-                "请根据证据给出驾驶员此刻最合适的下一步建议；不要调用或声称调用车机工具。"
+                + (
+                    "本次行程此前相关提醒与动作选择（历史，不代表当前状态）："
+                    f"{json.dumps(prior_interactions, ensure_ascii=False, sort_keys=True)}\n"
+                    if prior_interactions
+                    else ""
+                )
+                + "请根据证据给出驾驶员此刻最合适的下一步建议；不要调用或声称调用车机工具。"
             ),
         },
     ]

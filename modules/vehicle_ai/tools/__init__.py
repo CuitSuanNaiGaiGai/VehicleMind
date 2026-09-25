@@ -74,6 +74,7 @@ def build_default_tool_registry(
             "get_media_status",
             "search_nearby_rest_area",
             "search_vehicle_knowledge",
+            "query_trip_events",
         }
         registry.register(tool)
 
