@@ -1,7 +1,7 @@
 # A3 状态相关 RAG：LightRAG 检索器设计
 
 日期：2026-09-25  
-状态：设计已获用户确认，等待文档审阅  
+状态：设计已获用户确认；实现计划已启动
 范围：定义 A3 的技术边界和验收结果；本文不包含实现。
 
 ## 目标
@@ -76,7 +76,7 @@
 ## 风险与验证前置条件
 
 - A3 实施前固定并实测兼容的 LightRAG 服务版本/API；不直接依赖 `main` 浮动版本。
-- 明确 LLM 角色配置：索引抽取与 Agent 回答可使用现有 Qwen/GLM，但 LightRAG 的实体/关系抽取会产生额外请求与费用；embedding 采用锁版本、可本地运行的中文模型并记录 revision/hash。
+- 明确 LLM 角色配置：索引抽取与 Agent 回答可使用现有 Qwen/GLM，但 LightRAG 的实体/关系抽取会产生额外请求与费用；embedding 提供方、模型名、向量维度和版本须通过固定版本的 API smoke test 确认并记录，不在主应用依赖中引入 LightRAG 运行依赖。
 - 先完成固定 profile 服务启动、每个服务插入带 file_path 的文档、`/query/data` 返回 context/references、profile-to-endpoint 路由隔离的 contract smoke tests，再接入 VehicleAgent。服务切换通过选择不同白名单 base URL 完成；不通过 LightRAG 请求头传用户可控 workspace。
 - 由于当前 A3 目标只有 20 条知识，图谱检索是否对问题足够有价值以 30 条问题集验收；若效果不足，保留同一 Retriever 接口，允许以非 LightRAG 实现替换，不扩大为新的平台工程。
 

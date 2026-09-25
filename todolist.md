@@ -62,24 +62,24 @@
 
 #### A3. 状态相关 RAG
 
-**技术栈**：新增 Markdown/JSONL 知识条目、中文分词 `jieba`、关键词召回 `rank-bm25`、`sentence-transformers` 加中文嵌入模型 `BAAI/bge-small-zh-v1.5`；使用 NumPy 保存/计算小规模归一化向量相似度，RRF（倒数排名融合）合并两路结果。沿用 Qwen/GLM 生成回答。接入时核对 Python 3.13/本机兼容性，锁定包版本、模型 revision 与哈希；嵌入依赖作为可选依赖组。
+**技术栈**：LightRAG 固定版本 REST sidecar（与 Python 3.13 主环境隔离，按 `vehicle_common`、`vehiclemind_demo` 运行独立固定端口/目录/索引）；LightRAG `mix` + context-only 查询提供证据，不生成最终答复。VehicleMind 使用白名单 profile-to-endpoint 路由、只读 Agent 工具与 Qwen/GLM Function Calling；知识源用带 SHA-256、来源、章节、版本和适用范围的 YAML/Markdown 清单管理。按验证后锁定的 LightRAG 与 embedding 配置运行，不把 sidecar 依赖加入主环境。
 
 **需要做什么**：
 
-- [ ] 建立首批至少 20 条有来源的知识条目，覆盖车机功能说明、驾驶提醒与功能限制；保存文档、章节、版本、适用车型/场景及引用标识。
-- [ ] 按章节与主题切分内容，采用一致中文分词处理问题和文档；构建可重建的关键词及向量索引。
-- [ ] 以用户问题和当前有效状态构造查询，先过滤适用范围，再进行双路召回和排名融合；保存候选、分数和最终引用片段。
-- [ ] 将引用片段接入 Agent，回答展示文档出处；无命中、知识冲突或车型不匹配时明确说明。
+- [ ] 建立首批至少 20 条可公开、可追溯知识条目，覆盖车机功能说明、驾驶提醒与功能限制；通用内容在两个固定索引中使用相同稳定 ID 和内容哈希，演示专属内容只进入 `vehiclemind_demo`。
+- [ ] 固定并验证 LightRAG REST/API 与 embedding 配置；为两个 profile 各自启动独立服务、工作目录和索引，通过上传/状态轮询建立可重建索引，失败时不发布半成品。
+- [ ] 以用户问题和当前有效状态构造查询；只使用受控 profile-to-endpoint 映射选择实例，调用 LightRAG `mix` context-only 接口，保存前五条证据、排序、片段和引用映射。
+- [ ] 将检索实现为只读 Agent 工具，Agent 按需调用；回答使用稳定引用 ID 对应来源。服务不可用、无命中、引用映射失败、知识冲突或 profile 不匹配时明确说明，不捏造依据。
 - [ ] 将静态知识与当前车况/动态 POI 区分；知识文档不修改工具权限或替代工具实际结果。
 
 **达到什么结果**：
 
 - [ ] 能演示“为什么建议休息”“该车机功能如何操作”两类有引用的回答，点击引用可核对原文片段。
-- [ ] 建立至少 30 条问题的 AI 自审内部检索集合，包含可回答、无答案、版本/车型不匹配问题；冻结问题与预期证据对应关系。
+- [ ] 建立至少 30 条问题的 AI 辅助自审内部检索集合，包含 20 条可回答、5 条无答案、5 条 profile 不匹配；冻结问题与预期证据对应关系，不称为独立人工金标。
 - [ ] 报告 Recall@5（前五条证据召回率）、Citation Support（引用支持率）及无依据回答次数；指标来自实际运行，注明 AI 自审口径。
 - [ ] 修改知识条目后可以重建索引，并从运行记录追溯所使用的知识库与模型版本。
 
-技术参考：[rank-bm25 的一致分词要求](https://github.com/dorianbrown/rank_bm25/blob/master/README.md)、[Sentence Transformers 语义检索](https://www.sbert.net/examples/sentence_transformer/applications/semantic-search/README.html)、[中文 BGE 模型资产](https://huggingface.co/BAAI/bge-small-zh-v1.5/tree/main)。
+技术参考与已确认设计：[A3 LightRAG 检索器设计](docs/superpowers/specs/2026-09-25-a3-lightrag-design.md)。LightRAG 只提供检索证据；最终答复与安全/执行策略仍由 VehicleMind Agent 和策略层负责。
 
 #### A4. 行程内事件记忆
 
