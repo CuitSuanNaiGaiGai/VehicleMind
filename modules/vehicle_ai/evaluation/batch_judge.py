@@ -10,7 +10,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from modules.vehicle_ai.evaluation.batch import load_frozen_cases
+from modules.vehicle_ai.evaluation.batch import _total_usage, load_frozen_cases
 from modules.vehicle_ai.evaluation.batch_review import review_batch
 from modules.vehicle_ai.llm.base import BaseLLMClient
 
@@ -85,6 +85,7 @@ def judge_batch(
             "source_sha256": source_sha256,
             "decisions": [],
             "raw_responses": {},
+            "usage_by_case": {},
         }
     )
     if progress.get("judge") not in {JUDGE, "AI model assisted, Codex self-review"}:
@@ -98,6 +99,7 @@ def judge_batch(
     progress["judge"] = JUDGE
     progress["judge_model"] = judge_model
     progress["protocol_version"] = PROTOCOL_VERSION
+    progress.setdefault("usage_by_case", {})
     completed = {item["case_id"] for item in progress["decisions"]}
     case_ids = list(dict.fromkeys(item["case_id"] for item in run["trials"]))
     for case_id in case_ids:
@@ -167,6 +169,7 @@ def judge_batch(
             item["case_id"] = case_id
         progress["decisions"].extend(parsed)
         progress["raw_responses"][case_id] = response.content
+        progress["usage_by_case"][case_id] = _total_usage([{"usage": response.usage}])
         temporary = progress_path.with_suffix(".tmp")
         temporary.write_text(
             json.dumps(progress, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

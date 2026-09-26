@@ -40,6 +40,7 @@ class JudgeClient(BaseLLMClient):
                 ensure_ascii=False,
             ),
             [],
+            usage={"prompt_tokens": 123, "completion_tokens": 12},
         )
 
 
@@ -62,6 +63,10 @@ def test_judge_batch_saves_decisions_and_review(tmp_path: Path) -> None:
     assert result["reviewer"] == "test/stub-judge AI-assisted review"
     assert result["source_sha256"] == progress["source_sha256"]
     assert len(progress["decisions"]) == 2
+    assert progress["usage_by_case"]["C01"] == {
+        "prompt_tokens": 123,
+        "completion_tokens": 12,
+    }
 
 
 def test_judge_rejects_progress_copied_from_another_run(tmp_path: Path) -> None:

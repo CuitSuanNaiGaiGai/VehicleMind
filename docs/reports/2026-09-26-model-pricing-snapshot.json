@@ -1,0 +1,26 @@
+{
+  "captured_at": "2026-09-26",
+  "note": "只按可核验的官方标准目录价估算，不能代替供应商账单；历史与当前 token 均按本快照重算。Qwen 估算不扣除缓存、免费额度、促销或账户协议折扣。GLM 使用 BigModel endpoint，本次未能从可核验的该 endpoint 官方页面确认 GLM-5.1 的精确费率，因此费用不估算。",
+  "providers": {
+    "qwen": {
+      "model": "qwen3.8-max",
+      "currency": "CNY",
+      "region": "中国内地（北京）",
+      "pricing_tier": "标准在线推理，<=1M input tokens",
+      "input_cny_per_million": 12.0,
+      "output_cny_per_million": 36.0,
+      "source_url": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "note": "按未缓存输入的公开标准目录价计算；usage 未分辨缓存命中，结果是非账单估算。"
+    },
+    "glm": {
+      "model": "glm-5.1",
+      "currency": "CNY",
+      "region": "BigModel API endpoint",
+      "pricing_tier": null,
+      "input_cny_per_million": null,
+      "output_cny_per_million": null,
+      "source_url": "https://open.bigmodel.cn/pricing",
+      "note": "该官方定价页面在本次核验环境中未暴露可验证的 GLM-5.1 费率，费用标为 N/A。"
+    }
+  }
+}
