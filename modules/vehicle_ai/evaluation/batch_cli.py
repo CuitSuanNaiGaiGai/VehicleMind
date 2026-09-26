@@ -16,6 +16,7 @@ from modules.vehicle_ai.evaluation.batch import (
 )
 from modules.vehicle_ai.llm import build_llm_client
 from modules.vehicle_ai.agent.budget import AgentBudgetConfig
+from modules.vehicle_ai.evaluation.provenance import build_batch_provenance
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -75,6 +76,21 @@ def main(argv: list[str] | None = None) -> int:
     model = args.model or default_model
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     output = args.output_root / f"batch-{stamp}-{args.provider}"
+    dataset_root = args.policy or args.golden
+    provenance = build_batch_provenance(
+        Path(__file__).resolve().parents[3],
+        dataset_root,
+        args.agent_config,
+        cases,
+        repetitions=args.repetitions,
+        split=args.split,
+        temperature=args.temperature,
+        timeout_seconds=args.timeout_seconds,
+        max_tool_rounds=tool_rounds,
+        turn_timeout_seconds=turn_timeout,
+        max_tool_calls=tool_calls,
+        max_task_trace_events=config.max_task_trace_events,
+    )
     result = run_batch(
         cases,
         provider=args.provider,
@@ -91,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         turn_timeout_seconds=turn_timeout,
         max_tool_calls=tool_calls,
         max_task_trace_events=config.max_task_trace_events,
+        provenance=provenance,
     )
     print(f"已保存 {len(result['trials'])} 个 trial：{output}")
     print("回答语义仍待逐条复核；不能把 needs_review 计为成功。")

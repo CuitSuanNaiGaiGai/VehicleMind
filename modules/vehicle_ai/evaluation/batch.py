@@ -6,6 +6,7 @@ import hashlib
 import json
 import statistics
 from collections.abc import Callable, Sequence
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ import yaml
 
 from modules.vehicle_ai.evaluation.grader import grade_trial
 from modules.vehicle_ai.evaluation.models import EvaluationCase
+from modules.vehicle_ai.evaluation.provenance import BatchProvenance
 from modules.vehicle_ai.evaluation.report import write_report
 from modules.vehicle_ai.evaluation.rubric import load_rubric
 from modules.vehicle_ai.evaluation.runner import TrialResult, run_trial
@@ -98,7 +100,9 @@ def _trial_record(
         "error": trial.error,
         "request_count": trial.request_count,
         "latency_ms": trial.latency_ms,
-        "usage": _total_usage(trial.model_responses),
+        "usage": _total_usage(
+            trial.model_responses, expected_request_count=trial.request_count
+        ),
     }
     if case.policy_expectations is not None:
         record.update(
@@ -116,7 +120,12 @@ def _trial_record(
     return record
 
 
-def _total_usage(responses: Sequence[dict[str, Any]]) -> dict[str, int | None]:
+def _total_usage(
+    responses: Sequence[dict[str, Any]], *, expected_request_count: int | None = None
+) -> dict[str, int | None]:
+    if expected_request_count is not None and len(responses) != expected_request_count:
+        return {"prompt_tokens": None, "completion_tokens": None}
+
     def total(field: str) -> int | None:
         provider_field = {
             "prompt_tokens": "input_tokens",
@@ -149,7 +158,10 @@ def reconcile_usage_from_traces(run_root: Path) -> dict:
         if hashlib.sha256(trace_bytes).hexdigest() != item["trace_sha256"]:
             raise ValueError(f"trace hash mismatch: {item['case_id']}")
         trace = json.loads(trace_bytes)
-        item["usage"] = _total_usage(trace["trial"]["model_responses"])
+        item["usage"] = _total_usage(
+            trace["trial"]["model_responses"],
+            expected_request_count=trace["trial"]["request_count"],
+        )
     run["usage_reconciled_from_traces"] = True
     temporary = run_path.with_suffix(".tmp")
     temporary.write_text(
@@ -225,6 +237,7 @@ def run_batch(
     turn_timeout_seconds: float = 90.0,
     max_tool_calls: int = 10,
     max_task_trace_events: int = 200,
+    provenance: BatchProvenance | None = None,
 ) -> dict:
     if repetitions < 1 or not cases:
         raise ValueError("batch requires cases and positive repetitions")
@@ -235,6 +248,7 @@ def run_batch(
         "model": model,
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "review_scope": "AI-self-reviewed internal cases; answer semantics pending",
+        "provenance": asdict(provenance) if provenance is not None else None,
         "status": "running",
         "trials": [],
     }

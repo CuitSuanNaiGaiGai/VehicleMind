@@ -4,14 +4,25 @@ from pathlib import Path
 import yaml
 
 from modules.vehicle_ai.evaluation.batch import (
+    _total_usage,
     load_frozen_cases,
     reconcile_usage_from_traces,
     run_batch,
 )
+from modules.vehicle_ai.evaluation.provenance import BatchProvenance
 from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse
 
 
 ROOT = Path(__file__).resolve().parents[3] / "scenarios" / "agent_eval" / "golden"
+
+
+def test_partial_model_usage_is_null_when_an_attempt_has_no_response() -> None:
+    usage = _total_usage(
+        [{"usage": {"prompt_tokens": 10, "completion_tokens": 5}}],
+        expected_request_count=2,
+    )
+
+    assert usage == {"prompt_tokens": None, "completion_tokens": None}
 
 
 class ReplyClient(BaseLLMClient):
@@ -47,6 +58,43 @@ def test_batch_preserves_every_trial_and_does_not_claim_semantic_success(
         json.loads((output / "run.json").read_text(encoding="utf-8"))["trials"]
         == result["trials"]
     )
+
+
+def test_batch_persists_non_secret_provenance(tmp_path: Path) -> None:
+    provenance = BatchProvenance(
+        source_revision="a" * 40,
+        source_tree_clean=True,
+        manifest_sha256="b" * 64,
+        case_set_sha256="c" * 64,
+        rubric_set_sha256="d" * 64,
+        agent_config_sha256="e" * 64,
+        case_count=1,
+        repetitions=1,
+        split="all",
+        temperature=0.2,
+        timeout_seconds=30.0,
+        max_tool_rounds=5,
+        turn_timeout_seconds=90.0,
+        max_tool_calls=10,
+        max_task_trace_events=200,
+    )
+    output = tmp_path / "run"
+    run_batch(
+        load_frozen_cases(ROOT)[:1],
+        provider="test",
+        model="stub",
+        client_factory=ReplyClient,
+        repetitions=1,
+        output=output,
+        provenance=provenance,
+    )
+
+    stored = json.loads((output / "run.json").read_text(encoding="utf-8"))
+    assert stored["provenance"]["source_revision"] == "a" * 40
+    assert stored["provenance"]["manifest_sha256"] == "b" * 64
+    assert stored["provenance"]["case_count"] == 1
+    assert stored["provenance"]["repetitions"] == 1
+    assert "api_key" not in stored["provenance"]
 
 
 def test_missing_provider_usage_is_null_not_zero(tmp_path: Path) -> None:

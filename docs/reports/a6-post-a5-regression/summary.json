@@ -1,0 +1,1838 @@
+{
+  "title": "A6 A5 后在线 Agent 回归对照",
+  "pricing_snapshot_date": "2026-09-26",
+  "pricing_note": "只按可核验的官方标准目录价估算，不能代替供应商账单；历史与当前 token 均按本快照重算。Qwen 估算不扣除缓存、免费额度、促销或账户协议折扣。GLM 使用 BigModel endpoint，本次未能从可核验的该 endpoint 官方页面确认 GLM-5.1 的精确费率，因此费用不估算。",
+  "pricing_sources": [
+    {
+      "provider": "glm",
+      "model": "glm-5.1",
+      "source_url": "https://open.bigmodel.cn/pricing",
+      "note": "该官方定价页面在本次核验环境中未暴露可验证的 GLM-5.1 费率，费用标为 N/A。"
+    },
+    {
+      "provider": "qwen",
+      "model": "qwen3.8-max",
+      "source_url": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "note": "按未缓存输入的公开标准目录价计算；usage 未分辨缓存命中，结果是非账单估算。"
+    }
+  ],
+  "providers": {
+    "qwen": {
+      "before": {
+        "run_id": "a6-v4-baseline-qwen",
+        "provider": "qwen",
+        "model": "qwen3.8-max",
+        "started_at_utc": "2026-09-24T03:25:32.648657+00:00",
+        "source_revision": "c0a314e3234fcfa28954ac1d78878cde253ede4d",
+        "runtime_config": {
+          "temperature": 0.2,
+          "timeout_seconds": 45.0,
+          "max_tool_rounds": 5,
+          "turn_timeout_seconds": null,
+          "max_tool_calls": null,
+          "max_task_trace_events": null
+        },
+        "run_sha256": "0542f7fb2e5675d753e49502fb18aea1aa31a7ad0db2baa56d8a023b7781596f",
+        "review_sha256": "67078c7731e5b638f90847b8fafa97172a01f989050dc3e647190a1f3fbfbc16",
+        "judge_progress_sha256": "e57e1b467bb496c76233fed2f596fb756212d4544429a4e07eb3b1f3adf10930",
+        "trace_set_sha256": "b1a427df10dd794ef1b18cf6539cd6d8500c74ebe31b7491f68fe82814339831",
+        "review_source_sha256": "cf003e414bfd824588a56b94ab4a7fa2cd2a1b31dc9e24b33539667ed861c52c",
+        "judge_protocol_version": 4,
+        "scenario_count": 40,
+        "repetitions_per_scenario": 3,
+        "trial_count": 120,
+        "task_success": {
+          "passed": 82,
+          "total": 120
+        },
+        "mechanical_pass": {
+          "passed": 116,
+          "total": 120
+        },
+        "semantic_pass": {
+          "passed": 83,
+          "total": 120
+        },
+        "tool_selection": {
+          "passed": 119,
+          "total": 120
+        },
+        "argument_match": {
+          "passed": 119,
+          "total": 120
+        },
+        "final_state": {
+          "passed": 117,
+          "total": 120
+        },
+        "error_count": 0,
+        "unresolved_case_ids": [
+          "C03",
+          "C04",
+          "C05",
+          "M03",
+          "M07",
+          "R06",
+          "T03",
+          "T10",
+          "X03",
+          "X04",
+          "X05",
+          "X06",
+          "X07",
+          "X08",
+          "X09"
+        ],
+        "per_case_task_success": {
+          "C01": {
+            "passed": 3,
+            "total": 3
+          },
+          "C02": {
+            "passed": 3,
+            "total": 3
+          },
+          "C03": {
+            "passed": 0,
+            "total": 3
+          },
+          "C04": {
+            "passed": 0,
+            "total": 3
+          },
+          "C05": {
+            "passed": 0,
+            "total": 3
+          },
+          "C06": {
+            "passed": 3,
+            "total": 3
+          },
+          "M01": {
+            "passed": 3,
+            "total": 3
+          },
+          "M02": {
+            "passed": 3,
+            "total": 3
+          },
+          "M03": {
+            "passed": 2,
+            "total": 3
+          },
+          "M04": {
+            "passed": 3,
+            "total": 3
+          },
+          "M05": {
+            "passed": 3,
+            "total": 3
+          },
+          "M06": {
+            "passed": 3,
+            "total": 3
+          },
+          "M07": {
+            "passed": 0,
+            "total": 3
+          },
+          "M08": {
+            "passed": 3,
+            "total": 3
+          },
+          "R01": {
+            "passed": 3,
+            "total": 3
+          },
+          "R02": {
+            "passed": 3,
+            "total": 3
+          },
+          "R03": {
+            "passed": 3,
+            "total": 3
+          },
+          "R04": {
+            "passed": 3,
+            "total": 3
+          },
+          "R05": {
+            "passed": 3,
+            "total": 3
+          },
+          "R06": {
+            "passed": 2,
+            "total": 3
+          },
+          "T01": {
+            "passed": 3,
+            "total": 3
+          },
+          "T02": {
+            "passed": 3,
+            "total": 3
+          },
+          "T03": {
+            "passed": 0,
+            "total": 3
+          },
+          "T04": {
+            "passed": 3,
+            "total": 3
+          },
+          "T05": {
+            "passed": 3,
+            "total": 3
+          },
+          "T06": {
+            "passed": 3,
+            "total": 3
+          },
+          "T07": {
+            "passed": 3,
+            "total": 3
+          },
+          "T08": {
+            "passed": 3,
+            "total": 3
+          },
+          "T09": {
+            "passed": 3,
+            "total": 3
+          },
+          "T10": {
+            "passed": 0,
+            "total": 3
+          },
+          "X01": {
+            "passed": 3,
+            "total": 3
+          },
+          "X02": {
+            "passed": 3,
+            "total": 3
+          },
+          "X03": {
+            "passed": 1,
+            "total": 3
+          },
+          "X04": {
+            "passed": 0,
+            "total": 3
+          },
+          "X05": {
+            "passed": 0,
+            "total": 3
+          },
+          "X06": {
+            "passed": 0,
+            "total": 3
+          },
+          "X07": {
+            "passed": 2,
+            "total": 3
+          },
+          "X08": {
+            "passed": 0,
+            "total": 3
+          },
+          "X09": {
+            "passed": 0,
+            "total": 3
+          },
+          "X10": {
+            "passed": 3,
+            "total": 3
+          }
+        },
+        "per_split_task_success": {
+          "dev": {
+            "passed": 51,
+            "total": 72
+          },
+          "heldout": {
+            "passed": 31,
+            "total": 48
+          }
+        },
+        "descriptive_subsets": {
+          "context_grounding": {
+            "passed": 38,
+            "total": 66,
+            "case_ids": [
+              "C01",
+              "C02",
+              "C03",
+              "C04",
+              "C05",
+              "C06",
+              "R01",
+              "R02",
+              "R03",
+              "R04",
+              "R05",
+              "R06",
+              "X01",
+              "X02",
+              "X03",
+              "X04",
+              "X05",
+              "X06",
+              "X07",
+              "X08",
+              "X09",
+              "X10"
+            ]
+          },
+          "stale_unknown": {
+            "passed": 4,
+            "total": 18,
+            "case_ids": [
+              "C04",
+              "C05",
+              "R06",
+              "X06",
+              "X07",
+              "X08"
+            ]
+          },
+          "per_trial_task_success": {
+            "1": {
+              "passed": 28,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "2": {
+              "passed": 28,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "3": {
+              "passed": 26,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            }
+          }
+        },
+        "latency_ms": {
+          "p50": 1899.8598129837774,
+          "p95": 4896.707624953706,
+          "min": 757.6647910173051,
+          "max": 8137.277832953259
+        },
+        "request_count": 200,
+        "usage": {
+          "prompt_tokens": 313887,
+          "completion_tokens": 5480
+        },
+        "judge_request_count": 41,
+        "review_protocol_error_count": 1,
+        "judge_usage": {
+          "prompt_tokens": null,
+          "completion_tokens": null
+        },
+        "judge_model": "qwen/qwen3.8-max",
+        "reviewer": "qwen/qwen3.8-max AI-assisted review"
+      },
+      "after": {
+        "run_id": "batch-20260926T065457099089Z-qwen",
+        "provider": "qwen",
+        "model": "qwen3.8-max",
+        "started_at_utc": "2026-09-26T06:54:57.116272+00:00",
+        "source_revision": "9b6a4aa7fd6ce992fca6c576fc34e98c491b698e",
+        "runtime_config": {
+          "temperature": 0.2,
+          "timeout_seconds": 45.0,
+          "max_tool_rounds": 5,
+          "turn_timeout_seconds": 90.0,
+          "max_tool_calls": 10,
+          "max_task_trace_events": 200
+        },
+        "run_sha256": "c8a1fdc50d27fafd8b6bf50c28df56c45eb340e8ff388f145353bb912b3453be",
+        "review_sha256": "1c9233161e51a71c2359fd1465090bcaa9c481e94d61ac8e2fbbcbdb11d0e279",
+        "judge_progress_sha256": "fb556707d6286b359a3c427cefe5630dab5cb7ab709730b6b14a8ecb0a56e427",
+        "trace_set_sha256": "222e755fe2a7861f51c9bcd02e08f3b2cdc825a4ee254a34a950e2e791aa190f",
+        "review_source_sha256": "7e4bf5d5baac09dbfba0cf6bd971c4da78601d7345f1709add1e45516dc6eb49",
+        "judge_protocol_version": 4,
+        "scenario_count": 40,
+        "repetitions_per_scenario": 3,
+        "trial_count": 120,
+        "task_success": {
+          "passed": 80,
+          "total": 120
+        },
+        "mechanical_pass": {
+          "passed": 116,
+          "total": 120
+        },
+        "semantic_pass": {
+          "passed": 80,
+          "total": 120
+        },
+        "tool_selection": {
+          "passed": 119,
+          "total": 120
+        },
+        "argument_match": {
+          "passed": 119,
+          "total": 120
+        },
+        "final_state": {
+          "passed": 117,
+          "total": 120
+        },
+        "error_count": 0,
+        "unresolved_case_ids": [
+          "C04",
+          "C05",
+          "C06",
+          "M01",
+          "M03",
+          "R06",
+          "T03",
+          "T10",
+          "X01",
+          "X03",
+          "X04",
+          "X05",
+          "X06",
+          "X08",
+          "X09"
+        ],
+        "per_case_task_success": {
+          "C01": {
+            "passed": 3,
+            "total": 3
+          },
+          "C02": {
+            "passed": 3,
+            "total": 3
+          },
+          "C03": {
+            "passed": 3,
+            "total": 3
+          },
+          "C04": {
+            "passed": 0,
+            "total": 3
+          },
+          "C05": {
+            "passed": 0,
+            "total": 3
+          },
+          "C06": {
+            "passed": 1,
+            "total": 3
+          },
+          "M01": {
+            "passed": 0,
+            "total": 3
+          },
+          "M02": {
+            "passed": 3,
+            "total": 3
+          },
+          "M03": {
+            "passed": 0,
+            "total": 3
+          },
+          "M04": {
+            "passed": 3,
+            "total": 3
+          },
+          "M05": {
+            "passed": 3,
+            "total": 3
+          },
+          "M06": {
+            "passed": 3,
+            "total": 3
+          },
+          "M07": {
+            "passed": 3,
+            "total": 3
+          },
+          "M08": {
+            "passed": 3,
+            "total": 3
+          },
+          "R01": {
+            "passed": 3,
+            "total": 3
+          },
+          "R02": {
+            "passed": 3,
+            "total": 3
+          },
+          "R03": {
+            "passed": 3,
+            "total": 3
+          },
+          "R04": {
+            "passed": 3,
+            "total": 3
+          },
+          "R05": {
+            "passed": 3,
+            "total": 3
+          },
+          "R06": {
+            "passed": 1,
+            "total": 3
+          },
+          "T01": {
+            "passed": 3,
+            "total": 3
+          },
+          "T02": {
+            "passed": 3,
+            "total": 3
+          },
+          "T03": {
+            "passed": 0,
+            "total": 3
+          },
+          "T04": {
+            "passed": 3,
+            "total": 3
+          },
+          "T05": {
+            "passed": 3,
+            "total": 3
+          },
+          "T06": {
+            "passed": 3,
+            "total": 3
+          },
+          "T07": {
+            "passed": 3,
+            "total": 3
+          },
+          "T08": {
+            "passed": 3,
+            "total": 3
+          },
+          "T09": {
+            "passed": 3,
+            "total": 3
+          },
+          "T10": {
+            "passed": 0,
+            "total": 3
+          },
+          "X01": {
+            "passed": 1,
+            "total": 3
+          },
+          "X02": {
+            "passed": 3,
+            "total": 3
+          },
+          "X03": {
+            "passed": 1,
+            "total": 3
+          },
+          "X04": {
+            "passed": 0,
+            "total": 3
+          },
+          "X05": {
+            "passed": 1,
+            "total": 3
+          },
+          "X06": {
+            "passed": 0,
+            "total": 3
+          },
+          "X07": {
+            "passed": 3,
+            "total": 3
+          },
+          "X08": {
+            "passed": 0,
+            "total": 3
+          },
+          "X09": {
+            "passed": 0,
+            "total": 3
+          },
+          "X10": {
+            "passed": 3,
+            "total": 3
+          }
+        },
+        "per_split_task_success": {
+          "dev": {
+            "passed": 48,
+            "total": 72
+          },
+          "heldout": {
+            "passed": 32,
+            "total": 48
+          }
+        },
+        "descriptive_subsets": {
+          "context_grounding": {
+            "passed": 38,
+            "total": 66,
+            "case_ids": [
+              "C01",
+              "C02",
+              "C03",
+              "C04",
+              "C05",
+              "C06",
+              "R01",
+              "R02",
+              "R03",
+              "R04",
+              "R05",
+              "R06",
+              "X01",
+              "X02",
+              "X03",
+              "X04",
+              "X05",
+              "X06",
+              "X07",
+              "X08",
+              "X09",
+              "X10"
+            ]
+          },
+          "stale_unknown": {
+            "passed": 4,
+            "total": 18,
+            "case_ids": [
+              "C04",
+              "C05",
+              "R06",
+              "X06",
+              "X07",
+              "X08"
+            ]
+          },
+          "per_trial_task_success": {
+            "1": {
+              "passed": 27,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "2": {
+              "passed": 27,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "3": {
+              "passed": 26,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            }
+          }
+        },
+        "latency_ms": {
+          "p50": 1859.738354512956,
+          "p95": 4174.202542053536,
+          "min": 849.4189999764785,
+          "max": 5747.658749925904
+        },
+        "request_count": 200,
+        "usage": {
+          "prompt_tokens": 615527,
+          "completion_tokens": 7993
+        },
+        "judge_request_count": 40,
+        "review_protocol_error_count": 0,
+        "judge_usage": {
+          "prompt_tokens": 116958,
+          "completion_tokens": 9021
+        },
+        "judge_model": "qwen/qwen3.8-max",
+        "reviewer": "qwen/qwen3.8-max AI-assisted review"
+      },
+      "task_success_delta_percentage_points": null,
+      "comparison_status": "descriptive_only_missing_historical_budget",
+      "unknown_budget_fields": [
+        "turn_timeout_seconds",
+        "max_tool_calls",
+        "max_task_trace_events"
+      ],
+      "before_agent_cost_estimate_cny": 3.963924,
+      "after_agent_cost_estimate_cny": 7.674072,
+      "after_judge_cost_estimate_cny": 1.728252,
+      "before_judge_cost_estimate_cny": null
+    },
+    "glm": {
+      "before": {
+        "run_id": "a6-v4-baseline-glm",
+        "provider": "glm",
+        "model": "glm-5.1",
+        "started_at_utc": "2026-09-24T03:25:44.374782+00:00",
+        "source_revision": "c0a314e3234fcfa28954ac1d78878cde253ede4d",
+        "runtime_config": {
+          "temperature": 0.2,
+          "timeout_seconds": 45.0,
+          "max_tool_rounds": 5,
+          "turn_timeout_seconds": null,
+          "max_tool_calls": null,
+          "max_task_trace_events": null
+        },
+        "run_sha256": "bb09f33fb76bb451dee30442736d7e16d366ee9df21b94b07ad0ceb289e7f233",
+        "review_sha256": "15cb9cf2856a620eaf4ddbee4f9d4e6ac407a176bfa50e098af187cb5f4e8872",
+        "judge_progress_sha256": "0fb450d4d5e87925a1cd91ef44d11306be4a6ce27cc17eb836c287c4c0aed2b5",
+        "trace_set_sha256": "c1fead9be2eb1818259e4a12fbc25488c10da1cc4b6bb6831017c6138364a854",
+        "review_source_sha256": "111da14e87dcadae8a559092b2cf68491e81d2ea965ea76f628cb922a001839f",
+        "judge_protocol_version": 4,
+        "scenario_count": 40,
+        "repetitions_per_scenario": 3,
+        "trial_count": 120,
+        "task_success": {
+          "passed": 84,
+          "total": 120
+        },
+        "mechanical_pass": {
+          "passed": 106,
+          "total": 120
+        },
+        "semantic_pass": {
+          "passed": 87,
+          "total": 120
+        },
+        "tool_selection": {
+          "passed": 110,
+          "total": 120
+        },
+        "argument_match": {
+          "passed": 110,
+          "total": 120
+        },
+        "final_state": {
+          "passed": 117,
+          "total": 120
+        },
+        "error_count": 1,
+        "unresolved_case_ids": [
+          "C03",
+          "C04",
+          "C05",
+          "M05",
+          "M07",
+          "T10",
+          "X01",
+          "X03",
+          "X05",
+          "X06",
+          "X08",
+          "X09"
+        ],
+        "per_case_task_success": {
+          "C01": {
+            "passed": 3,
+            "total": 3
+          },
+          "C02": {
+            "passed": 3,
+            "total": 3
+          },
+          "C03": {
+            "passed": 0,
+            "total": 3
+          },
+          "C04": {
+            "passed": 0,
+            "total": 3
+          },
+          "C05": {
+            "passed": 0,
+            "total": 3
+          },
+          "C06": {
+            "passed": 3,
+            "total": 3
+          },
+          "M01": {
+            "passed": 3,
+            "total": 3
+          },
+          "M02": {
+            "passed": 3,
+            "total": 3
+          },
+          "M03": {
+            "passed": 3,
+            "total": 3
+          },
+          "M04": {
+            "passed": 3,
+            "total": 3
+          },
+          "M05": {
+            "passed": 0,
+            "total": 3
+          },
+          "M06": {
+            "passed": 3,
+            "total": 3
+          },
+          "M07": {
+            "passed": 0,
+            "total": 3
+          },
+          "M08": {
+            "passed": 3,
+            "total": 3
+          },
+          "R01": {
+            "passed": 3,
+            "total": 3
+          },
+          "R02": {
+            "passed": 3,
+            "total": 3
+          },
+          "R03": {
+            "passed": 3,
+            "total": 3
+          },
+          "R04": {
+            "passed": 3,
+            "total": 3
+          },
+          "R05": {
+            "passed": 3,
+            "total": 3
+          },
+          "R06": {
+            "passed": 3,
+            "total": 3
+          },
+          "T01": {
+            "passed": 3,
+            "total": 3
+          },
+          "T02": {
+            "passed": 3,
+            "total": 3
+          },
+          "T03": {
+            "passed": 3,
+            "total": 3
+          },
+          "T04": {
+            "passed": 3,
+            "total": 3
+          },
+          "T05": {
+            "passed": 3,
+            "total": 3
+          },
+          "T06": {
+            "passed": 3,
+            "total": 3
+          },
+          "T07": {
+            "passed": 3,
+            "total": 3
+          },
+          "T08": {
+            "passed": 3,
+            "total": 3
+          },
+          "T09": {
+            "passed": 3,
+            "total": 3
+          },
+          "T10": {
+            "passed": 0,
+            "total": 3
+          },
+          "X01": {
+            "passed": 0,
+            "total": 3
+          },
+          "X02": {
+            "passed": 3,
+            "total": 3
+          },
+          "X03": {
+            "passed": 0,
+            "total": 3
+          },
+          "X04": {
+            "passed": 3,
+            "total": 3
+          },
+          "X05": {
+            "passed": 0,
+            "total": 3
+          },
+          "X06": {
+            "passed": 0,
+            "total": 3
+          },
+          "X07": {
+            "passed": 3,
+            "total": 3
+          },
+          "X08": {
+            "passed": 0,
+            "total": 3
+          },
+          "X09": {
+            "passed": 0,
+            "total": 3
+          },
+          "X10": {
+            "passed": 3,
+            "total": 3
+          }
+        },
+        "per_split_task_success": {
+          "dev": {
+            "passed": 54,
+            "total": 72
+          },
+          "heldout": {
+            "passed": 30,
+            "total": 48
+          }
+        },
+        "descriptive_subsets": {
+          "context_grounding": {
+            "passed": 39,
+            "total": 66,
+            "case_ids": [
+              "C01",
+              "C02",
+              "C03",
+              "C04",
+              "C05",
+              "C06",
+              "R01",
+              "R02",
+              "R03",
+              "R04",
+              "R05",
+              "R06",
+              "X01",
+              "X02",
+              "X03",
+              "X04",
+              "X05",
+              "X06",
+              "X07",
+              "X08",
+              "X09",
+              "X10"
+            ]
+          },
+          "stale_unknown": {
+            "passed": 6,
+            "total": 18,
+            "case_ids": [
+              "C04",
+              "C05",
+              "R06",
+              "X06",
+              "X07",
+              "X08"
+            ]
+          },
+          "per_trial_task_success": {
+            "1": {
+              "passed": 28,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "2": {
+              "passed": 28,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "3": {
+              "passed": 28,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            }
+          }
+        },
+        "latency_ms": {
+          "p50": 11617.608938016929,
+          "p95": 29959.90208297735,
+          "min": 3771.929375012405,
+          "max": 45018.604917044286
+        },
+        "request_count": 211,
+        "usage": {
+          "prompt_tokens": null,
+          "completion_tokens": null
+        },
+        "judge_request_count": 40,
+        "review_protocol_error_count": 0,
+        "judge_usage": {
+          "prompt_tokens": 58102,
+          "completion_tokens": 10391
+        },
+        "judge_model": "qwen/qwen3.8-max",
+        "reviewer": "qwen/qwen3.8-max AI-assisted review"
+      },
+      "after": {
+        "run_id": "batch-20260926T065502079142Z-glm",
+        "provider": "glm",
+        "model": "glm-5.1",
+        "started_at_utc": "2026-09-26T06:55:02.091813+00:00",
+        "source_revision": "9b6a4aa7fd6ce992fca6c576fc34e98c491b698e",
+        "runtime_config": {
+          "temperature": 0.2,
+          "timeout_seconds": 45.0,
+          "max_tool_rounds": 5,
+          "turn_timeout_seconds": 90.0,
+          "max_tool_calls": 10,
+          "max_task_trace_events": 200
+        },
+        "run_sha256": "6ba839717afdeb51505cb5b09029efde046a31c0c7e55409e8a6ee8e975f9445",
+        "review_sha256": "1863d1198f32019e1d45e1eaa91c56aefdf19ade371bdd79a70c58b9777ea15e",
+        "judge_progress_sha256": "619b9035d855208ed20312eec9d06512072e4ce781576b0c8989d5380c75ac82",
+        "trace_set_sha256": "8d962e771f036575eed4b3d5debe0d188e27fdeaaac1e0734e67a01324a049d4",
+        "review_source_sha256": "748417cbf4e30fa9884e8fddd68d502d8a31e55e03f4be7a53342b8ffa3e9655",
+        "judge_protocol_version": 4,
+        "scenario_count": 40,
+        "repetitions_per_scenario": 3,
+        "trial_count": 120,
+        "task_success": {
+          "passed": 90,
+          "total": 120
+        },
+        "mechanical_pass": {
+          "passed": 107,
+          "total": 120
+        },
+        "semantic_pass": {
+          "passed": 96,
+          "total": 120
+        },
+        "tool_selection": {
+          "passed": 111,
+          "total": 120
+        },
+        "argument_match": {
+          "passed": 111,
+          "total": 120
+        },
+        "final_state": {
+          "passed": 117,
+          "total": 120
+        },
+        "error_count": 0,
+        "unresolved_case_ids": [
+          "C03",
+          "C04",
+          "C05",
+          "M03",
+          "M07",
+          "T10",
+          "X03",
+          "X05",
+          "X06",
+          "X08",
+          "X09"
+        ],
+        "per_case_task_success": {
+          "C01": {
+            "passed": 3,
+            "total": 3
+          },
+          "C02": {
+            "passed": 3,
+            "total": 3
+          },
+          "C03": {
+            "passed": 2,
+            "total": 3
+          },
+          "C04": {
+            "passed": 0,
+            "total": 3
+          },
+          "C05": {
+            "passed": 0,
+            "total": 3
+          },
+          "C06": {
+            "passed": 3,
+            "total": 3
+          },
+          "M01": {
+            "passed": 3,
+            "total": 3
+          },
+          "M02": {
+            "passed": 3,
+            "total": 3
+          },
+          "M03": {
+            "passed": 0,
+            "total": 3
+          },
+          "M04": {
+            "passed": 3,
+            "total": 3
+          },
+          "M05": {
+            "passed": 3,
+            "total": 3
+          },
+          "M06": {
+            "passed": 3,
+            "total": 3
+          },
+          "M07": {
+            "passed": 0,
+            "total": 3
+          },
+          "M08": {
+            "passed": 3,
+            "total": 3
+          },
+          "R01": {
+            "passed": 3,
+            "total": 3
+          },
+          "R02": {
+            "passed": 3,
+            "total": 3
+          },
+          "R03": {
+            "passed": 3,
+            "total": 3
+          },
+          "R04": {
+            "passed": 3,
+            "total": 3
+          },
+          "R05": {
+            "passed": 3,
+            "total": 3
+          },
+          "R06": {
+            "passed": 3,
+            "total": 3
+          },
+          "T01": {
+            "passed": 3,
+            "total": 3
+          },
+          "T02": {
+            "passed": 3,
+            "total": 3
+          },
+          "T03": {
+            "passed": 3,
+            "total": 3
+          },
+          "T04": {
+            "passed": 3,
+            "total": 3
+          },
+          "T05": {
+            "passed": 3,
+            "total": 3
+          },
+          "T06": {
+            "passed": 3,
+            "total": 3
+          },
+          "T07": {
+            "passed": 3,
+            "total": 3
+          },
+          "T08": {
+            "passed": 3,
+            "total": 3
+          },
+          "T09": {
+            "passed": 3,
+            "total": 3
+          },
+          "T10": {
+            "passed": 0,
+            "total": 3
+          },
+          "X01": {
+            "passed": 3,
+            "total": 3
+          },
+          "X02": {
+            "passed": 3,
+            "total": 3
+          },
+          "X03": {
+            "passed": 1,
+            "total": 3
+          },
+          "X04": {
+            "passed": 3,
+            "total": 3
+          },
+          "X05": {
+            "passed": 0,
+            "total": 3
+          },
+          "X06": {
+            "passed": 0,
+            "total": 3
+          },
+          "X07": {
+            "passed": 3,
+            "total": 3
+          },
+          "X08": {
+            "passed": 0,
+            "total": 3
+          },
+          "X09": {
+            "passed": 0,
+            "total": 3
+          },
+          "X10": {
+            "passed": 3,
+            "total": 3
+          }
+        },
+        "per_split_task_success": {
+          "dev": {
+            "passed": 57,
+            "total": 72
+          },
+          "heldout": {
+            "passed": 33,
+            "total": 48
+          }
+        },
+        "descriptive_subsets": {
+          "context_grounding": {
+            "passed": 48,
+            "total": 66,
+            "case_ids": [
+              "C01",
+              "C02",
+              "C03",
+              "C04",
+              "C05",
+              "C06",
+              "R01",
+              "R02",
+              "R03",
+              "R04",
+              "R05",
+              "R06",
+              "X01",
+              "X02",
+              "X03",
+              "X04",
+              "X05",
+              "X06",
+              "X07",
+              "X08",
+              "X09",
+              "X10"
+            ]
+          },
+          "stale_unknown": {
+            "passed": 9,
+            "total": 18,
+            "case_ids": [
+              "C04",
+              "C05",
+              "R06",
+              "X06",
+              "X07",
+              "X08"
+            ]
+          },
+          "per_trial_task_success": {
+            "1": {
+              "passed": 31,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "2": {
+              "passed": 29,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            },
+            "3": {
+              "passed": 30,
+              "total": 40,
+              "case_ids": [
+                "C01",
+                "C02",
+                "C03",
+                "C04",
+                "C05",
+                "C06",
+                "M01",
+                "M02",
+                "M03",
+                "M04",
+                "M05",
+                "M06",
+                "M07",
+                "M08",
+                "R01",
+                "R02",
+                "R03",
+                "R04",
+                "R05",
+                "R06",
+                "T01",
+                "T02",
+                "T03",
+                "T04",
+                "T05",
+                "T06",
+                "T07",
+                "T08",
+                "T09",
+                "T10",
+                "X01",
+                "X02",
+                "X03",
+                "X04",
+                "X05",
+                "X06",
+                "X07",
+                "X08",
+                "X09",
+                "X10"
+              ]
+            }
+          }
+        },
+        "latency_ms": {
+          "p50": 11386.666812992189,
+          "p95": 31665.523041971028,
+          "min": 3672.2470419481397,
+          "max": 36152.54933293909
+        },
+        "request_count": 215,
+        "usage": {
+          "prompt_tokens": 587165,
+          "completion_tokens": 37114
+        },
+        "judge_request_count": 40,
+        "review_protocol_error_count": 0,
+        "judge_usage": {
+          "prompt_tokens": 125316,
+          "completion_tokens": 9797
+        },
+        "judge_model": "qwen/qwen3.8-max",
+        "reviewer": "qwen/qwen3.8-max AI-assisted review"
+      },
+      "task_success_delta_percentage_points": null,
+      "comparison_status": "descriptive_only_missing_historical_budget",
+      "unknown_budget_fields": [
+        "turn_timeout_seconds",
+        "max_tool_calls",
+        "max_task_trace_events"
+      ],
+      "before_agent_cost_estimate_cny": null,
+      "after_agent_cost_estimate_cny": null,
+      "after_judge_cost_estimate_cny": 1.856484,
+      "before_judge_cost_estimate_cny": 1.0713
+    }
+  },
+  "stage_evidence": [
+    {
+      "stage": "A1",
+      "name": "上下文/异常可靠性（Reliability）",
+      "value": "在线失败逐条保留；无总体 A1 单分",
+      "scope": "A1 验收与历史回归，AI 自审合成场景"
+    },
+    {
+      "stage": "A2",
+      "name": "Recommendation Appropriateness（建议适配率）",
+      "value": "1/2；Confirmation Compliance（确认合规率）1/1；未经确认敏感执行 0",
+      "scope": "Qwen，3 个策略场景单次在线运行；字面规则评分，见 A2 报告"
+    },
+    {
+      "stage": "A3",
+      "name": "Recall@5 / Citation Support（证据召回/引用支持）",
+      "value": "20/20；69/74；范围弃答定向复测 5/5；来源越界 0",
+      "scope": "Qwen，30 题主评测；范围修正后 5 题单独复测，AI 辅助审查"
+    },
+    {
+      "stage": "A4",
+      "name": "Event Retrieval Accuracy / Temporal Confusion（事件检索/时间混淆）",
+      "value": "8/8 字段（4/4 查询）；注入检查 0/1",
+      "scope": "结构化合成行程事件，不是在线自然语言金标"
+    },
+    {
+      "stage": "A5",
+      "name": "Recovery Success / Safe Stop / Budget（恢复/停止/预算）",
+      "value": "1/1；4/4；7/7；固定场景断言 7/7",
+      "scope": "确定性故障注入、模拟 POI 与模拟车机，不是在线模型成绩"
+    }
+  ],
+  "limitations": [
+    "40 个冻结场景由项目内部 AI 自审，非独立人工金标准；每场景重复 3 次不增加独立样本量。",
+    "语义复核由同一 Qwen 审核器按 protocol v4 辅助完成，存在同源偏差，不等同人工审定。",
+    "模型名称是服务别名；提供商未提供可核对的权重/服务版本摘要，跨日期差异不能完全归因于代码变更。",
+    "Agent 运行只用合成场景与模拟工具；不代表真实车辆、道路安全或感知准确率。",
+    "Token 费用为指定时点公开标准价重算的估算，非账户账单；不含缓存折扣、免费额度、促销或审核失败重试等无法验证的计费调整。",
+    "GLM 当前 BigModel endpoint 的精确官方计费档未在本报告核验，相关费用为 N/A。",
+    "历史基线没有记录全部 Agent 运行预算；虽然已记录参数没有发现差异，但 Task Success 差值标为 N/A，只并列展示两次观察结果，不将变化归因于 A5 代码。"
+  ],
+  "golden_manifest_sha256": "6e29357b7ea67ca756103aeea188b2d9e7cb3fb7552a91d4a122596c79fc8250"
+}

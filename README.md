@@ -124,12 +124,13 @@ flowchart LR
 | [在线 Agent 失败案例：R03](scenarios/agent_eval/golden/cases/R03.yaml) | 道路观测为 `LIGHT` 且仅 2 辆车，Qwen 把它表述成“轻度拥堵”；3 次重复均经证据复查判失败 | 反映语义归因问题；在线输出非确定性，详见[失败记录](docs/reports/2026-09-24-online-agent-internal-evaluation.md)，不能保证重跑得到同一句话 |
 | [双模型候选 pilot](docs/reports/2026-09-23-online-agent-pilot.md) | Qwen 与 GLM 均通过真实工具调用预检，并各完成 8 条候选 trial；保存请求与工具轨迹 | **候选 pilot**，回答语义仍需人工复核，不计算正式成功率 |
 | [M01 确认流程复测](docs/reports/2026-09-23-agent-pilot-followup-review.md) | 修复前后单例显示重复导航请求与误导回复得到纠正；确认前不执行模拟导航 | 每模型仅一次修复后采样，不能推断稳定成功率 |
-| [40 条内部基准双模型重复评测](docs/reports/2026-09-24-online-agent-internal-evaluation.md) | 40 条冻结场景 × 各 3 次：Qwen **82/120**、GLM **85/120** 端到端成功；分层、波动、token、延迟和失败案例均可查 | Codex AI 自审场景 + 在线 AI 辅助语义审核及证据纠错；**非独立人工标注，不是感知精度** |
+| [A5 后在线回归（最新）](docs/reports/2026-09-26-a6-online-regression.md) · [交互报告](docs/reports/a6-post-a5-regression/report.html) | 冻结 40 场景 × 3 次：Qwen **80/120**、GLM **90/120** Task Success（任务成功）；Mechanical Pass（机械通过）116/120、107/120；Context Grounding（上下文依据）38/66、48/66；stale/UNKNOWN Handling（过期/未知处理）4/18、9/18 | Qwen v4 AI 语义审核、内部合成观测和模拟工具；历史运行缺少预算配置，前后只并列展示；不是独立人工金标或感知精度 |
+| [历史在线基准](docs/reports/2026-09-24-online-agent-internal-evaluation.md) | 旧审核协议下 Qwen **82/120**、GLM **85/120**；v4 重审见 [A6 报告](docs/reports/2026-09-26-a6-online-regression.md) | 在线 AI 辅助语义审核；非独立人工标注，不是感知精度 |
 | [A3 LightRAG 知识增强 Agent](docs/reports/2026-09-26-a3-lightrag-evaluation.md) | 双 profile / 20 条知识源；30 题：Recall@5 **20/20**、引用支持 **69/74**、无答案审查 **5/5**、检索范围泄漏 **0**；范围修正后定向复测 **5/5** | Qwen `qwen3.8-max` 单次 AI 辅助内部评测；首轮范围弃答 **2/5**，问题与修正过程见报告；非独立人工金标准 |
 | [A4 行程事件记忆](docs/reports/2026-09-26-a4-trip-event-memory.md) | SQLite 跨进程保留；冻结结构化查询 **4/4**、8/8 计数/事件 ID 字段匹配；旧 HIGH 风险未注入当前车况，时间混淆检查 **0/1** | 结构化合成事件序列与确定性 Agent 检查；不代表在线 LLM 自然语言问答成功率 |
 | [A5 Agent 计划与失败恢复](docs/reports/2026-09-26-a5-bounded-plan-recovery.md) · [可交互结果页](docs/reports/a5-bounded-plan-recovery/report.html) | 固定场景 **7/7**；恢复 **1/1**、安全停止 **4/4**、确认合规 **7/7**、双次回放一致 **7/7**、重复写违规 **0/7** | 确定性脚本模型、模拟地点及注入故障；未知写入场景实际回读车况后停止；不是在线模型成功率、实时地图或实车验证 |
 | [Agent 提示注入确认门](docs/reports/2026-09-26-agent-prompt-injection-safety.md) | 用户越权指令、伪造确认、引用攻击和检索片段攻击 **4/4** 被执行层拦截；未确认敏感写入 **0/4** | 刻意让脚本模型发起攻击性工具请求，只证明有限场景中的执行层确认门，不证明模型具备通用提示注入识别能力 |
-| [道路类别映射审查](docs/reports/2026-09-26-road-class-mapping-audit.md) | 静态审查定位到 85 通道 head 与 10 类展示表之间的需核对契约；权重 SHA 与清单一致 | 当前环境未能装载 ONNX Runtime 重跑；精确类别 ID 语义仍未确定，`truck` 不作为类别能力证据 |
+| [道路类别映射审查](docs/reports/2026-09-26-road-class-mapping-audit.md) | ONNX Runtime 实测三份导出模型 × 三个采样帧，NMS 输出均集中在 `class_id=3`；权重 SHA 与清单一致 | 运行时复现已完成，但精确训练类别语义仍未确定，`truck` 不作为类别能力证据 |
 | [道路感知本机性能实测](docs/reports/2026-09-24-road-performance.md) | Apple M5、1280×720、YOLOPv2 ONNX：各 3 个独立进程 × 30 测量帧；CPU **8.87–8.89 FPS**，CoreML 优先 **27.24–27.48 FPS**；推理与完整帧 p50/p95、环境和哈希见报告 | 同一离线短视频、无绘制/编码；CoreML session 含 CPU 回退；**非感知精度或上车实时保证** |
 | [舱内外零标注自动核验](docs/reports/2026-09-24-perception-auto-audit.md) | 本机真实模型逐帧处理舱内 **26/26**、舱外 **26/26** 条视频；共 **52,872/52,872** 帧有结构化输出，运行条件与哈希可追溯 | **仅证明可处理与输出分布，不是准确率**；舱外目标类别全部落在 `truck`，需排查类别映射/后处理；来源许可未确认，逐视频记录不公开 |
 
@@ -137,7 +138,9 @@ flowchart LR
 
 Agent 数字的分母是 **40 条冻结场景、每条重复 3 次、每模型 120 trial**；80 条开发回归变体不计入这些结果。场景由 Codex **AI 自审**，回答由**在线 AI 辅助**逐 trial 审核并对明确误判作证据纠错，不是独立人工金标。详细口径、失败案例和修正记录见[中文内部评测报告](docs/reports/2026-09-24-online-agent-internal-evaluation.md)。原始在线轨迹与道路性能逐帧结果保存在本地被 Git 忽略的 `runs/` 中，仓库公开场景、运行入口和审查记录，而非那次运行的全部原始请求；**尚无独立人工冻结的 Golden Set 或舱内外小样本精度**，不会借用其他项目的结果填入本页。
 
-本次 A5 代码后的全量在线双模型回归尚未重跑，因此上面的 40 场景数字仍是历史版本证据，不能说成 A5 合入后的当前线上成绩；对应回归口径和状态见[A6 展示与回归审查](docs/reports/2026-09-26-a6-showcase-and-regression.md)。
+当前 A5 后双模型 40 场景回归与 v4 语义复核已完成。汇总显示前后变化百分点为 N/A，因为历史运行缺少部分预算配置，不能归因于 A5 代码；详见[A6 在线回归报告](docs/reports/2026-09-26-a6-online-regression.md)。
+
+想自己测 Agent，可按[在线回归自测指南](docs/guide/agent-regression.md)运行两家模型、复核回答并定位每条失败。指南区分机械检查、语义审核、请求费用与历史比较，原始运行只保存在本机。
 
 <a id="quickstart"></a>
 ## 🚀 快速开始

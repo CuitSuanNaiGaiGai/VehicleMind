@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from modules.vehicle_ai.evaluation import batch_cli
@@ -43,3 +44,8 @@ def test_batch_cli_runs_selected_case_without_online_credentials(
     runs = list(tmp_path.glob("*/run.json"))
     assert len(runs) == 1
     assert len(load_frozen_cases(ROOT)) == 40
+    provenance = json.loads(runs[0].read_text())["provenance"]
+    assert provenance["case_count"] == 1
+    assert provenance["repetitions"] == 1
+    assert len(provenance["source_revision"]) == 40
+    assert "api_key" not in provenance

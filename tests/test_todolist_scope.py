@@ -7,12 +7,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_todolist_matches_recruiting_showcase_scope() -> None:
     text = (ROOT / "todolist.md").read_text(encoding="utf-8")
     required = (
-        "下一主线是“招聘展示闭环”",
+        "当前已完成招聘展示闭环 A6",
         "舱内最多 50 条",
         "舱外最多 50 条",
         "40 条 AI 自审内部评测场景与 80 条开发回归变体",
         "不将 80 条变体计为独立金标",
         "未经确认的敏感动作执行次数为 0",
+        "A6 任务状态已更新",
     )
     forbidden = (
         "实现 GRU 时序分类模型",
