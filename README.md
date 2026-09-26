@@ -103,7 +103,7 @@ flowchart LR
 | **舱外感知** | 离线道路视频 → 目标、车道、可行驶区；为道路上下文提供观测 | 第三方预训练 YOLOPv2 经 ONNX Runtime 推理，CoreML 可用时优先、CPU 回退；项目内实现预处理、后处理及结构化输出，另有 OpenCV 传统车道路径，不宣称自研模型训练 | [道路感知服务](modules/driving/perception_service.py) · [算法说明](docs/road_perception.md) |
 | **统一上下文与事件** | 舱内外语义观测 + 车辆状态 → Driver/Road/Vehicle 上下文与风险事件；隔离低层帧和决策层 | 项目内实现[舱内适配](modules/vehicle_ai/integration/cabin_adapter.py)、[舱外适配](modules/vehicle_ai/integration/driving_adapter.py)、字段契约、质量/过期状态及事件去抖 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [事件检测](modules/vehicle_ai/events/event_detector.py) |
 | **Agent 编排** | 用户请求 + 相关上下文/事件 → 回复或工具请求；决定何时读取车机状态与建议动作 | Qwen/GLM 是第三方在线 API；项目内实现上下文选择、对话与工具调用编排，也支持确定性离线脚本客户端 | [Agent](modules/vehicle_ai/agent/vehicle_agent.py) · [模型适配](modules/vehicle_ai/llm/factory.py) |
-| **可选知识增强** | 问题 + 有效车况 → 有来源的知识片段 → Agent 引用回答；未知或过期状态不参与查询 | 独立固定版本 LightRAG sidecar 提供 `mix` 检索证据；项目内实现双 profile 隔离、来源哈希、只读 Agent 工具与 30 题 AI 辅助内部评测；LightRAG 不生成最终答复 | [运行与核验指南](docs/guide/knowledge-rag-demo.md) · [知识工具](modules/vehicle_ai/knowledge/tool.py) |
+| **可选知识增强** | 问题 + 有效车况 → 有来源的知识片段 → Agent 引用回答；未知或过期状态不参与查询 | LightRAG 1.5.7；tiktoken `o200k_base` 编码、`text-embedding-v3` / 1024 维；NetworkX 图谱 + NanoVectorDB 余弦检索，以 `mix` 合并实体/关系/文本证据、去重取 Top-5；当前未启用 reranker。项目内实现双 profile 隔离、来源校验与只读取证工具 | [具体技术与指标](docs/guide/rag-agent-technical-details.md) · [运行指南](docs/guide/knowledge-rag-demo.md) · [知识工具](modules/vehicle_ai/knowledge/tool.py) |
 | **行程事件记忆** | 风险、提醒、用户选择与动作结果 → 可按当前行程和时间范围检索的历史证据 | Python `sqlite3` 持久化、事件 ID 去重、按行程隔离；Agent 只读查询，不将旧风险当作当前感知 | [运行指南](docs/guide/trip-memory-demo.md) · [事件存储](modules/vehicle_ai/memory/event_store.py) |
 | **受限计划与恢复** | 休息地点搜索 → 候选核验 → 用户确认 → 模拟导航 → 状态回读；失败时安全停止或提供一个需重新确认的候选 | 项目内有限状态计划，最多 9 步 / 1 次恢复；A4 SQLite 保存 `TASK_STEP`；确定性七场景验收：恢复 **1/1**、安全停止 **4/4**、预算 **7/7**、重复写违规 **0/7** | [运行指南](docs/guide/agent-plan-recovery.md) · [验收报告](docs/reports/2026-09-26-a5-bounded-plan-recovery.md) |
 | **工具确认门** | 工具请求 + 用户确认 → 模拟车机状态变化；阻止未授权导航 | 项目内实现 ToolRegistry、PendingAction 与一次性确认边界；执行层校验独立于 LLM 提示词；4 条用户/检索提示注入攻击均被确认门拦截 | [工具注册表](modules/vehicle_ai/tools/registry.py) · [确认设计](docs/agent_pending_actions.md) · [注入安全核验](docs/reports/2026-09-26-agent-prompt-injection-safety.md) |
@@ -124,10 +124,11 @@ flowchart LR
 | [在线 Agent 失败案例：R03](scenarios/agent_eval/golden/cases/R03.yaml) | 道路观测为 `LIGHT` 且仅 2 辆车，Qwen 把它表述成“轻度拥堵”；3 次重复均经证据复查判失败 | 反映语义归因问题；在线输出非确定性，详见[失败记录](docs/reports/2026-09-24-online-agent-internal-evaluation.md)，不能保证重跑得到同一句话 |
 | [双模型候选 pilot](docs/reports/2026-09-23-online-agent-pilot.md) | Qwen 与 GLM 均通过真实工具调用预检，并各完成 8 条候选 trial；保存请求与工具轨迹 | **候选 pilot**，回答语义仍需人工复核，不计算正式成功率 |
 | [M01 确认流程复测](docs/reports/2026-09-23-agent-pilot-followup-review.md) | 修复前后单例显示重复导航请求与误导回复得到纠正；确认前不执行模拟导航 | 每模型仅一次修复后采样，不能推断稳定成功率 |
-| [A5 后在线回归（最新）](docs/reports/2026-09-26-a6-online-regression.md) · [交互报告](docs/reports/a6-post-a5-regression/report.html) | 冻结 40 场景 × 3 次：Qwen **80/120**、GLM **90/120** Task Success（任务成功）；Mechanical Pass（机械通过）116/120、107/120；Context Grounding（上下文依据）38/66、48/66；stale/UNKNOWN Handling（过期/未知处理）4/18、9/18 | Qwen v4 AI 语义审核、内部合成观测和模拟工具；历史运行缺少预算配置，前后只并列展示；不是独立人工金标或感知精度 |
+| [LightRAG / Agent 三个主指标（最新完整重测）](docs/reports/2026-09-26-rag-agent-three-metrics.md) | Qwen / GLM：Evidence Hit@5（证据命中）均 **20/20**；Citation Support Rate（引用支持）**74/86（86.0%） / 95/104（91.3%）**；Task Success Rate（任务成功）**96/120（80.0%） / 97/120（80.8%）** | RAG 各 30 题，命中率来自独立检索探针；引用为已审子句比例，Qwen 两题审核失败；Agent 各 40 场景 × 3 次且未开启 RAG。小知识库、AI 辅助判分，不是联合车控成功率或模型排名 |
+| [A5 后在线回归（阶段记录）](docs/reports/2026-09-26-a6-online-regression.md) · [交互报告](docs/reports/a6-post-a5-regression/report.html) | 冻结 40 场景 × 3 次：Qwen **80/120**、GLM **90/120** Task Success（任务成功）；Mechanical Pass（机械通过）116/120、107/120；Context Grounding（上下文依据）38/66、48/66；stale/UNKNOWN Handling（过期/未知处理）4/18、9/18 | Qwen v4 AI 语义审核、内部合成观测和模拟工具；历史运行缺少预算配置，前后只并列展示；不是独立人工金标或感知精度 |
 | [Agent 决策依据与目的地变更定向回归](docs/reports/2026-09-26-agent-decision-quality.md) | C04/X08/M03 各 1 次；最终 Qwen、GLM 的 Task Success（任务成功）均为 **2/3** | 修复前两模型均为 0/3；只有三个合成场景×单次采样，AI 辅助语义审查非人工金标；M03 仍保留失败/审核争议，分项见报告 |
 | [历史在线基准](docs/reports/2026-09-24-online-agent-internal-evaluation.md) | 旧审核协议下 Qwen **82/120**、GLM **85/120**；v4 重审见 [A6 报告](docs/reports/2026-09-26-a6-online-regression.md) | 在线 AI 辅助语义审核；非独立人工标注，不是感知精度 |
-| [A3 LightRAG 知识增强 Agent](docs/reports/2026-09-26-a3-lightrag-evaluation.md) | 双 profile / 20 条知识源；30 题：Recall@5 **20/20**、引用支持 **69/74**、无答案审查 **5/5**、检索范围泄漏 **0**；范围修正后定向复测 **5/5** | Qwen `qwen3.8-max` 单次 AI 辅助内部评测；首轮范围弃答 **2/5**，问题与修正过程见报告；非独立人工金标准 |
+| [A3 LightRAG 知识增强 Agent（阶段记录）](docs/reports/2026-09-26-a3-lightrag-evaluation.md) | 双 profile / 20 条知识源；30 题：Recall@5 **20/20**、引用支持 **69/74**、无答案审查 **5/5**、检索范围泄漏 **0**；范围修正后定向复测 **5/5** | Qwen `qwen3.8-max` 单次 AI 辅助内部评测；首轮范围弃答 **2/5**，问题与修正过程见报告；非独立人工金标准 |
 | [A4 行程事件记忆](docs/reports/2026-09-26-a4-trip-event-memory.md) | SQLite 跨进程保留；冻结结构化查询 **4/4**、8/8 计数/事件 ID 字段匹配；旧 HIGH 风险未注入当前车况，时间混淆检查 **0/1** | 结构化合成事件序列与确定性 Agent 检查；不代表在线 LLM 自然语言问答成功率 |
 | [A5 Agent 计划与失败恢复](docs/reports/2026-09-26-a5-bounded-plan-recovery.md) · [可交互结果页](docs/reports/a5-bounded-plan-recovery/report.html) | 固定场景 **7/7**；恢复 **1/1**、安全停止 **4/4**、确认合规 **7/7**、双次回放一致 **7/7**、重复写违规 **0/7** | 确定性脚本模型、模拟地点及注入故障；未知写入场景实际回读车况后停止；不是在线模型成功率、实时地图或实车验证 |
 | [Agent 提示注入确认门](docs/reports/2026-09-26-agent-prompt-injection-safety.md) | 用户越权指令、伪造确认、引用攻击和检索片段攻击 **4/4** 被执行层拦截；未确认敏感写入 **0/4** | 刻意让脚本模型发起攻击性工具请求，只证明有限场景中的执行层确认门，不证明模型具备通用提示注入识别能力 |
@@ -142,6 +143,8 @@ Agent 数字的分母是 **40 条冻结场景、每条重复 3 次、每模型 1
 当前 A5 后双模型 40 场景回归与 v4 语义复核已完成。汇总显示前后变化百分点为 N/A，因为历史运行缺少部分预算配置，不能归因于 A5 代码；详见[A6 在线回归报告](docs/reports/2026-09-26-a6-online-regression.md)。
 
 想自己测 Agent，可按[在线回归自测指南](docs/guide/agent-regression.md)运行两家模型、复核回答并定位每条失败。指南区分机械检查、语义审核、请求费用与历史比较，原始运行只保存在本机。
+
+LightRAG 到底如何分词、切块、向量化和排序，见[实际技术链路](docs/guide/rag-agent-technical-details.md)。该说明基于本机索引与服务核验，区分已启用能力与可选功能；[三个核心指标重测报告](docs/reports/2026-09-26-rag-agent-three-metrics.md)分别衡量证据命中、引用支持和任务成功，不将它们混成一个总准确率。本轮保留所有原始审核判定与格式错误，未作人工改判；历史报告中的纠错不适用于这组新数字。
 
 <a id="quickstart"></a>
 ## 🚀 快速开始

@@ -19,6 +19,8 @@
 - [x] 受限计划与恢复：完成多候选地点、分步执行、失败替代与停止，控制总步数和重复动作；A5 七场景通过，见[验收报告](docs/reports/2026-09-26-a5-bounded-plan-recovery.md)。
 - [x] 贯穿式评测与展示：三个独立离线主案例已发布并可复现；A5 后两模型在线全量回归、同协议 v4 复核、分项报告与招聘展示已完成。历史预算不完整，优化前后只作描述性并列、差值 N/A。详见 [A6 报告](docs/reports/2026-09-26-a6-online-regression.md)。
 - [x] 决策依据与目标变更核验：按实际选入事实及字段质量生成简报；目标只匹配本次搜索的规范候选，唯一命中创建新的待确认动作；中文 HTML 读取真实简报和目标解析 trace。最终三场景×每模型一次采样各为 Task Success 2/3，AI 辅助审核及 M03 争议详见[定向回归报告](docs/reports/2026-09-26-agent-decision-quality.md)。
+- [x] LightRAG/Agent 技术与指标调研：明确 Evidence Hit@5、Citation Support Rate、Task Success Rate 三个主指标；核实 BPE tokenizer、实际 chunk、1024 维 embedding、图谱/向量检索及轮流合并，明确当前 reranker 未启用。见[技术说明](docs/guide/rag-agent-technical-details.md)。
+- [x] 按原题集重新评测三个主指标：RAG 每模型 30 题、Agent 每模型 40 场景×3 次；两家检索探针均 20/20，引用支持 Qwen 74/86、GLM 95/104，任务成功分别 96/120、97/120。区分探针与实际取证，保留审核错误/无引用题及失败；完整离线测试 725 passed、2 deselected，文档经独立审查。不做消融、不混合历史成绩。见[本轮报告](docs/reports/2026-09-26-rag-agent-three-metrics.md)。
 - [ ] 用户手动在本地浏览器打开最终在线 HTML，完成布局与中文显示的视觉抽查；结构化 HTML 检查已通过，但本机 `file://` 页面受安全策略阻止，视觉验收尚未完成，不阻塞代码/离线测试完成。
 
 #### A1. 可靠上下文与任务状态
