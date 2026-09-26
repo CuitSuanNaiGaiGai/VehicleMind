@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from modules.vehicle_ai.agent.plan import PlanStatus
+from modules.vehicle_ai.agent import turn as turn_module
 from modules.config.agent_plan import AgentPlanConfig
 from modules.vehicle_ai.context import NavigationState
 from modules.vehicle_ai.llm.base import LLMToolCall
@@ -736,4 +739,116 @@ def test_target_resolution_skips_same_batch_write_and_next_request_has_clean_his
     assert not any(
         message.get("role") == "assistant" and message.get("tool_calls")
         for message in latest_request.messages
+    )
+
+
+@pytest.mark.parametrize(
+    "user_text",
+    [
+        "改去西湖服务区，请重新搜索；改去河滨服务区。",
+        "改去西湖服务区，请重新搜索河滨服务区。",
+    ],
+)
+def test_unrecognized_target_continuation_never_stages_first_candidate(
+    user_text: str,
+) -> None:
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        _search_call(),
+        ScriptedResponse(content="已经为你切换到西湖服务区。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat(user_text, debug=False)
+
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.task.status.value == "AWAITING_INPUT"
+    assert runtime.agent.task.reason == "TARGET_NOT_FOUND"
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+    event = next(
+        event
+        for event in reversed(runtime.agent.trace)
+        if event["kind"] == "target_resolution"
+    )
+    assert event["target"] == user_text.removeprefix("改去").rstrip("。")
+    assert event["status"] == "not_found"
+    assert "没有与“" in answer
+
+
+def test_low_plan_budget_pairs_executed_search_and_skips_batch_writes(
+    monkeypatch,
+) -> None:
+    target_response = ScriptedResponse(
+        content=None,
+        tool_calls=(
+            LLMToolCall(
+                "budgeted-search",
+                "search_nearby_rest_area",
+                {},
+                "{}",
+            ),
+            LLMToolCall(
+                "unapproved-navigation",
+                "start_navigation",
+                {"poi_id": "rest_area_002"},
+                '{"poi_id":"rest_area_002"}',
+            ),
+        ),
+    )
+    runtime = _runtime(target_response, ScriptedResponse(content="音乐已播放。"))
+    runtime.agent.plan_flow.config = AgentPlanConfig(
+        max_steps=3, max_recoveries=0, max_candidates=3
+    )
+    captured_batches = []
+    append_result = turn_module._append_tool_result_message
+
+    def capture_result(messages, call_id, result):
+        append_result(messages, call_id, result)
+        if call_id == "budgeted-search":
+            captured_batches.append(messages)
+
+    monkeypatch.setattr(turn_module, "_append_tool_result_message", capture_result)
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    assert "步骤预算" in answer
+    assert runtime.agent.task.status.value == "FAILED"
+    assert runtime.agent.task.reason == "STEP_BUDGET_EXCEEDED"
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.task.last_tool_result["success"] is True
+    assert [item.name for item in runtime.tools.execution_history()] == [
+        "search_nearby_rest_area"
+    ]
+    assert len(captured_batches) == 1
+    batch = captured_batches[0]
+    assistant_call_ids = {
+        call["id"]
+        for message in batch
+        if message.get("role") == "assistant"
+        for call in message.get("tool_calls", [])
+    }
+    tool_result_ids = {
+        message["tool_call_id"] for message in batch if message.get("role") == "tool"
+    }
+    assert assistant_call_ids == {"budgeted-search", "unapproved-navigation"}
+    assert tool_result_ids == assistant_call_ids
+    search_message = next(
+        message for message in batch if message.get("tool_call_id") == "budgeted-search"
+    )
+    assert '"success": true' in search_message["content"]
+    skipped_message = next(
+        message
+        for message in batch
+        if message.get("tool_call_id") == "unapproved-navigation"
+    )
+    assert "TARGET_RESOLUTION_COMPLETE" in skipped_message["content"]
+
+    runtime.chat("播放音乐。", debug=False)
+    next_request = runtime.agent.llm.requests[-1]
+    assert not any(
+        message.get("role") == "assistant" and message.get("tool_calls")
+        for message in next_request.messages
     )

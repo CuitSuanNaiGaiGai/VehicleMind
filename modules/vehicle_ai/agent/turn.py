@@ -90,6 +90,31 @@ def _target_resolution_reply(
     return target_resolution_message(resolution, pending_created=pending_created)
 
 
+def _append_tool_result_message(
+    messages: list[dict], call_id: str, result: dict
+) -> None:
+    messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": call_id,
+            "content": json.dumps(result, ensure_ascii=False, default=str),
+        }
+    )
+
+
+def _append_skipped_tool_call_messages(messages: list[dict], calls) -> None:
+    for call in calls:
+        _append_tool_result_message(
+            messages,
+            call.id,
+            {
+                "success": False,
+                "error": "TARGET_RESOLUTION_COMPLETE",
+                "message": "目标搜索结果已处理；后续工具调用未执行。",
+            },
+        )
+
+
 def run_turn(
     agent: "VehicleAgent", user_text: str, messages: list, target: str | None
 ) -> str:
@@ -266,6 +291,10 @@ def run_turn(
                         allow_retry=retry_allowed,
                     )
                 except PlanTransitionError:
+                    _append_tool_result_message(messages, call.id, result.to_dict())
+                    _append_skipped_tool_call_messages(
+                        messages, response.tool_calls[call_index + 1 :]
+                    )
                     return agent._record_final_response(
                         user_text,
                         "当前计划已达到步骤预算，已停止继续执行。",
@@ -293,6 +322,10 @@ def run_turn(
                             agent, call.name, arguments, result, target=target
                         )
                     except PlanTransitionError:
+                        _append_tool_result_message(messages, call.id, result.to_dict())
+                        _append_skipped_tool_call_messages(
+                            messages, response.tool_calls[call_index + 1 :]
+                        )
                         return agent._record_final_response(
                             user_text,
                             "当前计划已达到步骤预算，已停止继续执行。",
@@ -302,36 +335,16 @@ def run_turn(
                     return agent._record_final_response(user_text, text)
                 agent._update_action_state(call.name, result)
                 budget.remaining()
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": call.id,
-                        "content": json.dumps(
-                            result.to_dict(), ensure_ascii=False, default=str
-                        ),
-                    }
-                )
+                _append_tool_result_message(messages, call.id, result.to_dict())
                 target_search_finished = (
                     target is not None
                     and call.name == "search_nearby_rest_area"
                     and (resolution is not None or not retry_allowed or did_retry)
                 )
                 if target_search_finished:
-                    for skipped_call in response.tool_calls[call_index + 1 :]:
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": skipped_call.id,
-                                "content": json.dumps(
-                                    {
-                                        "success": False,
-                                        "error": "TARGET_RESOLUTION_COMPLETE",
-                                        "message": "目标搜索结果已处理；后续工具调用未执行。",
-                                    },
-                                    ensure_ascii=False,
-                                ),
-                            }
-                        )
+                    _append_skipped_tool_call_messages(
+                        messages, response.tool_calls[call_index + 1 :]
+                    )
                     if resolution is not None:
                         answer = _target_resolution_reply(agent, resolution)
                     else:

@@ -9,13 +9,11 @@ from modules.vehicle_ai.agent.target_resolution import resolve_target
 PendingIntent = Literal["reject", "change_target"]
 
 _TARGET_CLAUSE_SEPARATOR = re.compile(r"[，,；;。！？!?\n]")
-_ALTERNATIVE_DESTINATION = re.compile(
-    r"(?:或者|还是|或|\bor\b|\binstead\b|\brather\b)", re.IGNORECASE
-)
 _SEARCH_CONTINUATION = re.compile(
-    r"^(?:"
-    r"请重新搜索|重新搜索|再搜索|请搜索|搜索一下|搜索|"
+    r"(?:"
+    r"帮我重新搜索|请重新搜索|重新搜索|再搜索|请搜索|搜索一下|搜索|"
     r"请重新查找|重新查找|重新查询|"
+    r"如果找不到就不要导航|如果找不到时不要导航|"
     r"找不到就不要导航|找不到时不要导航|没有结果就不要导航|"
     r"不要导航|先别导航|无需导航|"
     r"please\s+search|search(?:\s+again)?|"
@@ -45,19 +43,19 @@ def requested_target(text: str) -> str | None:
             body = cleaned[len(prefix) :].strip()
             if not body:
                 return None
-            parts = _TARGET_CLAUSE_SEPARATOR.split(body, maxsplit=1)
-            first_clause = parts[0].strip()
-            if len(parts) == 1:
-                return first_clause or None
-            continuation = parts[1].strip()
+            parts = [part.strip() for part in _TARGET_CLAUSE_SEPARATOR.split(body)]
+            first_clause = parts[0]
+            continuations = parts[1:]
             if (
                 first_clause
-                and continuation
-                and not _ALTERNATIVE_DESTINATION.search(body)
-                and _SEARCH_CONTINUATION.match(continuation)
+                and continuations
+                and all(
+                    continuation and _SEARCH_CONTINUATION.fullmatch(continuation)
+                    for continuation in continuations
+                )
             ):
                 return first_clause
-            return body
+            return first_clause if not continuations else body
     return None
 
 

@@ -44,6 +44,10 @@ def test_requested_target_excludes_following_search_constraint() -> None:
     )
 
 
+def test_requested_target_excludes_if_not_found_constraint() -> None:
+    assert requested_target("改去河滨服务区，如果找不到就不要导航") == "河滨服务区"
+
+
 def test_requested_target_preserves_english_internal_spaces_and_case() -> None:
     assert requested_target(
         "change destination to  East Lake Service Area, please search"
@@ -52,6 +56,19 @@ def test_requested_target_preserves_english_internal_spaces_and_case() -> None:
 
 def test_requested_target_keeps_multiple_destinations_together() -> None:
     assert requested_target("改去西湖或河滨服务区") == "西湖或河滨服务区"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "改去西湖服务区，请重新搜索；改去河滨服务区。",
+        "改去西湖服务区，请重新搜索河滨服务区。",
+    ],
+)
+def test_requested_target_does_not_discard_another_target_or_search_term(
+    text: str,
+) -> None:
+    assert requested_target(text) == text.removeprefix("改去").rstrip("。")
 
 
 @pytest.mark.parametrize(
