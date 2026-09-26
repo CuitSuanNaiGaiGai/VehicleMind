@@ -125,6 +125,7 @@ flowchart LR
 | [双模型候选 pilot](docs/reports/2026-09-23-online-agent-pilot.md) | Qwen 与 GLM 均通过真实工具调用预检，并各完成 8 条候选 trial；保存请求与工具轨迹 | **候选 pilot**，回答语义仍需人工复核，不计算正式成功率 |
 | [M01 确认流程复测](docs/reports/2026-09-23-agent-pilot-followup-review.md) | 修复前后单例显示重复导航请求与误导回复得到纠正；确认前不执行模拟导航 | 每模型仅一次修复后采样，不能推断稳定成功率 |
 | [A5 后在线回归（最新）](docs/reports/2026-09-26-a6-online-regression.md) · [交互报告](docs/reports/a6-post-a5-regression/report.html) | 冻结 40 场景 × 3 次：Qwen **80/120**、GLM **90/120** Task Success（任务成功）；Mechanical Pass（机械通过）116/120、107/120；Context Grounding（上下文依据）38/66、48/66；stale/UNKNOWN Handling（过期/未知处理）4/18、9/18 | Qwen v4 AI 语义审核、内部合成观测和模拟工具；历史运行缺少预算配置，前后只并列展示；不是独立人工金标或感知精度 |
+| [Agent 决策依据与目的地变更定向回归](docs/reports/2026-09-26-agent-decision-quality.md) | C04/X08/M03 各 1 次；最终 Qwen、GLM 的 Task Success（任务成功）均为 **2/3** | 修复前两模型均为 0/3；只有三个合成场景×单次采样，AI 辅助语义审查非人工金标；M03 仍保留失败/审核争议，分项见报告 |
 | [历史在线基准](docs/reports/2026-09-24-online-agent-internal-evaluation.md) | 旧审核协议下 Qwen **82/120**、GLM **85/120**；v4 重审见 [A6 报告](docs/reports/2026-09-26-a6-online-regression.md) | 在线 AI 辅助语义审核；非独立人工标注，不是感知精度 |
 | [A3 LightRAG 知识增强 Agent](docs/reports/2026-09-26-a3-lightrag-evaluation.md) | 双 profile / 20 条知识源；30 题：Recall@5 **20/20**、引用支持 **69/74**、无答案审查 **5/5**、检索范围泄漏 **0**；范围修正后定向复测 **5/5** | Qwen `qwen3.8-max` 单次 AI 辅助内部评测；首轮范围弃答 **2/5**，问题与修正过程见报告；非独立人工金标准 |
 | [A4 行程事件记忆](docs/reports/2026-09-26-a4-trip-event-memory.md) | SQLite 跨进程保留；冻结结构化查询 **4/4**、8/8 计数/事件 ID 字段匹配；旧 HIGH 风险未注入当前车况，时间混淆检查 **0/1** | 结构化合成事件序列与确定性 Agent 检查；不代表在线 LLM 自然语言问答成功率 |
