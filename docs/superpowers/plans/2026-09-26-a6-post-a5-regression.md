@@ -32,7 +32,9 @@ Python 3.13、现有 `batch_cli` / `batch_judge_cli`、SHA-256 冻结 YAML、pyt
 - 使用当前审核协议 v4 分别复核旧基线与 A5 后新 run，保留每批自己的 judge progress 和 source hash；旧原始目录不得被覆盖。
 - 启动 Qwen/GLM 各 40 × 3 全量新 run；记录运行 commit/hash、模型配置、request/token/latency 和每条机械结果。
 - 对比任何模型语义成功变化前，确认同一 rubric、同一 judge protocol 和 complete 120 decisions；AI review 仅标为内部辅助审核。
-- 如果完整 run/复核发生 API 错误，保留部分运行并注明状态，先重试单个缺失 case/审核，不重跑已完成成功项目、不删除失败项。
+- 历史 trace 缺少的执行预算保留为未知，不用当前默认值补写；已知预算必须一致。预算不全时只并列展示描述性结果，提升差值为 N/A，不归因于代码优化。
+- 审核响应先持久化再解析；格式错误保留原文摘要与 usage，按失败计入而不自动重试挑选结果。审核支持从已保存 case 续跑；已发生但无法追回 usage 的调用显式记为未核算，费用为 N/A。
+- Agent runner 保留逐 trial API 失败并继续；进程中断产生的不完整批次保留并排除汇总，不宣称支持逐 trial 断点续跑。审核进程中断可恢复已保存进度。
 
 ### 4. 费用口径与报告内容
 

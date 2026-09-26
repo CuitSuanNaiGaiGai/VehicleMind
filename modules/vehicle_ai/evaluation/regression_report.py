@@ -10,7 +10,12 @@ from collections import defaultdict
 from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
 
-from modules.vehicle_ai.evaluation.regression_html import render_html
+from modules.vehicle_ai.evaluation.regression_render import (
+    build_comparison,
+    write_report,
+)
+
+__all__ = ["aggregate_batch", "build_comparison", "write_report"]
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -49,9 +54,70 @@ def _bucket_metrics(items: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     for item in items:
         buckets[item["split"]].append(item)
     return {
-        name: _ratio(sum(item["task_pass"] for item in values), len(values))
+        name: _ratio(sum(item["task_pass"] is True for item in values), len(values))
         for name, values in sorted(buckets.items())
     }
+
+
+def _expected_review_source_sha256(run: dict[str, Any], manifest_sha256: str) -> str:
+    source = {
+        "provider": run["provider"],
+        "model": run["model"],
+        "started_at_utc": run["started_at_utc"],
+        "golden_manifest_sha256": manifest_sha256,
+        "trials": sorted(
+            (
+                {
+                    key: item[key]
+                    for key in ("case_id", "case_sha256", "trial_index", "trace_sha256")
+                }
+                for item in run["trials"]
+            ),
+            key=lambda item: (item["case_id"], item["trial_index"]),
+        ),
+    }
+    encoded = json.dumps(source, ensure_ascii=False, sort_keys=True).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _trace_usage(trial: dict[str, Any]) -> dict[str, int | None]:
+    request_count = trial.get("request_count")
+    responses = trial.get("model_responses")
+    requests = trial.get("requests")
+    if (
+        type(request_count) is not int
+        or request_count < 0
+        or not isinstance(responses, list)
+        or not isinstance(requests, list)
+        or any(not isinstance(row, dict) for row in responses)
+        or len(requests) != request_count
+        or len(responses) > request_count
+    ):
+        raise ValueError("invalid request accounting in trace")
+    totals: dict[str, int | None] = {}
+    for field, provider_field in (
+        ("prompt_tokens", "input_tokens"),
+        ("completion_tokens", "output_tokens"),
+    ):
+        values = [
+            (row.get("usage") or {}).get(
+                field, (row.get("usage") or {}).get(provider_field)
+            )
+            for row in responses
+        ]
+        if (
+            len(responses) != request_count
+            or not values
+            or any(type(value) is not int or value < 0 for value in values)
+        ):
+            totals[field] = None
+        else:
+            totals[field] = sum(
+                value
+                for value in values
+                if isinstance(value, int) and not isinstance(value, bool)
+            )
+    return totals
 
 
 def aggregate_batch(
@@ -119,6 +185,7 @@ def aggregate_batch(
         raise ValueError("run, review and judge decisions must be arrays")
     run_by_key: dict[tuple[str, int], dict[str, Any]] = {}
     trace_hashes: list[str] = []
+    runtime_config: dict[str, Any] | None = None
     for item in run_items:
         key = (item.get("case_id"), item.get("trial_index"))
         if key in run_by_key:
@@ -136,8 +203,14 @@ def aggregate_batch(
             raise ValueError(f"trace hash mismatch: {key}")
         trace_data = _read_json(trace)
         trace_trial = trace_data.get("trial", {})
+        trace_grade = trace_data.get("grade", {})
+        trace_case = trace_data.get("case", {})
+        if not all(
+            isinstance(value, dict) for value in (trace_trial, trace_grade, trace_case)
+        ):
+            raise ValueError(f"trace case, grade or trial is malformed: {key}")
         if (
-            trace_data.get("case", {}).get("id") != key[0]
+            trace_case.get("id") != key[0]
             or trace_trial.get("case_id") != key[0]
             or trace_trial.get("trial_index") != key[1]
             or trace_trial.get("provider") != run.get("provider")
@@ -145,10 +218,108 @@ def aggregate_batch(
             or trace_trial.get("case_sha256") != item.get("case_sha256")
         ):
             raise ValueError(f"trace identity mismatch: {key}")
+        if trace_case.get("split") != item.get("split") or trace_case.get(
+            "category"
+        ) != item.get("category"):
+            raise ValueError(f"trace case metadata mismatch: {key}")
+        for run_field, grade_field in (
+            ("mechanical_status", "status"),
+            ("tool_selection", "tool_selection"),
+            ("argument_match", "argument_match"),
+            ("final_state", "final_state"),
+        ):
+            grade_value = trace_grade.get(grade_field)
+            if run_field == "mechanical_status" and grade_value not in {
+                "fail",
+                "needs_review",
+            }:
+                raise ValueError(f"invalid trace mechanical status: {key}")
+            if run_field != "mechanical_status" and type(grade_value) is not bool:
+                raise ValueError(f"invalid trace grade type: {key} / {grade_field}")
+            if item.get(run_field) != grade_value:
+                raise ValueError(f"run grade does not match trace: {key} / {run_field}")
+        if item.get("error") != trace_trial.get("error") or item.get(
+            "error"
+        ) != trace_grade.get("error"):
+            raise ValueError(f"run error does not match trace: {key}")
+        if type(item.get("request_count")) is not int or item[
+            "request_count"
+        ] != trace_trial.get("request_count"):
+            raise ValueError(f"run request count does not match trace: {key}")
+        latency = item.get("latency_ms")
+        trace_latency = trace_trial.get("latency_ms")
+        if (
+            isinstance(latency, bool)
+            or not isinstance(latency, (int, float))
+            or not math.isfinite(latency)
+            or latency < 0
+            or isinstance(trace_latency, bool)
+            or not isinstance(trace_latency, (int, float))
+            or not math.isfinite(trace_latency)
+            or latency != trace_latency
+        ):
+            raise ValueError(f"run latency does not match trace: {key}")
+        item_usage = item.get("usage")
+        if not isinstance(item_usage, dict) or any(
+            value is not None and (type(value) is not int or value < 0)
+            for value in item_usage.values()
+        ):
+            raise ValueError(f"invalid run token usage: {key}")
+        if item_usage != _trace_usage(trace_trial):
+            raise ValueError(f"run token usage does not match trace: {key}")
+        settings = trace_trial.get("settings")
+        provenance = run.get("provenance") or {}
+        if not isinstance(settings, dict):
+            raise ValueError(f"trace runtime settings are malformed: {key}")
+        config_fields = (
+            "temperature",
+            "timeout_seconds",
+            "max_tool_rounds",
+            "turn_timeout_seconds",
+            "max_tool_calls",
+            "max_task_trace_events",
+        )
+        current_config = {field: settings.get(field) for field in config_fields}
+        for field in config_fields:
+            value = current_config[field]
+            if value is None:
+                continue
+            if field in {"max_tool_rounds", "max_tool_calls", "max_task_trace_events"}:
+                if type(value) is not int or value < 1:
+                    raise ValueError(f"invalid trace runtime setting: {key} / {field}")
+            elif (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+                or (field != "temperature" and value == 0)
+            ):
+                raise ValueError(f"invalid trace runtime setting: {key} / {field}")
+        if runtime_config is None:
+            runtime_config = current_config
+        elif runtime_config != current_config:
+            raise ValueError(f"runtime settings changed within a run: {key}")
+        for setting in (
+            "temperature",
+            "timeout_seconds",
+            "max_tool_rounds",
+            "turn_timeout_seconds",
+            "max_tool_calls",
+            "max_task_trace_events",
+        ):
+            if setting in provenance and settings.get(setting) != provenance[setting]:
+                raise ValueError(f"run budget does not match trace: {key} / {setting}")
         run_by_key[key] = item
         trace_hashes.append(trace_hash)
     if set(run_by_key) != expected:
         raise ValueError("run is missing a frozen case or repetition")
+    manifest_sha256 = expected_manifest_sha256 or (run.get("provenance") or {}).get(
+        "manifest_sha256"
+    )
+    if not isinstance(manifest_sha256, str) or len(manifest_sha256) != 64:
+        raise ValueError("cannot verify semantic review against a frozen manifest")
+    if _expected_review_source_sha256(run, manifest_sha256) != review_source:
+        raise ValueError("semantic review source is not bound to this run")
 
     review_by_key: dict[tuple[str, int], dict[str, Any]] = {}
     for item in review_items:
@@ -193,12 +364,60 @@ def aggregate_batch(
     sorted_latencies = sorted(latencies)
     p95 = sorted_latencies[math.ceil(0.95 * len(sorted_latencies)) - 1]
     usage_rows = [run_trial_by_key[key].get("usage", {}) for key in sorted(expected)]
-    judge_usage_rows = list(progress.get("usage_by_case", {}).values())
     prompt_tokens = _total([row.get("prompt_tokens") for row in usage_rows])
     completion_tokens = _total([row.get("completion_tokens") for row in usage_rows])
-    judge_prompt_tokens = _total([row.get("prompt_tokens") for row in judge_usage_rows])
-    judge_completion_tokens = _total(
-        [row.get("completion_tokens") for row in judge_usage_rows]
+    raw_responses = progress.get("raw_responses", {})
+    usage_by_case = progress.get("usage_by_case", {})
+    unaccounted = progress.get("unaccounted_attempts_by_case", {})
+    review_errors = progress.get("review_errors", {})
+    if not all(
+        isinstance(value, dict)
+        for value in (raw_responses, usage_by_case, unaccounted, review_errors)
+    ):
+        raise ValueError("judge progress accounting must be objects")
+    if any(not isinstance(row, dict) for row in usage_by_case.values()):
+        raise ValueError("judge usage entries must be objects")
+    if any(not isinstance(value, str) for value in raw_responses.values()):
+        raise ValueError("judge raw responses must be text")
+    if any(case_id not in case_ids for case_id in raw_responses) or any(
+        case_id not in case_ids for case_id in usage_by_case
+    ):
+        raise ValueError("judge progress references an unknown case")
+    if any(
+        case_id not in case_ids or type(count) is not int or count < 0
+        for case_id, count in unaccounted.items()
+    ):
+        raise ValueError("invalid unaccounted reviewer attempt count")
+    if any(case_id not in case_ids for case_id in review_errors):
+        raise ValueError("review error references an unknown case")
+    for case_id, error in review_errors.items():
+        if (
+            not isinstance(error, dict)
+            or error.get("error_type") != "invalid_judge_output"
+            or case_id not in raw_responses
+            or error.get("response_sha256")
+            != hashlib.sha256(raw_responses[case_id].encode("utf-8")).hexdigest()
+        ):
+            raise ValueError("judge protocol error is not bound to its raw response")
+        if any(
+            decision_by_key[(case_id, trial_index)].get("verdict") != "fail"
+            for trial_index in range(1, repetitions + 1)
+        ):
+            raise ValueError("invalid judge output was not failed closed")
+    unaccounted_count = sum(unaccounted.values())
+    judge_usage_complete = not unaccounted_count and set(raw_responses) == set(
+        usage_by_case
+    )
+    judge_usage_rows = list(usage_by_case.values())
+    judge_prompt_tokens = (
+        _total([row.get("prompt_tokens") for row in judge_usage_rows])
+        if judge_usage_complete
+        else None
+    )
+    judge_completion_tokens = (
+        _total([row.get("completion_tokens") for row in judge_usage_rows])
+        if judge_usage_complete
+        else None
     )
     run_bytes = run_path.read_bytes()
     review_bytes = review_path.read_bytes()
@@ -224,8 +443,10 @@ def aggregate_batch(
         "model": run["model"],
         "started_at_utc": run.get("started_at_utc"),
         "source_revision": (run.get("provenance") or {}).get("source_revision"),
+        "runtime_config": runtime_config,
         "run_sha256": hashlib.sha256(run_bytes).hexdigest(),
         "review_sha256": hashlib.sha256(review_bytes).hexdigest(),
+        "judge_progress_sha256": hashlib.sha256(progress_path.read_bytes()).hexdigest(),
         "trace_set_sha256": trace_set_hash,
         "review_source_sha256": review_source,
         "judge_protocol_version": judge_protocol_version,
@@ -261,7 +482,8 @@ def aggregate_batch(
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
         },
-        "judge_request_count": len(progress.get("raw_responses", {})),
+        "judge_request_count": len(raw_responses) + unaccounted_count,
+        "review_protocol_error_count": len(review_errors),
         "judge_usage": {
             "prompt_tokens": judge_prompt_tokens,
             "completion_tokens": judge_completion_tokens,
@@ -269,209 +491,3 @@ def aggregate_batch(
         "judge_model": progress.get("judge_model"),
         "reviewer": review.get("reviewer"),
     }
-
-
-def _cost_cny(
-    usage: dict[str, int | None], rates: dict[str, Any] | None
-) -> float | None:
-    if rates is None:
-        return None
-    input_rate = rates.get("input_cny_per_million")
-    output_rate = rates.get("output_cny_per_million")
-    prompt = usage.get("prompt_tokens")
-    completion = usage.get("completion_tokens")
-    if (
-        not isinstance(input_rate, (int, float))
-        or not isinstance(output_rate, (int, float))
-        or type(prompt) is not int
-        or type(completion) is not int
-    ):
-        return None
-    return (prompt * input_rate + completion * output_rate) / 1_000_000
-
-
-def build_comparison(
-    before: dict[str, dict[str, Any]],
-    after: dict[str, dict[str, Any]],
-    *,
-    stage_evidence: list[dict[str, str]],
-    pricing: dict[str, Any],
-) -> dict[str, Any]:
-    if set(before) != {"qwen", "glm"} or set(after) != {"qwen", "glm"}:
-        raise ValueError("comparison requires qwen and glm before/after batches")
-    providers: dict[str, Any] = {}
-    rates = pricing.get("providers", {})
-    for provider in ("qwen", "glm"):
-        old, new = before[provider], after[provider]
-        if (old["provider"], new["provider"]) != (provider, provider):
-            raise ValueError(f"provider mapping mismatch: {provider}")
-        if (
-            old["scenario_count"] != new["scenario_count"]
-            or old["per_case_task_success"].keys()
-            != new["per_case_task_success"].keys()
-        ):
-            raise ValueError(f"scenario denominator changed: {provider}")
-        if old["judge_protocol_version"] != new["judge_protocol_version"]:
-            raise ValueError(f"judge protocol changed: {provider}")
-        rate = rates.get(provider)
-        if rate is not None and rate.get("model") not in {old["model"], new["model"]}:
-            rate = None
-        judge_rate = rates.get("qwen")
-        expected_judge_model = (
-            f"qwen/{judge_rate['model']}" if judge_rate is not None else None
-        )
-        providers[provider] = {
-            "before": old,
-            "after": new,
-            "task_success_delta_percentage_points": 100
-            * (
-                new["task_success"]["passed"] / new["task_success"]["total"]
-                - old["task_success"]["passed"] / old["task_success"]["total"]
-            ),
-            "before_agent_cost_estimate_cny": _cost_cny(old["usage"], rate),
-            "after_agent_cost_estimate_cny": _cost_cny(new["usage"], rate),
-            "after_judge_cost_estimate_cny": _cost_cny(
-                new["judge_usage"],
-                judge_rate if new.get("judge_model") == expected_judge_model else None,
-            ),
-            "before_judge_cost_estimate_cny": _cost_cny(
-                old["judge_usage"],
-                judge_rate if old.get("judge_model") == expected_judge_model else None,
-            ),
-        }
-    return {
-        "title": "A6 A5 后在线 Agent 回归对照",
-        "pricing_snapshot_date": pricing.get("captured_at"),
-        "pricing_note": pricing.get("note", ""),
-        "pricing_sources": [
-            {
-                "provider": provider,
-                "model": item.get("model"),
-                "source_url": item.get("source_url"),
-                "note": item.get("note", ""),
-            }
-            for provider, item in sorted(rates.items())
-        ],
-        "providers": providers,
-        "stage_evidence": stage_evidence,
-        "limitations": [
-            "40 个冻结场景由项目内部 AI 自审，非独立人工金标准；每场景重复 3 次不增加独立样本量。",
-            "语义复核由同一 Qwen 审核器按 protocol v4 辅助完成，存在同源偏差，不等同人工审定。",
-            "模型名称是服务别名；提供商未提供可核对的权重/服务版本摘要，跨日期差异不能完全归因于代码变更。",
-            "Agent 运行只用合成场景与模拟工具；不代表真实车辆、道路安全或感知准确率。",
-            "Token 费用为指定时点公开标准价重算的估算，非账户账单；不含缓存折扣、免费额度、促销或审核失败重试等无法验证的计费调整。",
-            "GLM 当前 BigModel endpoint 的精确官方计费档未在本报告核验，相关费用为 N/A。",
-        ],
-    }
-
-
-def _format_ratio(value: dict[str, int]) -> str:
-    return (
-        f"{value['passed']}/{value['total']} ({value['passed'] / value['total']:.1%})"
-    )
-
-
-def _format_cost(value: float | None) -> str:
-    return "N/A" if value is None else f"¥{value:.4f}"
-
-
-def render_markdown(comparison: dict[str, Any]) -> str:
-    lines = [
-        f"# {comparison['title']}",
-        "",
-        "> 同一 40 条冻结场景、当前 rubric 与 AI 语义复核协议 v4；Qwen/GLM 各 3 次。重复 trial 不是独立样本。指标不合成为综合分。",
-        "",
-        "## 前后回归",
-        "",
-        "| 模型 | 版本 | Task Success（任务成功） | Mechanical Pass（机械通过） | Tool / Argument / State（工具/参数/状态匹配） | 异常 | 延迟 p50/p95 | 请求 | 输入/输出 token | Agent 费用估算 | Qwen 审核费用估算 |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
-    ]
-    for provider in ("qwen", "glm"):
-        item = comparison["providers"][provider]
-        for label, key in (("优化前", "before"), ("A5 后", "after")):
-            data = item[key]
-            prefix = "before" if key == "before" else "after"
-            usage = data["usage"]
-            latency = data["latency_ms"]
-            lines.append(
-                f"| {provider.upper()} | {label} | {_format_ratio(data['task_success'])} | "
-                f"{_format_ratio(data['mechanical_pass'])} | "
-                f"{_format_ratio(data['tool_selection'])} / {_format_ratio(data['argument_match'])} / {_format_ratio(data['final_state'])} | "
-                f"{data['error_count']}/{data['trial_count']} | {latency['p50']:.0f}/{latency['p95']:.0f} ms | "
-                f"{data['request_count']} | {usage['prompt_tokens'] if usage['prompt_tokens'] is not None else 'N/A'} / {usage['completion_tokens'] if usage['completion_tokens'] is not None else 'N/A'} | "
-                f"{_format_cost(item[f'{prefix}_agent_cost_estimate_cny'])} | "
-                f"{_format_cost(item[f'{prefix}_judge_cost_estimate_cny'])} |"
-            )
-        delta = item["task_success_delta_percentage_points"]
-        lines.append(
-            f"| 变化 | {provider.upper()} | {delta:+.1f} 个百分点 | | | | | | | | |"
-        )
-    lines.extend(
-        [
-            "",
-            "每行 Task Success 分母均为 120 个 trial（40 场景 × 3 次）；相同场景的重复性另由逐场景结果体现。Mechanical Pass 是确定性规则通过比例；Task Success 还要求 v4 AI 语义审查通过。`needs_review` 不计为完成任务成功。",
-            "",
-            "## 阶段证据（分母彼此独立）",
-            "",
-            "| 阶段 | 指标 | 结果 | 证据口径 |",
-            "|---|---|---:|---|",
-        ]
-    )
-    for row in comparison["stage_evidence"]:
-        lines.append(
-            f"| {row['stage']} | {row['name']} | {row['value']} | {row['scope']} |"
-        )
-    lines.extend(["", "## 未通过场景", ""])
-    for provider in ("qwen", "glm"):
-        item = comparison["providers"][provider]["after"]
-        ids = item["unresolved_case_ids"]
-        rendered = (
-            "、".join(
-                f"[{case_id}](../../scenarios/agent_eval/golden/cases/{case_id}.yaml)"
-                for case_id in ids
-            )
-            or "无"
-        )
-        lines.append(f"- {provider.upper()}：{rendered}")
-    lines.extend(["", "## 费用与复现来源", ""])
-    lines.append(
-        f"公开目录价格快照：{comparison.get('pricing_snapshot_date') or '未提供'}。{comparison['pricing_note']}"
-    )
-    for source in comparison.get("pricing_sources", []):
-        url = source.get("source_url")
-        suffix = (
-            f"[{url}]({url})"
-            if isinstance(url, str) and url.startswith("https://")
-            else "链接未核验"
-        )
-        lines.append(
-            f"- {source['provider'].upper()} {source.get('model') or ''} 官方来源：{suffix}；{source.get('note', '')}"
-        )
-    for provider in ("qwen", "glm"):
-        lines.append(f"- {provider.upper()}：")
-        for key in ("before", "after"):
-            data = comparison["providers"][provider][key]
-            lines.append(
-                f"  - {key} run `{data['run_id']}`；revision `{data.get('source_revision') or '历史来源未随 run 固化'}`；"
-                f"run SHA-256 `{data['run_sha256']}`；review SHA-256 `{data['review_sha256']}`；"
-                f"trace 集 SHA-256 `{data['trace_set_sha256']}`；语义 protocol v{data['judge_protocol_version']}。"
-            )
-    lines.extend(["", "## 限制", ""])
-    lines.extend(f"- {item}" for item in comparison["limitations"])
-    lines.extend(
-        [
-            "",
-            "在线请求只包含版本化合成场景、当前工具协议及合成 Agent 回复；本报告不包含舱内/舱外视频、个人数据、密钥或逐请求原始 trace。完整 trace 和 AI 判定原文保留在本机 Git 忽略目录，按 run ID 和 SHA-256 核对。",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def write_report(comparison: dict[str, Any], output_dir: Path) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "summary.json").write_text(
-        json.dumps(comparison, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    (output_dir / "report.md").write_text(render_markdown(comparison), encoding="utf-8")
-    (output_dir / "report.html").write_text(render_html(comparison), encoding="utf-8")
