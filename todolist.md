@@ -278,7 +278,7 @@
 - [x] 实现工具选择、参数匹配、状态变化和禁止动作的确定性 grader。
 - [x] 实现在线 AI 辅助逐 trial 回答语义审核、原始决定留存与 Codex 证据纠错；**不是独立人工语义 grader**。
 - [x] 固定本次评测的模型版本、温度、重试策略和最大工具轮次。
-- [ ] 将 token、模型延迟、请求数记录为 per-trial 指标已有历史报告；工具延迟、重试汇总与可按明确当期单价计算的费用仍未形成统一结果包。
+- [ ] 补齐工具调用级延迟与重试次数汇总，并核验两家模型当期单价；A6 已提供 per-trial token、端到端延迟、请求数与重复波动，Qwen 按公开费率估算，GLM 费率无法核验故成本为 N/A，见 [A6 报告](docs/reports/2026-09-26-a6-online-regression.md)。
 - [x] 对已知在线语义失败和确认编排缺陷分类并保存修复前后证据；本轮新增参数编码、M01 指代、M05 过期问题均有根因说明与回归测试。
 
 ### 量化指标
@@ -286,12 +286,12 @@
 - [x] 报告内部端到端 Task Success Rate，并注明 AI 自审边界。
 - [x] 报告 Tool Selection Accuracy。
 - [x] 报告规范化 Tool Argument Exact Match。
-- [ ] 报告 Context Grounding Correctness。
+- [x] 报告 Context Grounding Correctness（上下文依据子集语义通过率）：Qwen 38/66（57.6%）、GLM 48/66（72.7%）；口径与 AI 辅助审核限制见 [A6 报告](docs/reports/2026-09-26-a6-online-regression.md)。
 - [x] 报告 Confirmation Compliance Rate；A5 七场景执行层确认合规率 7/7，另有 4 条注入专项攻击 0/4 未确认敏感写入。
-- [ ] 报告 stale/UNKNOWN 正确处理率。
+- [x] 报告 stale/UNKNOWN Handling（过期/未知子集语义通过率）：Qwen 4/18（22.2%）、GLM 9/18（50.0%）；口径与 AI 辅助审核限制见 [A6 报告](docs/reports/2026-09-26-a6-online-regression.md)。
 - [x] 报告确定性安全策略的重放一致率；A5 固定场景集双次执行结果一致 7/7。
 - [x] A5 与三个离线主案例均报告未确认敏感动作执行数 0（范围为固定模拟场景）。
-- [ ] 同时报告失败次数、重复 trial 波动、token、延迟和成本；历史在线报告已有失败/波动/token/延迟，但无当期可核验费用，且不是 A5 后版本。
+- [x] 同时报告失败次数、重复 trial 波动、token、延迟和成本；A6 报告逐项给出当前数据，无法核验的 GLM 费用明确为 N/A，不伪造账单；前后变化仍因历史预算缺项而不可归因。
 
 ## 6. 小样本感知验证
 

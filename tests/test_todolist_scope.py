@@ -14,6 +14,9 @@ def test_todolist_matches_recruiting_showcase_scope() -> None:
         "不将 80 条变体计为独立金标",
         "未经确认的敏感动作执行次数为 0",
         "A6 任务状态已更新",
+        "[x] 报告 Context Grounding Correctness",
+        "[x] 报告 stale/UNKNOWN Handling",
+        "[x] 同时报告失败次数、重复 trial 波动、token、延迟和成本",
     )
     forbidden = (
         "实现 GRU 时序分类模型",
