@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import json
+
+import pytest
+
 from modules.vehicle_ai.agent.plan import PlanStatus
+from modules.vehicle_ai.agent import turn as turn_module
 from modules.config.agent_plan import AgentPlanConfig
 from modules.vehicle_ai.context import NavigationState
 from modules.vehicle_ai.llm.base import LLMToolCall
@@ -13,7 +18,6 @@ from modules.vehicle_ai.tools.base import ToolResult
 
 def _search_call(max_distance_km: float | None = None) -> ScriptedResponse:
     arguments = {} if max_distance_km is None else {"max_distance_km": max_distance_km}
-    import json
 
     return ScriptedResponse(
         content=None,
@@ -29,8 +33,6 @@ def _search_call(max_distance_km: float | None = None) -> ScriptedResponse:
 
 
 def _navigation_call(poi_id: str) -> ScriptedResponse:
-    import json
-
     arguments = {"poi_id": poi_id}
     return ScriptedResponse(
         content=None,
@@ -431,3 +433,422 @@ def test_finish_confirmation_without_active_execute_step_is_ignored() -> None:
 
     assert result is None
     assert plan.status is PlanStatus.RUNNING
+
+
+def test_compound_target_change_uses_exact_new_candidate_and_invalidates_old_pending() -> (
+    None
+):
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        _search_call(),
+        ScriptedResponse(content="未找到匹配地点。"),
+    )
+
+    runtime.chat("帮我找最近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索；找不到就不要导航。", debug=False)
+
+    pending = runtime.agent.pending_actions.get()
+    assert pending is not None
+    assert pending.action_id != old_action.action_id
+    assert pending.arguments == {"poi_id": "rest_area_002"}
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_state
+        is NavigationState.IDLE
+    )
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+    assert "河滨服务区" in answer
+    assert "未找到" not in answer
+    event = next(
+        event
+        for event in reversed(runtime.agent.trace)
+        if event["kind"] == "target_resolution"
+    )
+    assert event["status"] == "matched"
+    assert event["selected_id"] == "rest_area_002"
+    assert event["selected_display_name"] == "河滨休息区"
+    assert event["pending_action_id"] == pending.action_id
+
+    assert runtime.agent.confirm_pending(pending.action_id).success
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_destination_id
+        == "rest_area_002"
+    )
+
+
+def test_unmatched_target_stays_awaiting_input_without_old_approval() -> None:
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        _search_call(),
+        ScriptedResponse(content="已经为你切换到东湖服务区。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat("改去东湖服务区，请重新搜索。", debug=False)
+
+    assert "没有与“东湖服务区”完全匹配" in answer
+    assert runtime.agent.pending_actions.get() is None
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+    assert runtime.agent.task.reason == "TARGET_NOT_FOUND"
+    assert runtime.agent.task.to_dict()["plan"]["selected_poi_id"] is None
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_state
+        is NavigationState.IDLE
+    )
+
+
+def test_ambiguous_exact_alias_does_not_stage_a_navigation_action() -> None:
+    catalog = (
+        {
+            "poi_id": "river-east",
+            "name": "东河服务区",
+            "aliases": ["河滨服务区"],
+            "distance_km": 3.0,
+        },
+        {
+            "poi_id": "river-west",
+            "name": "西河服务区",
+            "aliases": ["河滨服务区"],
+            "distance_km": 4.0,
+        },
+    )
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient(
+            (
+                _search_call(),
+                _navigation_call("river-east"),
+                _search_call(),
+                ScriptedResponse(content="已切换到河滨服务区。"),
+            )
+        ),
+        navigation_config=NavigationConfig(poi_catalog=catalog),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    assert "多个地点" in answer
+    assert runtime.agent.pending_actions.get() is None
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+    assert runtime.agent.task.reason == "TARGET_AMBIGUOUS"
+    event = next(
+        event
+        for event in reversed(runtime.agent.trace)
+        if event["kind"] == "target_resolution"
+    )
+    assert event["status"] == "ambiguous"
+    assert event["candidate_ids"] == ["river-east", "river-west"]
+
+
+def test_failed_target_search_keeps_actual_search_error_distinct() -> None:
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        _search_call(max_distance_km=1.0),
+        ScriptedResponse(content="未找到匹配地点。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    assert "没有返回可用候选" in answer
+    assert runtime.agent.task.reason == "NO_RESULTS"
+    assert runtime.agent.pending_actions.get() is None
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+    assert not any(
+        event["kind"] == "target_resolution" for event in runtime.agent.trace[-4:]
+    )
+
+
+def test_target_search_resolution_uses_successful_retry_result() -> None:
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        _search_call(),
+        ScriptedResponse(content="未找到匹配地点。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+    search_tool = runtime.tools.get("search_nearby_rest_area").handler.__self__
+    search_tool._transient_search_failures = 1
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    searches = [
+        item
+        for item in runtime.tools.execution_history()
+        if item.name == "search_nearby_rest_area"
+    ]
+    assert len(searches) == 3
+    assert searches[-2].error == "TRANSIENT_ERROR"
+    assert searches[-1].success is True
+    pending = runtime.agent.pending_actions.get()
+    assert pending is not None
+    assert pending.arguments == {"poi_id": "rest_area_002"}
+    assert "河滨服务区" in answer
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+
+
+def test_target_change_without_search_requests_a_new_search() -> None:
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        ScriptedResponse(content="已经为你改好目的地。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    assert "尚未执行本次目标搜索" in answer
+    assert runtime.agent.task.reason == "TARGET_SEARCH_REQUIRED"
+    assert runtime.agent.pending_actions.get() is None
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+    assert (
+        runtime.context_manager.get_context().vehicle.navigation_state
+        is NavigationState.IDLE
+    )
+
+
+def test_short_target_prefix_starts_a_fresh_plan_without_location_suffix() -> None:
+    target_text = "改去Riverside"
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient(
+            (
+                _search_call(),
+                _navigation_call("rest_area_001"),
+                _search_call(),
+                ScriptedResponse(content="已切换。"),
+            )
+        ),
+        navigation_config=NavigationConfig(
+            poi_catalog=(
+                {
+                    "poi_id": "rest_area_001",
+                    "name": "West Lake",
+                    "aliases": [],
+                    "distance_km": 2.0,
+                },
+                {
+                    "poi_id": "riverside",
+                    "name": "Riverside",
+                    "aliases": [],
+                    "distance_km": 3.0,
+                },
+            )
+        ),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat(target_text, debug=False)
+
+    replacement = runtime.agent.pending_actions.get()
+    assert replacement is not None
+    assert replacement.arguments == {"poi_id": "riverside"}
+    assert replacement.action_id != old_action.action_id
+    assert runtime.agent.task.to_dict()["plan"]["goal"] == target_text
+    assert "Riverside" in answer
+
+
+def test_explicit_target_request_after_completed_plan_starts_a_new_search() -> None:
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        _search_call(),
+        ScriptedResponse(content="未找到匹配地点。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    first_action = runtime.agent.pending_actions.get()
+    assert first_action is not None
+    assert runtime.agent.confirm_pending(first_action.action_id).success
+    assert runtime.agent.task.to_dict()["plan"]["status"] == PlanStatus.COMPLETED
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    replacement = runtime.agent.pending_actions.get()
+    assert replacement is not None
+    assert replacement.action_id != first_action.action_id
+    assert replacement.arguments == {"poi_id": "rest_area_002"}
+    assert runtime.agent.task.status.value == "AWAITING_CONFIRMATION"
+    assert "河滨服务区" in answer
+    assert "未找到" not in answer
+
+
+def test_target_resolution_skips_same_batch_write_and_next_request_has_clean_history() -> (
+    None
+):
+    target_response = ScriptedResponse(
+        content=None,
+        tool_calls=(
+            LLMToolCall(
+                "target-search",
+                "search_nearby_rest_area",
+                {},
+                "{}",
+            ),
+            LLMToolCall(
+                "unapproved-navigation",
+                "start_navigation",
+                {"poi_id": "rest_area_001"},
+                '{"poi_id":"rest_area_001"}',
+            ),
+        ),
+    )
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        target_response,
+        ScriptedResponse(content="音乐已播放。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    calls_before_change = runtime.tools.execution_history()
+    navigation_count_before_change = sum(
+        item.name == "start_navigation" for item in calls_before_change
+    )
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    pending = runtime.agent.pending_actions.get()
+    assert pending is not None
+    assert pending.arguments == {"poi_id": "rest_area_002"}
+    assert "河滨服务区" in answer
+    assert (
+        sum(
+            item.name == "start_navigation"
+            for item in runtime.tools.execution_history()
+        )
+        == navigation_count_before_change
+    )
+
+    runtime.chat("播放音乐。", debug=False)
+    latest_request = runtime.agent.llm.requests[-1]
+    assert not any(
+        message.get("role") == "assistant" and message.get("tool_calls")
+        for message in latest_request.messages
+    )
+
+
+@pytest.mark.parametrize(
+    "user_text",
+    [
+        "改去西湖服务区，请重新搜索；改去河滨服务区。",
+        "改去西湖服务区，请重新搜索河滨服务区。",
+    ],
+)
+def test_unrecognized_target_continuation_never_stages_first_candidate(
+    user_text: str,
+) -> None:
+    runtime = _runtime(
+        _search_call(),
+        _navigation_call("rest_area_001"),
+        _search_call(),
+        ScriptedResponse(content="已经为你切换到西湖服务区。"),
+    )
+    runtime.chat("帮我找附近服务区并导航", debug=False)
+    old_action = runtime.agent.pending_actions.get()
+    assert old_action is not None
+
+    answer = runtime.chat(user_text, debug=False)
+
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.task.status.value == "AWAITING_INPUT"
+    assert runtime.agent.task.reason == "TARGET_NOT_FOUND"
+    assert not runtime.agent.confirm_pending(old_action.action_id).success
+    event = next(
+        event
+        for event in reversed(runtime.agent.trace)
+        if event["kind"] == "target_resolution"
+    )
+    assert event["target"] == user_text.removeprefix("改去").rstrip("。")
+    assert event["status"] == "not_found"
+    assert "没有与“" in answer
+
+
+def test_low_plan_budget_pairs_executed_search_and_skips_batch_writes(
+    monkeypatch,
+) -> None:
+    target_response = ScriptedResponse(
+        content=None,
+        tool_calls=(
+            LLMToolCall(
+                "budgeted-search",
+                "search_nearby_rest_area",
+                {},
+                "{}",
+            ),
+            LLMToolCall(
+                "unapproved-navigation",
+                "start_navigation",
+                {"poi_id": "rest_area_002"},
+                '{"poi_id":"rest_area_002"}',
+            ),
+        ),
+    )
+    runtime = _runtime(target_response, ScriptedResponse(content="音乐已播放。"))
+    runtime.agent.plan_flow.config = AgentPlanConfig(
+        max_steps=3, max_recoveries=0, max_candidates=3
+    )
+    captured_batches = []
+    append_result = turn_module._append_tool_result_message
+
+    def capture_result(messages, call_id, result):
+        append_result(messages, call_id, result)
+        if call_id == "budgeted-search":
+            captured_batches.append(messages)
+
+    monkeypatch.setattr(turn_module, "_append_tool_result_message", capture_result)
+
+    answer = runtime.chat("改去河滨服务区，请重新搜索。", debug=False)
+
+    assert "步骤预算" in answer
+    assert runtime.agent.task.status.value == "FAILED"
+    assert runtime.agent.task.reason == "STEP_BUDGET_EXCEEDED"
+    assert runtime.agent.pending_actions.get() is None
+    assert runtime.agent.task.last_tool_result["success"] is True
+    assert [item.name for item in runtime.tools.execution_history()] == [
+        "search_nearby_rest_area"
+    ]
+    assert len(captured_batches) == 1
+    batch = captured_batches[0]
+    assistant_call_ids = {
+        call["id"]
+        for message in batch
+        if message.get("role") == "assistant"
+        for call in message.get("tool_calls", [])
+    }
+    tool_result_ids = {
+        message["tool_call_id"] for message in batch if message.get("role") == "tool"
+    }
+    assert assistant_call_ids == {"budgeted-search", "unapproved-navigation"}
+    assert tool_result_ids == assistant_call_ids
+    search_message = next(
+        message for message in batch if message.get("tool_call_id") == "budgeted-search"
+    )
+    assert '"success": true' in search_message["content"]
+    skipped_message = next(
+        message
+        for message in batch
+        if message.get("tool_call_id") == "unapproved-navigation"
+    )
+    assert "TARGET_RESOLUTION_COMPLETE" in skipped_message["content"]
+
+    runtime.chat("播放音乐。", debug=False)
+    next_request = runtime.agent.llm.requests[-1]
+    assert not any(
+        message.get("role") == "assistant" and message.get("tool_calls")
+        for message in next_request.messages
+    )

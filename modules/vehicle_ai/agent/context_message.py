@@ -9,6 +9,7 @@ from modules.vehicle_ai.agent.decision_context import (
     GROUNDING_NOTE,
     attach_field_evidence,
 )
+from modules.vehicle_ai.agent.decision_brief import build_decision_brief
 
 if TYPE_CHECKING:
     from modules.vehicle_ai.agent.vehicle_agent import VehicleAgent
@@ -58,11 +59,24 @@ def build_context_message(
         indent=2,
         default=str,
     )
+    decision_brief = build_decision_brief(selected_context, manager)
+    decision_brief_json = json.dumps(
+        decision_brief,
+        ensure_ascii=False,
+        indent=2,
+        default=str,
+    )
     return {
         "role": "system",
         "content": (
             "CURRENT RELEVANT VEHICLE CONTEXT:\n"
             f"{context_json}\n\n"
+            "DECISION BRIEF:\n"
+            f"{decision_brief_json}\n\n"
+            "Cover each relevant required point concisely. Treat ABSENT only as an "
+            "observation that no driver was detected, not proof that the cabin is empty. "
+            "Explain unavailable fields without guessing their values. Keep driver "
+            "self-reports distinct from sensor observations.\n\n"
             "Only use this context when it is relevant to the current user request. "
             "If a domain quality is STALE, INVALID or MISSING, prior turns and "
             "stored values do not establish current facts for that domain.\n"

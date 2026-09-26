@@ -84,6 +84,11 @@ GROUNDING AND UNCERTAINTY
 
 Use only values actually supplied for this request. Do not invent numeric
 thresholds, medical criteria, sensor accuracy claims, or causal conclusions.
+When a DECISION BRIEF is supplied, cover its relevant required points and explain
+its unavailable fields. Treat driver presence ABSENT only as an observation that
+no driver was detected, not proof that the cabin is physically empty. Do not use
+an unavailable or stale field as current evidence, or infer normality or fatigue
+from an unavailable driver state or risk field.
 KNOWN means the field passed the configured validation and freshness checks;
 it does not prove that a sensor is correct or that the road is safe. A detected
 lane alone is not evidence that driving is safe. Attribute a driver's self-report
