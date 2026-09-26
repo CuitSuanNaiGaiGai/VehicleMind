@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 import hashlib
+import time
 
 import cv2
 import pytest
@@ -46,7 +47,7 @@ class FakeCabinService:
         self.timestamps.append(timestamp_ms)
         state = "NORMAL" if len(self.timestamps) < 3 else "DROWSY"
         return SimpleNamespace(
-            metadata=SimpleNamespace(valid=True),
+            metadata=SimpleNamespace(valid=True, processing_ms=len(self.timestamps)),
             face_visible=True,
             presence="PRESENT",
             driver_state=state,
@@ -132,6 +133,10 @@ def test_cabin_processes_all_frames_at_native_timestamps(tmp_path: Path):
     assert capture.released and service.closed
     assert str(tmp_path) not in str(result)
     assert "frame" not in result["samples"][0]
+    assert result["performance"]["first_frame_ms"] == 1
+    assert result["performance"]["steady_frame_ms_samples"] == [2, 3]
+    assert result["performance"]["service_init_ms"] >= 0
+    assert result["performance"]["replay_loop_ms"] >= 0
 
 
 def test_road_counts_outputs_and_adjacent_flips(tmp_path: Path):
@@ -147,6 +152,89 @@ def test_road_counts_outputs_and_adjacent_flips(tmp_path: Path):
     assert result["lane_output_flips"] == 2
     assert result["drivable_output_flips"] == 0
     assert result["active_providers"] == ["CPUExecutionProvider"]
+    assert "performance" not in result
+
+
+def test_cabin_timing_excludes_initialization_and_close_from_replay(
+    tmp_path, monkeypatch
+):
+    clock = [0.0]
+    monkeypatch.setattr(time, "perf_counter", lambda: clock[0])
+
+    class TimedCapture(FakeCapture):
+        def read(self):
+            clock[0] += 0.01
+            return super().read()
+
+        def release(self):
+            clock[0] += 0.02
+            super().release()
+
+    class TimedService(FakeCabinService):
+        def close(self):
+            clock[0] += 10
+            super().close()
+
+    def service_factory(_domain):
+        clock[0] += 0.5
+        return TimedService()
+
+    def capture_factory(_path):
+        clock[0] += 0.03
+        return TimedCapture([0])
+
+    result = process_video(
+        entry("cabin", "one.mp4", frames=1),
+        tmp_path,
+        capture_factory=capture_factory,
+        service_factory=service_factory,
+    )
+    assert result["performance"] == pytest.approx(
+        {
+            "service_init_ms": 500,
+            "first_frame_ms": 1,
+            "steady_frame_ms_samples": [],
+            "replay_loop_ms": 70,
+        }
+    )
+
+
+def test_cabin_invalid_output_still_records_service_processing_time(tmp_path):
+    class InvalidCabinService(FakeCabinService):
+        def process_frame(self, frame, timestamp_ms):
+            snapshot = super().process_frame(frame, timestamp_ms)
+            snapshot.metadata.valid = False
+            return snapshot
+
+    result = process_video(
+        entry("cabin", "invalid.mp4", frames=2),
+        tmp_path,
+        capture_factory=lambda _: FakeCapture([0, 100]),
+        service_factory=lambda _: InvalidCabinService(),
+    )
+    assert result["status"] == "success"
+    assert result["processed_frames"] == 2
+    assert result["valid_output_frames"] == 0
+    assert result["performance"]["first_frame_ms"] == 1
+    assert result["performance"]["steady_frame_ms_samples"] == [2]
+
+
+def test_capture_creation_failure_remains_failed_and_closes_service(tmp_path):
+    service = FakeCabinService()
+
+    def broken_capture(_path):
+        raise OSError("capture unavailable")
+
+    result = process_video(
+        entry("cabin", "bad.mp4"),
+        tmp_path,
+        capture_factory=broken_capture,
+        service_factory=lambda _: service,
+    )
+    assert result["status"] == "failed"
+    assert result["performance"]["first_frame_ms"] is None
+    assert result["performance"]["steady_frame_ms_samples"] == []
+    assert service.closed
 
 
 def test_timestamp_fallback_is_explicit_when_codec_has_no_clock(tmp_path: Path):
