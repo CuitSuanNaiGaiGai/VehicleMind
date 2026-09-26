@@ -45,6 +45,8 @@ Python 3.13、现有 `batch_cli` / `batch_judge_cli`、SHA-256 冻结 YAML、pyt
 
 ### 5. 文档闭环和交付
 
+- 补齐既有 TODO 的子集描述：新增 `regression_subsets.py` 纯函数，从已验证 reviewed trial 计算设计中固定的 66/18 语义子集与三次 Task Success 波动；先测试非子集排除、fail 保留、分母与重复拆分，再接入聚合/Markdown/HTML。附具体 case IDs，注明事后描述性汇总、不做逐事实或人工准确率声称。
+
 - Files: `README.md`, `docs/interview_story.md`, `todolist.md`, A6 reports/spec/plan
 - 给出本地运行与产物定位命令；更新 TODO 中已由新证据满足的项，保留感知标签、路类映射语义人工复核和 Release 后置项。
 - 运行专项与全量 pytest、Ruff lint/format、CI 指定 mypy、源码大小策略、报告/HTML 安全回归、`git diff --check`。
@@ -54,3 +56,11 @@ Python 3.13、现有 `batch_cli` / `batch_judge_cli`、SHA-256 冻结 YAML、pyt
 
 - 冻结用例含真实个人数据/本机媒体、case/hash 不一致、API 凭据缺失/权限错误、评分对照无法做到同口径，或 PR 保护/CI 无法通过。
 - 停止时保留已完成安全部分，记录哪些未完成和证据；不以猜测补齐结果。
+
+## 执行记录
+
+- `dbf78ea`：provenance、历史隔离复核与汇总入口。
+- `9b6a4aa`：审核先落盘、异常尝试计数、trace/评分交叉校验、模型与预算检查、N/A 费用/差值、报告链接及自测指南；独立复审通过。全量 669 passed、2 skipped（可选 live LightRAG）；Ruff、mypy、源码大小、模型清单及 diff 检查通过。
+- 历史 Qwen/GLM 共 240 条已按 v4 复核，任务通过分别 82/120、84/120；原批次未修改。Qwen 有一次旧实现丢失的审核响应，已显式登记未核算尝试，不估算该批完整审核费用。
+- 新 Qwen/GLM 批次已在干净提交 `9b6a4aa7fd6ce992fca6c576fc34e98c491b698e` 启动，各 40 场景 × 3 次；运行完成后才填写最终指标与任务勾选。
+- 子集语义指标与逐次 Task Success 波动已实现并通过独立复审；专项 15 passed，全量 674 passed、2 skipped，Ruff/format/mypy/大小策略通过。不修改 Agent 运行代码或已保存 trial。

@@ -44,7 +44,24 @@ uv run python -m modules.vehicle_ai.evaluation.batch_judge_cli \
 
 ## 对照汇总
 
-历史批次需要先用 `regression_baseline_cli` 创建隔离副本，再按 v4 复核；不能覆盖历史原目录。四批均完整后运行：
+历史批次需要先用 `regression_baseline_cli` 创建隔离副本，再按 v4 复核；不能覆盖历史原目录。下列命令只适用于持有本项目原历史运行的本机目录；干净 clone 不含这些 trace，应使用自己的完整历史批次与其真实源码版本，不能伪造目录或 commit。输出副本已存在时不要覆盖。
+
+```bash
+uv run python -m modules.vehicle_ai.evaluation.regression_baseline_cli \
+  runs/agent_eval/batch-20260924T032532645475Z-qwen \
+  --output runs/agent_eval/a6-v4-baseline-qwen \
+  --source-revision c0a314e3234fcfa28954ac1d78878cde253ede4d
+uv run python -m modules.vehicle_ai.evaluation.regression_baseline_cli \
+  runs/agent_eval/batch-20260924T032544374590Z-glm \
+  --output runs/agent_eval/a6-v4-baseline-glm \
+  --source-revision c0a314e3234fcfa28954ac1d78878cde253ede4d
+uv run python -m modules.vehicle_ai.evaluation.batch_judge_cli \
+  runs/agent_eval/a6-v4-baseline-qwen --provider qwen --model qwen3.8-max
+uv run python -m modules.vehicle_ai.evaluation.batch_judge_cli \
+  runs/agent_eval/a6-v4-baseline-glm --provider qwen --model qwen3.8-max
+```
+
+四批均完整后运行：
 
 ```bash
 uv run python -m modules.vehicle_ai.evaluation.regression_report_cli \

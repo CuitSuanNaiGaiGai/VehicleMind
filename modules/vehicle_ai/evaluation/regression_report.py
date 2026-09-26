@@ -14,6 +14,7 @@ from modules.vehicle_ai.evaluation.regression_render import (
     build_comparison,
     write_report,
 )
+from modules.vehicle_ai.evaluation.regression_subsets import summarize_subsets
 
 __all__ = ["aggregate_batch", "build_comparison", "write_report"]
 
@@ -469,6 +470,7 @@ def aggregate_batch(
         ),
         "per_case_task_success": per_case,
         "per_split_task_success": _bucket_metrics(items),
+        "descriptive_subsets": summarize_subsets(items),
         "latency_ms": {
             "p50": statistics.median(latencies),
             "p95": p95,

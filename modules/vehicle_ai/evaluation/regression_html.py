@@ -5,6 +5,8 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
+from modules.vehicle_ai.evaluation.regression_subsets import render_subset_html
+
 
 def _rate(value: dict[str, int]) -> str:
     percent = value["passed"] / value["total"] if value["total"] else 0.0
@@ -137,6 +139,7 @@ main{{max-width:1200px;margin:38px auto;padding:0 22px}}header,.panel{{backgroun
 <section class="panel"><h2>在线 Agent 前后对照</h2><div class="scroll"><table><thead><tr><th>模型</th><th>对照</th><th>Task Success（任务成功）</th><th>Mechanical Pass（机械通过）</th><th>Semantic Pass（语义通过）</th><th>Tool / Argument / State（工具/参数/状态匹配）</th><th>Agent 异常</th><th>审核格式错误</th><th>p50 / p95 延迟</th><th>Agent 请求数</th><th>审核请求数</th><th>Agent 输入 / 输出 token</th><th>Agent 费用估算</th><th>Qwen 审核费用估算</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>
 <p class="muted">每个核心率的分母是 120 个 trial（40 场景 × 3 次）；重复次数不代表独立样本量。输入/输出 token 缺报时为 N/A。</p></section>
 <section class="panel"><h2>A1–A5 阶段证据（各用各自分母）</h2><div class="scroll"><table><thead><tr><th>阶段</th><th>指标</th><th>结果</th><th>口径</th></tr></thead><tbody>{stages}</tbody></table></div></section>
+{render_subset_html(comparison)}
 <section class="panel"><h2>A5 后未通过场景</h2><ul>{"".join(failure_sections)}</ul><p class="muted">链接只指向公开冻结 case，不展示 prompt 全文或原始模型 trace。</p></section>
 <section class="panel"><h2>运行证据与复现配置</h2><ul>{"".join(run_evidence)}</ul><p class="muted">优化前与 A5 后的实际模型名、模型运行预算及来源短哈希均列于此；无原始 prompt 或逐条回答。</p></section>
 <section class="panel"><h2>证据与限制</h2><p>价格快照：{escape(str(comparison.get("pricing_snapshot_date") or "N/A"))}。{escape(comparison.get("pricing_note", ""))}</p><ul>{"".join(price_sources)}</ul><ul>{limitations}</ul>

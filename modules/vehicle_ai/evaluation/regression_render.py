@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from modules.vehicle_ai.evaluation.regression_html import render_html
+from modules.vehicle_ai.evaluation.regression_subsets import render_subset_markdown
 
 
 def _matching_rate(
@@ -235,6 +236,7 @@ def render_markdown(comparison: dict[str, Any]) -> str:
         lines.append(
             f"| {row['stage']} | {row['name']} | {row['value']} | {row['scope']} |"
         )
+    lines.append(render_subset_markdown(comparison))
     lines.extend(["", "## 未通过场景", ""])
     for provider in ("qwen", "glm"):
         item = comparison["providers"][provider]["after"]
