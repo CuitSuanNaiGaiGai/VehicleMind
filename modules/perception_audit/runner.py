@@ -15,6 +15,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
 
+import cv2
+
 from modules.perception_audit.catalog import scan_catalog
 from modules.perception_audit.process import process_catalog
 from modules.perception_audit.report import build_summary, render_html, render_markdown
@@ -83,8 +85,15 @@ def _provenance(model_paths: dict[str, Path], sample_interval: int) -> dict:
         },
         "dependencies": {
             name: _version(name)
-            for name in ("numpy", "opencv-python", "mediapipe", "onnxruntime")
+            for name in (
+                "numpy",
+                "opencv-python",
+                "opencv-contrib-python",
+                "mediapipe",
+                "onnxruntime",
+            )
         },
+        "runtime": {"opencv": cv2.__version__},
         "models": {domain: _asset(path) for domain, path in model_paths.items()},
         "configuration": {
             "sample_interval": sample_interval,

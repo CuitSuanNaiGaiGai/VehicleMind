@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -89,6 +90,12 @@ def _initial_result(item: dict) -> dict:
             face_visible_frames=0,
             eye_closed_frames=0,
             yawn_output_frames=0,
+            performance={
+                "service_init_ms": None,
+                "first_frame_ms": None,
+                "steady_frame_ms_samples": [],
+                "replay_loop_ms": None,
+            },
         )
     else:
         result.update(
@@ -176,7 +183,11 @@ def process_video(
     if "sha256" in item and (not path.is_file() or file_sha256(path) != item["sha256"]):
         result["error"] = "文件与冻结清单不一致"
         return result
+    init_started = time.perf_counter()
     service = service_factory(item["domain"])
+    performance = result.get("performance")
+    if performance is not None:
+        performance["service_init_ms"] = (time.perf_counter() - init_started) * 1000
     if item["domain"] == "road":
         session = getattr(getattr(service, "detector", None), "session", None)
         get_providers = getattr(session, "get_providers", None)
@@ -184,6 +195,7 @@ def process_video(
             list(get_providers()) if callable(get_providers) else []
         )
     capture = None
+    replay_loop_started = time.perf_counter()
     try:
         capture = capture_factory(str(path))
         if not capture.isOpened():
@@ -205,6 +217,12 @@ def process_video(
             result["timestamp_fallback_frames"] += int(fallback)
             snapshot = service.process_frame(frame, timestamp_ms=timestamp)
             result["processed_frames"] += 1
+            if performance is not None:
+                processing_ms = float(snapshot.metadata.processing_ms)
+                if index == 0:
+                    performance["first_frame_ms"] = processing_ms
+                else:
+                    performance["steady_frame_ms_samples"].append(processing_ms)
             if not snapshot.metadata.valid:
                 previous = None
                 previous_valid_timestamp = None
@@ -253,6 +271,10 @@ def process_video(
     finally:
         if capture is not None:
             capture.release()
+        if performance is not None:
+            performance["replay_loop_ms"] = (
+                time.perf_counter() - replay_loop_started
+            ) * 1000
         service.close()
     return result
 
