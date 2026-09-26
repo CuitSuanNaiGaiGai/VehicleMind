@@ -28,9 +28,9 @@
 
 **Interface:** `summarize_ms(values: Sequence[float]) -> dict[str, float | int] | None`；空序列返回 `None`；负数、NaN、Infinity 抛 `ValueError`；P50/P95 使用 `(n-1) * q` 线性插值，与道路性能报告算法一致。
 
-- [ ] **Step 1: 先写失败测试**，覆盖空序列、`[10, 20, 40]` 得到 count 3 / mean 70÷3 / p50 20 / p95 38 / min 10 / max 40，以及负数和非有限值拒绝。
-- [ ] **Step 2: 运行定向测试确认 RED**：`uv run --group dev pytest tests/perception_audit/test_performance.py -q`；预期因模块不存在而导入失败。
-- [ ] **Step 3: 实现最小统计函数**：用 `math.isfinite` 校验，排序后以位置 `(n - 1) * q` 线性插值，空输入返回 `None`。
+- [x] **Step 1: 先写失败测试**，覆盖空序列、`[10, 20, 40]` 得到 count 3 / mean 70÷3 / p50 20 / p95 38 / min 10 / max 40，以及负数和非有限值拒绝。
+- [x] **Step 2: 运行定向测试确认 RED**：`uv run --group dev pytest tests/perception_audit/test_performance.py -q`；预期因模块不存在而导入失败。
+- [x] **Step 3: 实现最小统计函数**：用 `math.isfinite` 校验，排序后以位置 `(n - 1) * q` 线性插值，空输入返回 `None`。
 
 ```python
 def summarize_ms(values: Sequence[float]) -> dict[str, float | int] | None:
@@ -56,7 +56,7 @@ def summarize_ms(values: Sequence[float]) -> dict[str, float | int] | None:
     }
 ```
 
-- [ ] **Step 4: 重跑定向测试确认 GREEN**，再运行 Ruff 与 `git diff --check`。
+- [x] **Step 4: 重跑定向测试确认 GREEN**，再运行 Ruff 与 `git diff --check`。
 
 ### Task 2：逐视频舱内计时
 
@@ -66,9 +66,9 @@ def summarize_ms(values: Sequence[float]) -> dict[str, float | int] | None:
 
 **Interface:** 舱内成功视频结果增加 `performance`：`service_init_ms`、`first_frame_ms`、`steady_frame_ms_samples`、`replay_loop_ms`。稳态样本从第二个处理帧开始；计时从 `snapshot.metadata.processing_ms` 读取，不用外层推测模型时间。道路结果结构保持原样。
 
-- [ ] **Step 1: 更新伪服务并写 RED 测试**：伪 cabin metadata 按帧返回 1/2/3ms；断言首帧为 1ms、稳态样本为 `[2, 3]`、初始化和回放墙钟非负；road 结果没有 cabin 性能字段；损坏视频仍标失败。
-- [ ] **Step 2: 运行定向测试确认 RED**：`uv run --group dev pytest tests/perception_audit/test_process.py -q`；失败应指向缺少性能字段。
-- [ ] **Step 3: 实现最小计时**：服务工厂调用外包 `perf_counter()` 计算初始化；只对 cabin 收集 metadata 时延；首帧与后续帧分开；从打开视频前到解码/处理循环结束计墙钟，排除模型初始化及 `service.close()`。
+- [x] **Step 1: 更新伪服务并写 RED 测试**：伪 cabin metadata 按帧返回 1/2/3ms；断言首帧为 1ms、稳态样本为 `[2, 3]`、初始化和回放墙钟非负；road 结果没有 cabin 性能字段；损坏视频仍标失败。
+- [x] **Step 2: 运行定向测试确认 RED**：`uv run --group dev pytest tests/perception_audit/test_process.py -q`；失败应指向缺少性能字段。
+- [x] **Step 3: 实现最小计时**：服务工厂调用外包 `perf_counter()` 计算初始化；只对 cabin 收集 metadata 时延；首帧与后续帧分开；从打开视频前到解码/处理循环结束计墙钟，排除模型初始化及 `service.close()`。
 
 ```python
 if item["domain"] == "cabin":
@@ -99,7 +99,7 @@ result["performance"]["replay_loop_ms"] = (
 ) * 1000  # after capture.release(), immediately before service.close()
 ```
 
-- [ ] **Step 4: 重跑 process 测试**，确认时间样本对齐 `processed_frames`，失败结果不会被摘要误算为完整视频。
+- [x] **Step 4: 重跑 process 测试**，确认时间样本对齐 `processed_frames`，失败结果不会被摘要误算为完整视频。
 
 ### Task 3：聚合与中文展示
 
@@ -107,8 +107,8 @@ result["performance"]["replay_loop_ms"] = (
 - Modify: `modules/perception_audit/report.py`
 - Modify: `tests/perception_audit/test_report.py`
 
-- [ ] **Step 1: 写 RED 测试**：成功与失败视频混合时，只汇总成功 cabin 行；检查服务初始化、首帧、稳态帧的样本数及分位数；旧结果缺失 `performance` 时 `build_summary()` 和 Markdown/HTML 不报错、显示“暂无可计算性能数据”。
-- [ ] **Step 2: 实现摘要**：通过 Task 1 的 `summarize_ms` 生成初始化、首帧、稳态帧的聚合；`replay_fps = 成功视频 processed_frames 总数 / (成功视频 replay_loop_ms 总和 / 1000)`；回放时间非正或无样本时使用 `null`。
+- [x] **Step 1: 写 RED 测试**：成功与失败视频混合时，只汇总成功 cabin 行；检查服务初始化、首帧、稳态帧的样本数及分位数；旧结果缺失 `performance` 时 `build_summary()` 和 Markdown/HTML 不报错、显示“暂无可计算性能数据”。
+- [x] **Step 2: 实现摘要**：通过 Task 1 的 `summarize_ms` 生成初始化、首帧、稳态帧的聚合；离线吞吐只按有有限正回放耗时的成功视频统计，并让对应处理帧数与耗时使用同一视频子集，避免旧结果缺失耗时时虚高；回放时间无有效样本时使用 `null`。
 
 ```python
 successful = [row for row in cabin_rows if row["status"] == "success"]
@@ -128,26 +128,33 @@ steady_samples = [
     for row in performance
     for sample in row.get("steady_frame_ms_samples", [])
 ]
-loop_ms = [
-    float(row["replay_loop_ms"])
-    for row in performance
-    if row.get("replay_loop_ms") is not None
-]
 processed_frames = sum(row["processed_frames"] for row in successful)
+replay_rows = [
+    (int(video["processed_frames"]), float(perf["replay_loop_ms"]))
+    for video in successful
+    for perf in [video.get("performance", {})]
+    if perf.get("replay_loop_ms") is not None
+    and math.isfinite(float(perf["replay_loop_ms"]))
+    and float(perf["replay_loop_ms"]) > 0
+]
+replay_frames = sum(frames for frames, _ in replay_rows)
+replay_ms = sum(elapsed for _, elapsed in replay_rows)
 summary = {
     "video_count": len(successful),
     "processed_frames": processed_frames,
     "service_init_ms": summarize_ms(init_samples),
     "first_frame_ms": summarize_ms(first_samples),
     "steady_frame_ms": summarize_ms(steady_samples),
-    "replay_fps": processed_frames / (sum(loop_ms) / 1000)
-    if loop_ms and sum(loop_ms) > 0
+    "replay_video_count": len(replay_rows),
+    "replay_processed_frames": replay_frames,
+    "replay_fps": replay_frames / (replay_ms / 1000)
+    if replay_rows
     else None,
 }
 ```
 
-- [ ] **Step 3: 实现中文报告**：Markdown 和 HTML 使用 `Service Initialization Latency (服务初始化延迟)`、`First-frame Latency (首帧处理延迟)`、`Steady-state Frame Latency (稳态单帧处理延迟)`、`Offline Replay Throughput (离线回放吞吐)`；呈现 n、p50/p95，HTML 不输出原始逐帧样本。
-- [ ] **Step 4: 重跑 report 与 perception audit 定向测试**，检查历史 schema 兼容、无绝对路径、无 `Precision/Recall/F1` 等准确率暗示。
+- [x] **Step 3: 实现中文报告**：Markdown 和 HTML 使用 `Service Initialization Latency (服务初始化延迟)`、`First-frame Latency (首帧处理延迟)`、`Steady-state Frame Latency (稳态单帧处理延迟)`、`Offline Replay Throughput (离线回放吞吐)`；呈现 n、p50/p95，HTML 不输出原始逐帧样本。
+- [x] **Step 4: 重跑 report 与 perception audit 定向测试**，检查历史 schema 兼容、无绝对路径、无 `Precision/Recall/F1` 等准确率暗示。
 
 ### Task 4：真实固定样本与公开证据
 
@@ -155,8 +162,9 @@ summary = {
 - Create: `docs/reports/2026-09-26-cabin-performance.md`
 - Modify: `README.md`
 - Modify: `todolist.md`
+- Modify: `modules/perception_audit/runner.py` and its provenance tests, to record the effective OpenCV runtime alongside installed distribution versions.
 
-- [ ] 用 perception extra 在本地现有舱内 26 条、舱外 26 条视频完整重跑审计；不上传视频/画面，不覆盖旧 run。检查新 manifest 记录 Git commit、配置哈希、依赖版本和模型哈希，且 `.complete` 存在。
+- [ ] 用 perception extra 在本地现有舱内 26 条、舱外 26 条视频完整重跑审计；不上传视频/画面，不覆盖旧 run。检查新 manifest 记录 Git commit、配置哈希、依赖分发包版本（含 OpenCV 实际运行时）和模型哈希，且 `.complete` 存在。
 - [ ] 从新 `summary.json` 与 `manifest.json` 生成中文公开报告；只摘录真实聚合指标、n、硬件/软件/模型信息、计时口径和样本局限，不写本机路径或逐视频记录。
 - [ ] 更新 README 指向报告；仅勾选舱内性能及其可追溯性 TODO，不勾选准确率、类别语义或标签相关条目。
 - [ ] 运行完整离线测试 `uv run --group dev pytest -m "not hardware and not online" -q`、Ruff check/format、CI 范围 mypy、源码大小、资产清单 schema 与 `git diff --check`。

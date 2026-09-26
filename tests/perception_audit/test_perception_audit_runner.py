@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import cv2
 import pytest
 
 from modules.perception_audit.runner import run_audit
@@ -87,6 +88,8 @@ def test_runner_writes_private_artifacts_and_complete_marker_last(tmp_path: Path
     assert manifest["provenance"]["models"]["cabin"]["sha256"]
     assert "git" in manifest["provenance"]
     assert "dependencies" in manifest["provenance"]
+    assert "opencv-contrib-python" in manifest["provenance"]["dependencies"]
+    assert manifest["provenance"]["runtime"]["opencv"] == cv2.__version__
     effective = manifest["provenance"]["configuration"]["effective"]
     assert effective["cabin"]["eye"]["ear_threshold"] == 0.21
     assert effective["road"]["work_width"] == 1280
