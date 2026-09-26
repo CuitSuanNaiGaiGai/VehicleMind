@@ -7,6 +7,8 @@ from html import escape
 from pathlib import Path
 from urllib.parse import quote
 
+from modules.perception_audit import performance_report
+
 SAFE_FAILURES = frozenset(
     {
         "视频无法打开",
@@ -48,6 +50,7 @@ def build_summary(catalog: dict, results: list[dict]) -> dict:
             "failures": dict(sorted(failures.items())),
         }
         if domain == "cabin":
+            row["performance"] = performance_report.build_performance(selected)
             states = Counter()
             durations = Counter()
             for video in selected:
@@ -108,15 +111,14 @@ def render_markdown(summary: dict) -> str:
     for domain, label in (("cabin", "舱内"), ("road", "舱外")):
         row = summary["domains"][domain]
         videos, frames, output = row["videos"], row["frames"], row["output"]
-        lines.extend(
-            [
-                f"## {label}",
-                "",
-                f"- 处理成功：{videos['successful']} / {videos['attempted']} 条视频。",
-                f"- 有效输出：{frames['valid_output']} / {frames['processed']} 帧。",
-            ]
-        )
+        lines += [
+            f"## {label}",
+            "",
+            f"- 处理成功：{videos['successful']} / {videos['attempted']} 条视频。",
+            f"- 有效输出：{frames['valid_output']} / {frames['processed']} 帧。",
+        ]
         if domain == "cabin":
+            lines.extend(performance_report.render_markdown(row.get("performance")))
             lines.append(f"- 状态输出帧数：{output['state_counts']}。")
             lines.append(
                 f"- 状态输出时长（秒，按视频时间戳近似）："
@@ -163,8 +165,7 @@ def render_html(
             f"<em>{ratio_label}</em></article>"
         )
 
-    cards = []
-    rows = []
+    cards, rows = [], []
     for domain, label in (("cabin", "舱内"), ("road", "舱外")):
         data = summary["domains"][domain]
         videos, frames, output = data["videos"], data["frames"], data["output"]
@@ -285,6 +286,7 @@ def render_html(
         "当前视频缺少对齐真值标签；以下数字不能解释为检测准确率、误报率或漏报率。"
         "</aside>"
         + "".join(cards)
+        + performance_report.render_html(summary["domains"]["cabin"].get("performance"))
         + '<section class="detail"><h2>输出概览与失败类型</h2><table>'
         "<thead><tr><th>域</th><th>模型输出行为</th><th>处理失败</th></tr></thead><tbody>"
         + "".join(rows)
