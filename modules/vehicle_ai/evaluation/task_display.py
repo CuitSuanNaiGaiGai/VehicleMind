@@ -3,6 +3,8 @@
 import json
 from html import escape
 
+from modules.vehicle_ai.evaluation.decision_display import decision_brief_panel
+
 
 LABELS = {
     "IDLE": "空闲",
@@ -187,5 +189,6 @@ def evidence_panel(trial) -> str:
     return (
         "<section class='card'><h2>逐轮输入证据</h2><p class='note'>源时间可为离线视频时间，不等同于当前时刻；未提供置信度不代表确定。</p>"
         + "".join(rows)
+        + decision_brief_panel(trial.requests)
         + "</section>"
     )

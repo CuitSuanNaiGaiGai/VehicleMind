@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 from modules.vehicle_ai.evaluation.grader import grade_trial
 from modules.vehicle_ai.evaluation.models import EvaluationCase
@@ -11,6 +13,41 @@ from modules.vehicle_ai.llm.base import BaseLLMClient, LLMResponse
 class ReplyClient(BaseLLMClient):
     def chat(self, messages, tools=None):
         return LLMResponse("建议尽快安全停车休息。<script>alert(1)</script>", [])
+
+
+def test_evidence_panel_renders_only_recorded_briefs_and_escapes_text() -> None:
+    from modules.vehicle_ai.evaluation.task_display import evidence_panel
+
+    brief = {
+        "version": 1,
+        "required_points": [
+            {
+                "code": "<script>",
+                "text_zh": "<script>alert(1)</script>",
+                "evidence_fields": ["<driver.risk>"],
+            }
+        ],
+        "unavailable_fields": {"<driver.risk>": "<STALE>"},
+    }
+    recorded = (
+        "CURRENT RELEVANT VEHICLE CONTEXT:\n{}\n\nDECISION BRIEF:\n"
+        + json.dumps(brief, ensure_ascii=False)
+    )
+    old = "CURRENT RELEVANT VEHICLE CONTEXT:\n{}"
+    trial = SimpleNamespace(
+        requests=(
+            {"messages": [{"content": recorded}]},
+            {"messages": [{"content": old}]},
+        )
+    )
+
+    html = evidence_panel(trial)
+
+    assert "第 1 次模型请求" in html and "第 2 次模型请求" in html
+    assert "未记录" in html
+    assert "&lt;script&gt;" in html
+    assert "&lt;driver.risk&gt;" in html
+    assert "<script>alert(1)</script>" not in html
 
 
 def case_with_observations() -> EvaluationCase:

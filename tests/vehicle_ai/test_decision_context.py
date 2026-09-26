@@ -4,7 +4,7 @@ import pytest
 
 from modules.observation import ObservationMetadata
 from modules.vehicle_ai.agent.vehicle_agent import VehicleAgent
-from modules.vehicle_ai.context import ContextManager, RiskLevel
+from modules.vehicle_ai.context import ContextManager, DriverState, RiskLevel
 from modules.vehicle_ai.context.context_selector import ContextSelector
 
 
@@ -48,6 +48,35 @@ def test_unobserved_self_report_does_not_become_sensor_evidence():
 
 def test_generic_chat_keeps_context_empty():
     assert "No vehicle context" in context_message(ContextManager(), "你好")
+
+
+def test_cross_domain_question_keeps_fresh_driver_when_road_is_stale():
+    clock = [0.0]
+    manager = ContextManager(quality_clock=lambda: clock[0])
+    manager.update_road(vehicle_count=11)
+    clock[0] = 1.5
+    manager.update_driver(state=DriverState.DROWSY, risk=RiskLevel.HIGH)
+    clock[0] = 1.6
+
+    payload = context_message(manager, "结合我现在的状态和道路情况说说。")
+    selected = json.JSONDecoder().raw_decode(payload.split("CONTEXT:\n", 1)[1])[0]
+
+    assert selected["driver"]["risk"] == "HIGH"
+    assert selected["road"]["quality_status"] == "STALE"
+    assert "vehicle_count" not in selected["road"]
+
+
+def test_paraphrased_cross_domain_question_keeps_driver_context():
+    manager = ContextManager()
+    manager.update_road(vehicle_count=11)
+    manager.update_driver(state=DriverState.DROWSY, risk=RiskLevel.HIGH)
+
+    payload = context_message(manager, "我现在的驾驶状态和路况如何？")
+    selected = json.JSONDecoder().raw_decode(payload.split("CONTEXT:\n", 1)[1])[0]
+
+    assert selected["driver"]["state"] == "DROWSY"
+    assert selected["driver"]["risk"] == "HIGH"
+    assert selected["road"]["vehicle_count"] == 11
 
 
 @pytest.mark.parametrize("invalid", [False, True])

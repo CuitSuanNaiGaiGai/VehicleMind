@@ -108,6 +108,8 @@ class ContextSelector:
         "rest",
     }
 
+    DRIVER_STATUS_KEYWORDS = {"我的状态", "我现在的状态", "当前状态", "现在的状态"}
+
     CLIMATE_KEYWORDS = {
         "热",
         "冷",
@@ -251,6 +253,20 @@ class ContextSelector:
                 topics.add(topic)
 
                 matched[topic.value] = sorted(hits)
+
+        status_hits = [
+            keyword for keyword in self.DRIVER_STATUS_KEYWORDS if keyword in text
+        ]
+        if status_hits and topics & {
+            ContextTopic.DRIVER,
+            ContextTopic.ROAD,
+            ContextTopic.NAVIGATION,
+        }:
+            topics.add(ContextTopic.DRIVER)
+            matched.setdefault(ContextTopic.DRIVER.value, []).extend(status_hits)
+            matched[ContextTopic.DRIVER.value] = sorted(
+                set(matched[ContextTopic.DRIVER.value])
+            )
 
         # ----------------------------------------------------
         # Domain coupling rules
