@@ -213,6 +213,8 @@ uv run --extra perception --group dev python -m scripts.audit_perception_videos 
 ```
 
   每侧最多 50 条视频，按文件名排序冻结；正式运行逐帧推理，可能需要较长时间。模型路径为 `models/mediapipe/face_landmarker.task` 和 `models/driving/YOLOPv2_512.onnx`。`manifest.json` 记录哈希、依赖、配置及 Git 状态，`videos/` 保留本地逐视频结构化结果；旧运行不会覆盖，只有完整写入后才出现 `.complete`。来源与许可未知时保持 `unknown`；没有对齐真值标签时精度为 `not_evaluated`，输出变化不能称为误报或漏报。`runs/` 与本地视频均被 Git 忽略，请勿公开原视频或逐视频记录。macOS 上 MediaPipe 初始化可能需要可用的图形上下文；若进程在初始化时直接退出，请在本机终端运行。
+
+本机已完成舱内、舱外各 26 条视频的全量处理。舱内 Service Initialization Latency (服务初始化延迟) P50/P95 为 22.53/29.23 ms，First-frame Latency (首帧处理延迟) 为 8.74/9.42 ms，Steady-state Frame Latency (稳态单帧处理延迟) 为 4.38/4.86 ms；Offline Replay Throughput (离线回放吞吐) 为 204.19 FPS（26 条、30,063 帧）。这些是单次 Apple M5 本机处理结果，不是准确率或实时/端到端指标；计时口径、依赖与模型哈希见[舱内性能报告](docs/reports/2026-09-26-cabin-performance.md)。
 - 可选的在线 Agent 决策可先复制[配置示例](.env.example)为本地 `.env`，填写 `DASHSCOPE_API_KEY` 或 `GLM_API_KEY` 与对应模型配置，然后运行下面的一条跨域场景。**API 调用会产生费用**；将 `--provider qwen` 改为 `--provider glm` 可切换提供方。命令会在 `runs/agent_eval/` 生成中文 `report.html`、`report.md` 和 `trial.json`；终端打印 HTML 路径，可直接用浏览器打开。HTML 按“录制舱内外观测 → 实际发送的上下文 → 在线模型回复/工具 → 模拟车机结果”展示，原始消息折叠保留；舱内外 GIF 是从仓库相对路径引用的**独立感知演示素材**，不是本次在线运行的同步画面，单独拷贝 HTML 不会带上 GIF。这是在线 Agent 的单例调试，**观测仍是录制场景、非当次视频推理**，不计正式成功率。不要把 `.env` 或 `runs/` 上传到 Git。
 
 ```bash

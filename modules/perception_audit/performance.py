@@ -20,9 +20,7 @@ def summarize_ms(values: Sequence[float]) -> dict[str, float | int] | None:
         position = (len(ordered) - 1) * q
         lower = math.floor(position)
         upper = math.ceil(position)
-        return ordered[lower] + (ordered[upper] - ordered[lower]) * (
-            position - lower
-        )
+        return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
 
     return {
         "count": len(ordered),

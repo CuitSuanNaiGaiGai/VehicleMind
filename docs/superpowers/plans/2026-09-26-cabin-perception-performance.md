@@ -164,8 +164,8 @@ summary = {
 - Modify: `todolist.md`
 - Modify: `modules/perception_audit/runner.py` and its provenance tests, to record the effective OpenCV runtime alongside installed distribution versions.
 
-- [ ] 用 perception extra 在本地现有舱内 26 条、舱外 26 条视频完整重跑审计；不上传视频/画面，不覆盖旧 run。检查新 manifest 记录 Git commit、配置哈希、依赖分发包版本（含 OpenCV 实际运行时）和模型哈希，且 `.complete` 存在。
-- [ ] 从新 `summary.json` 与 `manifest.json` 生成中文公开报告；只摘录真实聚合指标、n、硬件/软件/模型信息、计时口径和样本局限，不写本机路径或逐视频记录。
-- [ ] 更新 README 指向报告；仅勾选舱内性能及其可追溯性 TODO，不勾选准确率、类别语义或标签相关条目。
-- [ ] 运行完整离线测试 `uv run --group dev pytest -m "not hardware and not online" -q`、Ruff check/format、CI 范围 mypy、源码大小、资产清单 schema 与 `git diff --check`。
+- [x] 用 perception extra 在本地现有舱内 26 条、舱外 26 条视频完整重跑审计；不上传视频/画面，不覆盖旧 run。检查新 manifest 记录 Git commit、配置哈希、依赖分发包版本（含 OpenCV 实际运行时）和模型哈希，且 `.complete` 存在。
+- [x] 从新 `summary.json` 与 `manifest.json` 生成中文公开报告；只摘录真实聚合指标、n、硬件/软件/模型信息、计时口径和样本局限，不写本机路径或逐视频记录。
+- [x] 更新 README 指向报告；仅勾选舱内性能及其可追溯性 TODO，不勾选准确率、类别语义或标签相关条目。
+- [x] 运行完整离线测试 `uv run --group dev pytest -m "not hardware and not online" -q`、Ruff check/format、CI 范围 mypy、源码大小、资产清单 schema 与 `git diff --check`。
 - [ ] 代码审查、提交并推送功能分支；通过 `core-quality` 后按仓库保护规则合并 main。
