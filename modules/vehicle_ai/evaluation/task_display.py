@@ -3,7 +3,10 @@
 import json
 from html import escape
 
-from modules.vehicle_ai.evaluation.decision_display import decision_brief_panel
+from modules.vehicle_ai.evaluation.decision_display import (
+    decision_brief_panel,
+    target_resolution_panel,
+)
 
 
 LABELS = {
@@ -26,7 +29,9 @@ REASONS = {
     "INVALID_ARGUMENTS": "参数校验失败",
     "PENDING_EXPIRED": "待确认操作过期",
     "WRITE_OUTCOME_UNKNOWN": "写操作结果未知，等待核对",
-    "TARGET_NOT_FOUND": "新目标未找到",
+    "TARGET_AMBIGUOUS": "目标匹配不唯一",
+    "TARGET_NOT_FOUND": "目标未匹配本次搜索候选",
+    "TARGET_SEARCH_REQUIRED": "尚未执行目标搜索",
     "USER_CANCELLED": "用户取消",
     "CLARIFICATION_REQUESTED": "需要补充信息",
     "NO_REFERENT": "缺少可关联目标",
@@ -154,6 +159,7 @@ def task_panel(trial) -> str:
     return (
         "<section class='card'><h2>任务进度与停止原因</h2>"
         + ("".join(rows) or "<p>旧报告未记录任务状态</p>")
+        + target_resolution_panel(list(trial.agent_trace))
         + plan_html
         + "</section>"
     )

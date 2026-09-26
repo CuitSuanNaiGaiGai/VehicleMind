@@ -50,6 +50,95 @@ def test_evidence_panel_renders_only_recorded_briefs_and_escapes_text() -> None:
     assert "<script>alert(1)</script>" not in html
 
 
+def test_task_panel_renders_target_resolution_outcomes_safely() -> None:
+    from modules.vehicle_ai.evaluation.task_display import task_panel
+
+    trace = (
+        {
+            "kind": "target_resolution",
+            "source": "search_nearby_rest_area",
+            "quality": "TOOL_RESULT",
+            "target": "河滨<script>",
+            "status": "matched",
+            "candidate_ids": ["river<&>"],
+            "selected_id": "river<&>",
+            "selected_display_name": "河滨服务区<script>",
+            "pending_action_id": "pending<&>",
+            "task": {},
+        },
+        {
+            "kind": "target_resolution",
+            "source": "search_nearby_rest_area",
+            "quality": "TOOL_RESULT",
+            "target": "西湖服务区",
+            "status": "matched",
+            "candidate_ids": ["west_lake"],
+            "selected_id": "west_lake",
+            "selected_display_name": "西湖服务区",
+            "pending_action_id": None,
+            "task": {},
+        },
+        {
+            "kind": "target_resolution",
+            "source": "search_nearby_rest_area",
+            "quality": "TOOL_RESULT",
+            "target": "中心服务区",
+            "status": "ambiguous",
+            "candidate_ids": ["center<1>", "center&2"],
+            "selected_id": None,
+            "selected_display_name": None,
+            "pending_action_id": None,
+            "task": {},
+        },
+        {
+            "kind": "target_resolution",
+            "source": "search_nearby_rest_area",
+            "quality": "TOOL_RESULT",
+            "target": "未知地点",
+            "status": "not_found",
+            "candidate_ids": [],
+            "selected_id": None,
+            "selected_display_name": None,
+            "pending_action_id": None,
+            "task": {},
+        },
+        *(
+            {
+                "kind": "agent_reply",
+                "task": {"status": "FAILED", "goal": "改目标", "reason": reason},
+            }
+            for reason in (
+                "TARGET_AMBIGUOUS",
+                "TARGET_NOT_FOUND",
+                "TARGET_SEARCH_REQUIRED",
+            )
+        ),
+    )
+
+    html = task_panel(SimpleNamespace(agent_trace=trace, tool_calls=()))
+
+    assert "请求目标：河滨&lt;script&gt;" in html
+    assert "河滨服务区&lt;script&gt;" in html and "river&lt;&amp;&gt;" in html
+    assert "新的待确认操作" in html and "pending&lt;&amp;&gt;" in html
+    assert "没有新的待确认操作" in html and "当前不能导航" in html
+    assert "匹配候选 ID" in html
+    assert "center&lt;1&gt;" in html and "center&amp;2" in html
+    assert "未找到匹配候选" in html
+    assert "目标匹配不唯一" in html
+    assert "目标未匹配本次搜索候选" in html
+    assert "尚未执行目标搜索" in html
+    assert "<script>" not in html
+
+
+def test_task_panel_handles_old_trace_without_target_resolution() -> None:
+    from modules.vehicle_ai.evaluation.task_display import task_panel
+
+    html = task_panel(SimpleNamespace(agent_trace=(), tool_calls=()))
+
+    assert "任务进度与停止原因" in html
+    assert "target_resolution" not in html
+
+
 def case_with_observations() -> EvaluationCase:
     return EvaluationCase.from_mapping(
         {

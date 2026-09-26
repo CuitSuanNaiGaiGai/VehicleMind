@@ -5,8 +5,13 @@ from typing import TYPE_CHECKING
 
 from modules.vehicle_ai.agent.budget import BudgetExceeded, TurnBudget
 from modules.vehicle_ai.agent.plan import PlanTransitionError
-from modules.vehicle_ai.agent.task_state import TaskStatus
 from modules.vehicle_ai.agent.session import record
+from modules.vehicle_ai.agent.target_resolution import (
+    TargetResolution,
+    target_resolution_message,
+    target_search_failure_message,
+)
+from modules.vehicle_ai.agent.task_state import TaskStatus
 from modules.vehicle_ai.tools.validation import valid_arguments
 
 if TYPE_CHECKING:
@@ -42,6 +47,49 @@ def reconcile(agent: "VehicleAgent", name: str, result):
     return "操作结果尚不确定，已停止自动重试；请核对车机状态后再决定下一步。"
 
 
+def _candidate_display_name(candidate: dict | None) -> str | None:
+    if candidate is None:
+        return None
+    for key in ("display_name_zh", "name", "poi_id"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _target_resolution_reply(
+    agent: "VehicleAgent", resolution: TargetResolution
+) -> str:
+    candidate = resolution.candidate
+    selected_id = (
+        candidate.get("poi_id")
+        if resolution.status == "matched" and candidate is not None
+        else None
+    )
+    pending = agent.pending_actions.get()
+    pending_created = bool(
+        pending is not None
+        and pending.tool_name == "start_navigation"
+        and pending.arguments.get("poi_id") == selected_id
+        and selected_id is not None
+    )
+    record(
+        agent,
+        "target_resolution",
+        source="search_nearby_rest_area",
+        quality="TOOL_RESULT",
+        target=resolution.target,
+        status=resolution.status,
+        candidate_ids=list(resolution.candidate_ids),
+        selected_id=selected_id,
+        selected_display_name=_candidate_display_name(candidate),
+        pending_action_id=(
+            pending.action_id if pending is not None and pending_created else None
+        ),
+    )
+    return target_resolution_message(resolution, pending_created=pending_created)
+
+
 def run_turn(
     agent: "VehicleAgent", user_text: str, messages: list, target: str | None
 ) -> str:
@@ -75,15 +123,19 @@ def run_turn(
                 text = response.content or ""
                 if not text.strip():
                     return stop("EMPTY_RESPONSE", "模型未返回有效回复，本轮已停止。")
-                agent.plan_flow.finish_turn(agent, text)
                 current = agent.pending_actions.get()
                 if target is not None and (
                     current is None or current.tool_name != "start_navigation"
                 ):
-                    return stop(
-                        "TARGET_NOT_FOUND",
-                        "未找到与新目标匹配的地点，未创建待确认导航。",
+                    agent.task.transition(
+                        TaskStatus.AWAITING_INPUT, "TARGET_SEARCH_REQUIRED"
                     )
+                    return agent._record_final_response(
+                        user_text,
+                        "尚未执行本次目标搜索，未创建待确认导航；请重新发起搜索。",
+                    )
+                agent.plan_flow.finish_turn(agent, text)
+                current = agent.pending_actions.get()
                 agent.task.finish(current is not None)
                 if (
                     agent.task.status is TaskStatus.COMPLETED
@@ -98,7 +150,7 @@ def run_turn(
                 return agent._record_final_response(user_text, text)
 
             messages.append(agent._assistant_tool_message(response))
-            for call in response.tool_calls:
+            for call_index, call in enumerate(response.tool_calls):
                 try:
                     raw = json.loads(call.arguments_json)
                     if (
@@ -203,8 +255,9 @@ def run_turn(
                     retry_allowed = agent.plan_flow.claim_read_retry(
                         agent, call.name, result
                     )
+                resolution: TargetResolution | None = None
                 try:
-                    agent.plan_flow.observe_tool(
+                    resolution = agent.plan_flow.observe_tool(
                         agent,
                         call.name,
                         arguments,
@@ -217,7 +270,9 @@ def run_turn(
                         user_text,
                         "当前计划已达到步骤预算，已停止继续执行。",
                     )
+                did_retry = False
                 if retry_allowed:
+                    did_retry = True
                     retry_result = agent.tool_registry.execute(
                         call.name, arguments, user_intent=user_text
                     )
@@ -234,7 +289,7 @@ def run_turn(
                     )
                     result = retry_result
                     try:
-                        agent.plan_flow.observe_tool(
+                        resolution = agent.plan_flow.observe_tool(
                             agent, call.name, arguments, result, target=target
                         )
                     except PlanTransitionError:
@@ -256,6 +311,39 @@ def run_turn(
                         ),
                     }
                 )
+                target_search_finished = (
+                    target is not None
+                    and call.name == "search_nearby_rest_area"
+                    and (resolution is not None or not retry_allowed or did_retry)
+                )
+                if target_search_finished:
+                    for skipped_call in response.tool_calls[call_index + 1 :]:
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": skipped_call.id,
+                                "content": json.dumps(
+                                    {
+                                        "success": False,
+                                        "error": "TARGET_RESOLUTION_COMPLETE",
+                                        "message": "目标搜索结果已处理；后续工具调用未执行。",
+                                    },
+                                    ensure_ascii=False,
+                                ),
+                            }
+                        )
+                    if resolution is not None:
+                        answer = _target_resolution_reply(agent, resolution)
+                    else:
+                        if agent.task.status is not TaskStatus.AWAITING_INPUT:
+                            agent.task.transition(
+                                TaskStatus.AWAITING_INPUT,
+                                result.error or "TARGET_SEARCH_NOT_COMPLETED",
+                            )
+                        answer = target_search_failure_message(
+                            result.error or "TARGET_SEARCH_NOT_COMPLETED"
+                        )
+                    return agent._record_final_response(user_text, answer)
                 pending = agent.pending_actions.get()
                 if (
                     result.error == "CONFIRMATION_REQUIRED"

@@ -109,10 +109,17 @@ def test_unresolved_target_change_is_not_completed():
         search(), LLMResponse("是否导航？", []), LLMResponse("没有找到", [])
     )
     agent.chat("找服务区", debug=False)
-    agent.chat("换成东湖服务区", debug=False)
+    old_pending = agent.pending_actions.get()
+    assert old_pending is not None
+
+    answer = agent.chat("换成东湖服务区", debug=False)
+
     assert agent.task.goal == "换成东湖服务区"
-    assert agent.task.status == "FAILED"
-    assert agent.task.reason == "TARGET_NOT_FOUND"
+    assert agent.task.status == "AWAITING_INPUT"
+    assert agent.task.reason == "TARGET_SEARCH_REQUIRED"
+    assert agent.pending_actions.get() is None
+    assert not agent.confirm_pending(old_pending.action_id).success
+    assert "尚未执行本次目标搜索" in answer
 
 
 def test_expired_pointer_waits_for_input_instead_of_reusing_history():

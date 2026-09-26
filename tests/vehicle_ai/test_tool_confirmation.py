@@ -430,7 +430,8 @@ def test_target_change_does_not_ground_new_call_to_old_destination() -> None:
     answer = runtime.chat("换成东湖服务区", debug=False)
 
     assert runtime.agent.pending_actions.get() is None
-    assert answer == "未找到与新目标匹配的地点，未创建待确认导航。"
+    assert "尚未执行本次目标搜索" in answer
+    assert runtime.agent.task.reason == "TARGET_SEARCH_REQUIRED"
     assert runtime.agent.confirm_pending(old.action_id).error == "INVALID_CONFIRMATION"
     assert (
         runtime.context_manager.get_context().vehicle.navigation_state

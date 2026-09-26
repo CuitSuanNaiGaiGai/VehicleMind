@@ -11,8 +11,12 @@ from modules.vehicle_ai.agent.plan import (
     TaskPlan,
 )
 from modules.vehicle_ai.agent.plan_actions import PlanActionsMixin
+from modules.vehicle_ai.agent.pending_intent import classify_pending_intent
+from modules.vehicle_ai.agent.target_resolution import (
+    TargetResolution,
+    resolve_target,
+)
 from modules.vehicle_ai.agent.task_state import TaskStatus
-from modules.vehicle_ai.agent.pending_intent import search_result_matches_target
 from modules.vehicle_ai.tools.base import ToolResult
 
 if TYPE_CHECKING:
@@ -41,7 +45,8 @@ class TaskPlanFlow(PlanActionsMixin):
         return any(term in normalized for term in REST_LOCATION_TERMS)
 
     def begin(self, agent: VehicleAgent, goal: str) -> TaskPlan | None:
-        if not self.is_rest_location_request(goal):
+        is_target_change = classify_pending_intent(goal) == "change_target"
+        if not self.is_rest_location_request(goal) and not is_target_change:
             return None
         current = agent.task.plan
         if current is not None and current.status is PlanStatus.RUNNING:
@@ -109,7 +114,11 @@ class TaskPlanFlow(PlanActionsMixin):
             candidate = self._candidate(plan, poi_id)
             if candidate is None:
                 reason = (
-                    "TARGET_NOT_FOUND" if target is not None else "UNGROUNDED_POI_ID"
+                    "TARGET_SEARCH_REQUIRED"
+                    if target is not None and not plan.candidates
+                    else "TARGET_NOT_FOUND"
+                    if target is not None
+                    else "UNGROUNDED_POI_ID"
                 )
                 self._stop(
                     agent,
@@ -123,7 +132,9 @@ class TaskPlanFlow(PlanActionsMixin):
                     ),
                 )
                 return (
-                    "未找到与新目标匹配的地点，未创建待确认导航。"
+                    "尚未执行本次目标搜索，未创建待确认导航。"
+                    if reason == "TARGET_SEARCH_REQUIRED"
+                    else "未找到与新目标匹配的地点，未创建待确认导航。"
                     if target is not None
                     else "地点不在本轮模拟搜索候选中，已停止且未创建导航操作。"
                 )
@@ -151,10 +162,10 @@ class TaskPlanFlow(PlanActionsMixin):
         result: ToolResult,
         target: str | None = None,
         allow_retry: bool = False,
-    ) -> None:
+    ) -> TargetResolution | None:
         plan = agent.task.plan
         if plan is None or plan.status is not PlanStatus.RUNNING:
-            return
+            return None
         if name == "search_vehicle_knowledge":
             step = self._active_step(plan, "KNOWLEDGE")
             if step is not None:
@@ -173,7 +184,7 @@ class TaskPlanFlow(PlanActionsMixin):
         elif name == "search_nearby_rest_area":
             step = self._active_step(plan, "SEARCH")
             if step is None:
-                return
+                return None
             raw_candidates = result.data.get("candidates", [])
             candidates = [
                 dict(item)
@@ -195,7 +206,7 @@ class TaskPlanFlow(PlanActionsMixin):
                 ),
                 error=result.error,
             )
-            if not result.success or not candidates:
+            if not result.success or (not candidates and target is None):
                 terminal_reason = result.error or "NO_RESULTS"
                 if result.data.get("retryable") and allow_retry:
                     self._start_step(
@@ -204,7 +215,7 @@ class TaskPlanFlow(PlanActionsMixin):
                         "SEARCH",
                         "对可重试的只读查询最多再执行一次",
                     )
-                    return
+                    return None
                 status = (
                     PlanStatus.STOPPED_NO_RESULT
                     if terminal_reason == "NO_RESULTS"
@@ -217,16 +228,10 @@ class TaskPlanFlow(PlanActionsMixin):
                     terminal_reason,
                     task_status=TaskStatus.AWAITING_INPUT,
                 )
-            elif target is not None:
-                selected = next(
-                    (
-                        candidate
-                        for candidate in candidates
-                        if search_result_matches_target(target, candidate)
-                    ),
-                    None,
-                )
-                if selected is None:
+                return None
+            if target is not None:
+                resolution = resolve_target(target, candidates)
+                if resolution.status == "not_found":
                     self._stop(
                         agent,
                         plan,
@@ -234,13 +239,24 @@ class TaskPlanFlow(PlanActionsMixin):
                         "TARGET_NOT_FOUND",
                         task_status=TaskStatus.AWAITING_INPUT,
                     )
+                elif resolution.status == "ambiguous":
+                    self._stop(
+                        agent,
+                        plan,
+                        PlanStatus.FAILED,
+                        "TARGET_AMBIGUOUS",
+                        task_status=TaskStatus.AWAITING_INPUT,
+                    )
                 else:
+                    assert resolution.candidate is not None
                     self._stage_candidate(
                         agent,
                         plan,
-                        selected,
+                        resolution.candidate,
                         reason="已匹配用户明确指定的规范地点。",
                     )
+                return resolution
+        return None
 
     def begin_confirmation(
         self, agent: VehicleAgent, action: dict[str, Any] | None
