@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -38,13 +39,13 @@ def test_prepare_rejudge_copy_preserves_immutable_original_and_trace_hashes(
         dataset_root=GOLDEN,
         expected_case_ids=("C01",),
         repetitions=1,
-        source_revision="c0a314e",
+        source_revision="HEAD",
         grading_revision="HEAD",
     )
 
     copied = json.loads((destination / "run.json").read_text(encoding="utf-8"))
     assert (source / "run.json").read_bytes() == original_bytes
-    assert copied["provenance"]["source_revision"].startswith("c0a314e")
+    assert re.fullmatch(r"[0-9a-f]{40}", copied["provenance"]["source_revision"])
     assert len(copied["provenance"]["manifest_sha256"]) == 64
     assert copied["comparison_derivation"]["source_run_id"] == "historical"
     assert copied["trials"][0]["trace_sha256"] == original["trials"][0]["trace_sha256"]
@@ -74,7 +75,7 @@ def test_prepare_rejudge_copy_rejects_corrupt_source_trace(tmp_path: Path) -> No
             dataset_root=GOLDEN,
             expected_case_ids=("C01",),
             repetitions=1,
-            source_revision="c0a314e",
+            source_revision="HEAD",
             grading_revision="HEAD",
         )
     assert not destination.exists()

@@ -19,8 +19,8 @@ def test_interview_story_is_one_page_and_evidence_linked() -> None:
         "60–90 秒口述提纲",
         "离线视频",
         "模拟车机",
-        "82/120",
-        "85/120",
+        "80/120",
+        "90/120",
         "AI 自审",
     ):
         assert detail in text, detail
