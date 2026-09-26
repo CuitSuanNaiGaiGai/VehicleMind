@@ -2,6 +2,8 @@
 
 ## 当前已完成
 
+> 此记录留存招聘展示闭环的阶段过程。在线评测现已完成，最新可引用的分数与运行哈希见[A6在线回归报告](2026-09-26-a6-online-regression.md)。本页底部 625 测试数和“尚未重跑”段落均为当时记录。
+
 - 在线单次决策 HTML 的任务进度面板现在会从实际 `agent_trace` 展示受限计划步骤、候选 POI、选择结果、步骤/恢复预算及失败证据；没有计划的旧 trace 仍可读取。HTML 原有舱内外 GIF、关键事实、实际发送上下文、动作结果和折叠 JSON 保持不变。输入字段按 HTML 转义输出。
 - A5 确定性中文 HTML / JSON 已公开在[结果目录](a5-bounded-plan-recovery/)，并新增[运行指南](../guide/agent-plan-recovery.md)。
 - 新增[正常驾驶播放音乐场景](../../assets/scenarios/normal_driver_music.yaml)，三个无密钥离线主案例（疲劳休息、正常音乐、取消导航）均已重新运行并生成中文 HTML、JSON 和 trace。第三条链路由脚本模型调用 `play_music`，最终状态 `media_playing=true`、歌单名匹配，5/5 场景断言通过；trace SHA-256：`ed4b1794022d1ff1d719e64abc4389894585c599c5e12d77fe57c39f33f4c4a1`。这仅证明回放/模拟工具流程。
@@ -11,11 +13,9 @@
 - 最终只读审查发现 A5 独立 grader 之前只检查了未知写入后的回读工具名。现已把预期回读状态、工具成功与 `deferred` 标志纳入 YAML 和 grader，并加入篡改预期状态必须判失败的测试；未知写入场景实际证据为 `get_vehicle_status` 成功、`IDLE`、未 deferred。
 - 40 条冻结集仍是 AI 自审内部测试集；历史报告 Qwen 82/120、GLM 85/120 的结果不重新解释成独立人工金标。
 
-## 本次没有新跑的在线回归
+## 在线回归结果
 
-本次没有重新向 Qwen/GLM 发送这批冻结场景。在线复测会将冻结场景、提示词、工具 schema 及相关项目上下文发送给对应外部模型服务；当前执行环境未批准这批内容的外发范围。此前的 API/费用授权已记录，但本轮不通过其他入口重试，也不伪造在线结果。
-
-因此旧双模型指标仍有效地描述其原运行版本，但**不是 A5 合入后的当前版本结果**。在线 A5 行为（何时搜索、LLM 如何选择地点、模型最终回复质量）仍应由后续获准的 Qwen/GLM 单次/重复运行和语义审核验证。
+之后按当前授权完成同一 40 条合成场景、两模型各重复 3 次，并将旧 trace 按 v4 复核。新 Qwen Task Success（任务成功）80/120、GLM 90/120；重复波动、语义子集、延迟、费用、失败场景及哈希均见[A6完整报告](2026-09-26-a6-online-regression.md)。由于历史运行未记录全部预算配置，变化百分点为 N/A，不作代码因果结论。原在线审核报告保留其旧协议与旧分数，不能当作本轮结果。
 
 ## A6 可复现本地验证
 
@@ -30,9 +30,9 @@ uv run python scripts/run_agent_recovery_eval.py
 
 本地三条 HTML 报告与原始 JSON/trace 默认写入被 Git 忽略的 `runs/`；A5 的固定结果见 [summary.json](a5-bounded-plan-recovery/summary.json) 和 [report.html](a5-bounded-plan-recovery/report.html)。
 
-当时的 A6 本地验证：**625 passed、2 deselected**（`online`/`hardware` 标记）。Ruff lint、全仓 format 检查、CI 指定 mypy 及当时修改边界 mypy、源码大小策略、模型清单 schema 与 `git diff --check` 均通过；A5 脚本化场景复跑为 **7/7**。这是 A6 验收批次的历史记录，不代表后续审计分支的当前测试总数。
+阶段验收当时的 A6 本地验证：**625 passed、2 deselected**（`online`/`hardware` 标记）。这是历史数字，不代表最新测试总数。
 
-干净克隆验收：从当时已推送的功能分支提交克隆到临时目录，执行 `uv sync --frozen --group dev` 后，全量离线测试为 **625 passed、2 deselected**；再按 README 的命令运行疲劳休息场景，报告 `passed=true`、9/9 断言通过、未授权敏感动作执行 0。此项验证使用临时目录，没有把 `runs/` 产物放入 Git。审计分支新增测试后的当前全量结果另见对应运行记录，不回写成 A6 当时的验收数。
+干净克隆验收：从当时已推送的功能分支提交克隆到临时目录，执行 `uv sync --frozen --group dev` 后，全量离线测试为 **625 passed、2 deselected**；再按 README 的命令运行疲劳休息场景，报告 `passed=true`、9/9 断言通过、未授权敏感动作执行 0。此项验证使用临时目录，没有把 `runs/` 产物放入 Git。
 
 | 覆盖率口径 | 行覆盖 | 目标状态 |
 |---|---:|---|

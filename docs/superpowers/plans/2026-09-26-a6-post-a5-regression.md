@@ -62,5 +62,6 @@ Python 3.13、现有 `batch_cli` / `batch_judge_cli`、SHA-256 冻结 YAML、pyt
 - `dbf78ea`：provenance、历史隔离复核与汇总入口。
 - `9b6a4aa`：审核先落盘、异常尝试计数、trace/评分交叉校验、模型与预算检查、N/A 费用/差值、报告链接及自测指南；独立复审通过。全量 669 passed、2 skipped（可选 live LightRAG）；Ruff、mypy、源码大小、模型清单及 diff 检查通过。
 - 历史 Qwen/GLM 共 240 条已按 v4 复核，任务通过分别 82/120、84/120；原批次未修改。Qwen 有一次旧实现丢失的审核响应，已显式登记未核算尝试，不估算该批完整审核费用。
-- 新 Qwen/GLM 批次已在干净提交 `9b6a4aa7fd6ce992fca6c576fc34e98c491b698e` 启动，各 40 场景 × 3 次；运行完成后才填写最终指标与任务勾选。
+- 新 Qwen/GLM 批次均在干净提交 `9b6a4aa7fd6ce992fca6c576fc34e98c491b698e` 启动，各 40 场景 × 3 次；Agent API 异常均为 0。v4 Task Success 为 Qwen 80/120、GLM 90/120，机械通过分别116/120、107/120；因旧执行预算只部分记录，差值为 N/A，不将观察归因于代码。
 - 子集语义指标与逐次 Task Success 波动已实现并通过独立复审；专项 15 passed，全量 674 passed、2 skipped，Ruff/format/mypy/大小策略通过。不修改 Agent 运行代码或已保存 trial。
+- 脱敏汇总输出在 `docs/reports/a6-post-a5-regression/`； README、面试卡和 TODO 已更新。原始运行与 reviewer trace 均留在 Git 忽略的本机 `runs/`。
