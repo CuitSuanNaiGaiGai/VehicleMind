@@ -21,7 +21,7 @@
 
 [项目简介](#overview) · [演示效果](#demo) · [核心能力](#capabilities) ·
 [系统架构](#architecture) · [技术栈](#stack) · [结果与证据](#evidence) ·
-[快速开始](#quickstart) · [面试讲述卡](docs/interview_story.md) · [项目结构](#structure) · [当前限制](#limitations)
+[快速开始](#quickstart) · [面试讲述卡](docs/interview_story.md) · [项目结构](#structure) · [运行范围与后续方向](#limitations)
 
 </div>
 
@@ -32,22 +32,22 @@
 
 VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工作流。视频感知把舱内驾驶员状态与舱外道路画面转换为**语义观测**；Agent 消费这些观测、车辆状态和用户请求，形成上下文并处理风险事件、信息查询与车机动作。敏感写操作会暂停并等待用户批准；批准后工作流恢复，再由 ToolRegistry 执行授权检查与工具调用。
 
-**两条输入路径、同一套 Agent 工作流：**真实视频路径使用本地离线视频和模型权重生成语义观测；录制语义观测回放直接读取场景中的观测，不运行感知模型，可无密钥复现下游 Agent 流程。视频感知提供观测，不代替 Agent 决策；回放截图也不能作为感知精度证据。见[系统架构](#architecture)。
+**两条输入路径、同一套 Agent 工作流：**真实视频路径使用本地离线视频和模型权重生成语义观测；录制语义观测回放读取场景中的观测，以确定性脚本模型无密钥复现 Agent 流程。两条路径均从统一上下文进入 Agent 决策与工具执行，见[系统架构](#architecture)。
 
 <a id="demo"></a>
 ## 🎬 演示效果
 
 ### 疲劳风险下的休息服务区协助
 
-舱内外感知产生疲劳与道路语义观测 → 统一上下文与事件管线汇总车辆状态并形成高风险事件，将其送入 Agent 工作流 → 用户提出休息需求 → Agent 搜索服务区 → 敏感导航写入形成 PendingAction 并暂停 → 用户批准 → 图恢复并由 ToolRegistry 执行 → 返回**模拟导航结果**。以下截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成。上方媒体停在较早视频画面（仍显示 NORMAL），下方统一上下文是场景末尾的 DROWSY / HIGH 与导航 ACTIVE；不要把两处当作同一时刻的推理结果。
+舱内外感知产生疲劳与道路语义观测 → 统一上下文与事件管线汇总车辆状态并形成高风险事件，将其送入 Agent 工作流 → 用户提出休息需求 → Agent 搜索服务区 → 敏感导航写入形成 PendingAction 并暂停 → 用户批准 → 图恢复并由 ToolRegistry 执行 → 返回**模拟导航结果**。以下截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成。上方媒体展示较早的 NORMAL 视频画面，下方统一上下文展示场景末尾的 DROWSY / HIGH 与导航 ACTIVE。
 
 <p align="center">
   <a href="assets/demo/vehiclemind_report_full.png"><img src="assets/demo/vehiclemind_report.png" width="95%" alt="VehicleMind 中文离线回放报告，含舱内外画面与最终统一上下文；点击查看完整时间线和断言"/></a>
 </p>
 
-点击截图可查看[完整报告画面](assets/demo/vehiclemind_report_full.png)，其中保留了风险事件、待确认动作、显式确认、工具结果和 9 项场景断言。原始运行产物位于本地 `runs/`，不会随 GitHub 仓库发布。
+点击截图可查看[完整报告画面](assets/demo/vehiclemind_report_full.png)，其中保留了风险事件、待确认动作、显式确认、工具结果和 9 项场景断言。原始运行产物保存在本地 `runs/`。
 
-截图来自录制语义观测回放；下方 GIF 来自独立的真实视频感知演示。它们不是同一次模型推理，请勿混作端到端感知准确率证明。
+截图展示录制语义观测驱动的 Agent 回放；下方两张 GIF 分别展示独立运行的舱内驾驶员状态感知与舱外道路感知。
 
 <p align="center">
   <img src="assets/demo/cabin_demo.gif" width="48%" alt="舱内驾驶员状态感知演示"/>
@@ -61,7 +61,7 @@ VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工�
 - **有界恢复并重新确认：**失败恢复产生的新候选需要新的 PendingAction 和用户批准，不会自动重放写操作；见[计划与恢复指南](docs/guide/agent-plan-recovery.md)。
 - **关联追踪与评测：**结构化 trace 关联 `thread_id` / `task_id`，记录图节点、模型/工具调用、策略、审批、恢复、状态和耗时，并可附到 trial 结果；见[Trace 实现](modules/vehicle_ai/observability/trace.py)与[评测运行器](modules/vehicle_ai/evaluation/runner.py)。
 
-trace 默认保存在进程内，可通过可选 `TraceBackend` 导出；trace 不保存模型提示词/回复正文或工具参数值。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化。
+Runtime 默认使用进程内 `InMemorySaver` 保存单座舱 Demo / 测试的 checkpoint。结构化 trace 记录关联 ID、执行状态与耗时等元数据，默认保存在进程内，可通过可选 `TraceBackend` 导出。
 
 <a id="capabilities"></a>
 ## 🌟 核心能力
@@ -111,7 +111,7 @@ flowchart LR
     O --> EV[Evaluation / Trial]
 ```
 
-真实视频路径调用本地感知模型并输出语义观测；录制观测路径跳过推理，只验证下游 Agent 协同。用户批准后，图从中断处继续，但实际工具调用仍通过 ToolRegistry 的策略检查与执行边界。两种路径共用语义上下文，但**不能用录制观测回放估计感知准确率**。Agent 可接 Qwen / GLM 在线 API；无网络的演示使用确定性离线 Agent，以保证复现。
+本地视频感知与录制观测都汇入 Context Manager，再进入 Agent 工作流。用户批准后，图从中断处继续，由 ToolRegistry 检查策略并执行工具。Agent 可使用 Qwen / GLM 在线 API，也可使用确定性脚本模型复现审批与恢复流程。
 
 <a id="stack"></a>
 ## 🛠️ 技术栈与个人工作
@@ -183,7 +183,7 @@ uv sync --group dev
 uv run --group dev python -m apps.vehicle_ai_demo.langgraph_demo
 ```
 
-该演示使用确定性脚本模型：Agent 请求打开驾驶员车窗后，图在敏感动作前进入 `interrupt`；调用 `resume_stateful("approve")` 后才执行原始 PendingAction。测试还覆盖“首选服务区确认后不可用 → 替代候选再次 interrupt → 第二次确认后执行”，用于验证恢复路径不会自动重放写操作。
+该演示使用确定性脚本模型：Agent 请求打开驾驶员车窗后，图在敏感动作前进入 `interrupt`；调用 `resume_stateful("approve")` 后才执行原始 PendingAction。测试还覆盖“首选服务区确认后不可用 → 替代候选再次 interrupt → 第二次确认后执行”，核验恢复候选的再次审批与执行。
 
 ### 无密钥运行完整离线 Demo
 
@@ -198,15 +198,15 @@ uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
 open "runs/$VM_RUN_ID/report.html"
 ```
 
-这是录制语义观测回放；依赖安装完成后，**运行阶段不需要**摄像头、模型权重、API Key 或网络。输出包括 `report.html`、`summary.json`、`trace.json`、`resolved_config.yaml` 和 `run_card.md`。旧报告不会自动更新，上述命令会创建新的结果目录且不会覆盖旧运行；若工作树有改动，调试时可加 `--allow-dirty`，但 dirty 运行不适合作为正式证据。
+该命令使用录制语义观测、确定性脚本模型与模拟车机。依赖安装完成后即可离线运行，每次用独立运行 ID 创建结果目录，输出 `report.html`、`summary.json`、`trace.json`、`resolved_config.yaml` 和 `run_card.md`。正式记录使用已提交的工作树；调试本地改动时可加 `--allow-dirty`。
 
-**运行后应看到：**终端打印“通过: drowsy-rest-stop”；中文报告中的舱内/舱外面板来自录制观测，最终驾驶员状态为 `DROWSY`、风险为 `HIGH`，时间线依次包含风险事件、搜索服务区、模拟导航的待确认状态、用户确认与工具执行结果。示例场景应有 **9/9 断言通过、未确认敏感动作执行 0 次**。可打开 `summary.json` 核对 `passed`、`assertions` 与 `unauthorized_sensitive_executions`；这些是回放流程断言，不是感知精度。
+**运行后应看到：**终端打印“通过: drowsy-rest-stop”；中文报告中的舱内/舱外面板来自录制观测，最终驾驶员状态为 `DROWSY`、风险为 `HIGH`，时间线依次包含风险事件、搜索服务区、模拟导航的待确认状态、用户确认与工具执行结果。示例场景应有 **9/9 断言通过、未确认敏感动作执行 0 次**。可打开 `summary.json` 核对 `passed`、`assertions` 与 `unauthorized_sensitive_executions` 等回放流程断言字段。
 
-**常见问题：**若提示运行目录已存在，请换新的 `VM_RUN_ID`，不要覆盖旧证据；若提示工作树不干净，先提交改动，或仅在调试时加 `--allow-dirty`；若 `open` 不可用（非 macOS），请用本机浏览器打开输出的 `report.html` 路径。安装依赖需要网络，但安装后的离线回放不调用在线模型。
+**常见问题：**若提示运行目录已存在，请使用新的 `VM_RUN_ID`；若提示工作树不干净，先提交改动，或在调试时加 `--allow-dirty`；非 macOS 环境可用本机浏览器打开输出的 `report.html` 路径。首次安装依赖需要网络。
 
 ### 正常音乐与取消链路
 
-另外两条主案例复用同一回放器，也各自生成中文 HTML、JSON 摘要和 trace。使用不同运行 ID，报告不会覆盖：
+另外两条主案例复用同一回放器，分别以独立运行 ID 生成中文 HTML、JSON 摘要和 trace：
 
 ```bash
 VM_RUN_ID="normal-driver-music-$(date +%Y%m%d-%H%M%S)-$RANDOM"
@@ -222,11 +222,11 @@ uv run --group dev python -m apps.vehicle_ai_demo.replay_demo \
 open "runs/$VM_RUN_ID/report.html"
 ```
 
-三条回放都使用**录制/合成语义观测**、脚本模型和模拟车机，不能证明真实视频感知准确率，也不调用在线模型。
+音乐场景展示模拟媒体播放与状态回读；取消场景展示用户拒绝待确认导航后，导航保持 `IDLE` 的流程。
 
 ### 可选：知识增强 Agent 在线展示
 
-已配置 Qwen/GLM API 并构建双 profile 索引后，可运行 `.venv/bin/python scripts/run_knowledge_eval.py --mode online-rag --provider qwen --profile all`。首次安装独立 LightRAG 环境、重建索引、单题冒烟与中文报告核验步骤见[知识增强运行指南](docs/guide/knowledge-rag-demo.md)。这条路径会调用在线模型；普通离线 Demo 不会启动知识服务。
+已配置 Qwen/GLM API 并构建双 profile 索引后，可运行 `.venv/bin/python scripts/run_knowledge_eval.py --mode online-rag --provider qwen --profile all`。首次安装独立 LightRAG 环境、重建索引、单题冒烟与中文报告核验步骤见[知识增强运行指南](docs/guide/knowledge-rag-demo.md)。这条路径通过知识服务检索证据，再由在线模型生成回答。
 
 ### 行程事件记忆 Agent 展示
 
@@ -234,7 +234,7 @@ open "runs/$VM_RUN_ID/report.html"
 
 ### Agent 受限规划与恢复验收
 
-不需要 API Key，运行 7 个脚本化场景，生成中文步骤报告：
+使用确定性脚本模型运行 7 个场景，生成中文步骤报告：
 
 ```bash
 uv run python scripts/run_agent_recovery_eval.py
@@ -244,8 +244,12 @@ uv run python scripts/run_agent_recovery_eval.py
 
 ### 真实视频与在线 Agent
 
-- 可选的真实视频协同演示需自备本地视频与模型权重，命令和运行限制见[视频运行指南](docs/offline_video_pipeline.md)；它与上面的录制观测回放报告不是同一次运行。
-- 对无标注本地视频，可独立生成**感知自动核验报告**，查看处理覆盖、舱内状态输出、舱外目标/车道输出与失败原因；这不计算准确率，也不触发 Agent 决策：
+本地视频协同演示读取自备视频与模型权重，将感知输出接入 Agent；准备步骤与命令见[视频运行指南](docs/offline_video_pipeline.md)。
+
+<details>
+<summary><b>可选：本地视频感知自动核验</b></summary>
+
+感知自动核验独立处理本地视频，生成处理覆盖、舱内状态、舱外目标/车道输出与失败原因报告：
 
 ```bash
 uv sync --extra perception --group dev
@@ -255,10 +259,13 @@ uv run --extra perception --group dev python -m scripts.audit_perception_videos 
 # 终端会打印新建的 runs/perception_audit/<运行ID>/report.html 路径
 ```
 
-  每侧最多 50 条视频，按文件名排序冻结；正式运行逐帧推理，可能需要较长时间。模型路径为 `models/mediapipe/face_landmarker.task` 和 `models/driving/YOLOPv2_512.onnx`。`manifest.json` 记录哈希、依赖、配置及 Git 状态，`videos/` 保留本地逐视频结构化结果；旧运行不会覆盖，只有完整写入后才出现 `.complete`。来源与许可未知时保持 `unknown`；没有对齐真值标签时精度为 `not_evaluated`，输出变化不能称为误报或漏报。`runs/` 与本地视频均被 Git 忽略，请勿公开原视频或逐视频记录。macOS 上 MediaPipe 初始化可能需要可用的图形上下文；若进程在初始化时直接退出，请在本机终端运行。
+每侧最多 50 条视频，按文件名排序冻结后逐帧推理。模型路径为 `models/mediapipe/face_landmarker.task` 和 `models/driving/YOLOPv2_512.onnx`。每次运行创建独立目录，`manifest.json` 记录哈希、依赖、配置及 Git 状态，`videos/` 保存本地逐视频结果，完整写入后生成 `.complete`。来源与许可未知时标记为 `unknown`，缺少对齐真值标签时精度标记为 `not_evaluated`。本地视频和 `runs/` 由 Git 忽略。macOS 上 MediaPipe 初始化可能需要可用的图形上下文；遇到初始化退出时可在本机终端运行。
 
-本机已完成舱内、舱外各 26 条视频的全量处理。舱内 Service Initialization Latency (服务初始化延迟) P50/P95 为 22.53/29.23 ms，First-frame Latency (首帧处理延迟) 为 8.74/9.42 ms，Steady-state Frame Latency (稳态单帧处理延迟) 为 4.38/4.86 ms；Offline Replay Throughput (离线回放吞吐) 为 204.19 FPS（26 条、30,063 帧）。这些是单次 Apple M5 本机处理结果，不是准确率或实时/端到端指标；计时口径、依赖与模型哈希见[舱内性能报告](docs/reports/2026-09-26-cabin-performance.md)。
-- 可选的在线 Agent 决策可先复制[配置示例](.env.example)为本地 `.env`，填写 `DASHSCOPE_API_KEY` 或 `GLM_API_KEY` 与对应模型配置，然后运行下面的一条跨域场景。**API 调用会产生费用**；将 `--provider qwen` 改为 `--provider glm` 可切换提供方。命令会在 `runs/agent_eval/` 生成中文 `report.html`、`report.md` 和 `trial.json`；终端打印 HTML 路径，可直接用浏览器打开。HTML 按“录制舱内外观测 → 实际发送的上下文 → 在线模型回复/工具 → 模拟车机结果”展示，原始消息折叠保留；舱内外 GIF 是从仓库相对路径引用的**独立感知演示素材**，不是本次在线运行的同步画面，单独拷贝 HTML 不会带上 GIF。这是在线 Agent 的单例调试，**观测仍是录制场景、非当次视频推理**，不计正式成功率。不要把 `.env` 或 `runs/` 上传到 Git。
+本机已完成舱内、舱外各 26 条视频的全量处理。舱内 Service Initialization Latency (服务初始化延迟) P50/P95 为 22.53/29.23 ms，First-frame Latency (首帧处理延迟) 为 8.74/9.42 ms，Steady-state Frame Latency (稳态单帧处理延迟) 为 4.38/4.86 ms；Offline Replay Throughput (离线回放吞吐) 为 204.19 FPS（26 条、30,063 帧）。上述数值来自单次 Apple M5 本机离线处理；计时口径、依赖与模型哈希见[舱内性能报告](docs/reports/2026-09-26-cabin-performance.md)。
+
+</details>
+
+在线 Agent 单例调试：复制[配置示例](.env.example)为本地 `.env`，填写 `DASHSCOPE_API_KEY` 或 `GLM_API_KEY` 与对应模型配置，然后运行下面的跨域场景。**API 调用会产生费用**；将 `--provider qwen` 改为 `--provider glm` 可切换提供方。命令在 `runs/agent_eval/` 生成中文 `report.html`、`report.md` 和 `trial.json`，终端打印可由浏览器打开的 HTML 路径。报告按“录制舱内外观测 → 实际发送的上下文 → 在线模型回复/工具 → 模拟车机结果”展示，原始消息折叠保留。报告中的 GIF 使用仓库相对路径引用独立感知演示素材，查看时需保留对应目录结构。凭据与原始运行产物保存在本地。
 
 ```bash
 uv run --group dev python -m modules.vehicle_ai.evaluation.cli \
@@ -266,7 +273,7 @@ uv run --group dev python -m modules.vehicle_ai.evaluation.cli \
 ```
 
 40 条冻结内部场景的重复运行、AI 辅助审核与纠错命令见[评估说明](scenarios/agent_eval/README.md)。
-- 回归检查：
+回归检查：
 
 ```bash
 uv run --group dev python -m pytest -q
@@ -294,7 +301,7 @@ VehicleMind/
 
 <details><summary><b>为什么先使用离线视频与录制观测？</b></summary>
 
-真实采集条件目前不可用。离线视频保留感知演示，录制观测则把 Agent 编排和安全确认变成无需模型权重即可复现的场景；两种证据在界面与报告中明确分开。
+离线视频用于运行感知并提供语义观测，录制观测用于固定输入、复现 Agent 编排与安全确认。界面与报告标明各自的输入来源。
 
 </details>
 
@@ -305,12 +312,11 @@ LLM 只提出工具请求，敏感动作由确定性执行层保存为 PendingAc
 </details>
 
 <a id="limitations"></a>
-## ⚠️ 当前限制与 Roadmap
+## 🧭 运行范围与后续方向
 
-- 模型权重和视频不随仓库发布；现有 GIF 是感知演示素材，不等于本次回放重新推理的输出。
-- 在线双模型已有 AI 自审内部重复评测，但尚无独立人工审定的可靠性指标；舱内外小样本验证也未完成。
-- 车辆状态与工具执行均为本地模拟，未连接真实车载硬件。更多边界见[项目证据与限制](docs/project_limits.md)。
-- 近期优先级：完善作品集主案例与可核验结果，再补少量必要量化证据；大规模候选场景扩充暂不作为展示主线。进度见[todolist.md](todolist.md)。
+项目提供三种运行方式：录制观测与脚本模型复现 Agent 工作流；自备本地视频与权重运行感知并接入 Agent；录制场景与 Qwen / GLM API 运行在线 Agent 调试和评测。三种方式的车辆状态与工具执行均使用本地模拟车机。证据口径和运行边界见[项目证据与限制](docs/project_limits.md)。
+
+后续优先完善主案例与可核验结果，补齐独立人工审定的 Agent 场景集和舱内外小样本标注验证；进度见[todolist.md](todolist.md)。
 
 原创代码采用 [Apache License 2.0](LICENSE)。预训练模型、视频、数据与第三方代码遵循各自条款，详见[第三方声明](THIRD_PARTY_NOTICES.md)。
 
