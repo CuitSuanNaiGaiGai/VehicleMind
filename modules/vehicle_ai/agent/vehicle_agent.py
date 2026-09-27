@@ -65,8 +65,10 @@ class VehicleAgent:
         max_task_trace_events: int = 200,
         trip_id: str | None = None,
         historical_event_sink: Callable[[dict], None] | None = None,
+        trace_recorder=None,
     ):
         self.llm = llm
+        self.trace_recorder = trace_recorder
 
         self.context_manager = context_manager
 
@@ -93,6 +95,7 @@ class VehicleAgent:
             self.pending_actions,
             self.tool_registry,
             self.tool_registry.take_confirmation_issuer(),
+            trace_recorder=self.trace_recorder,
         )
         self.context_selector = ContextSelector()
         self.trip_id = trip_id
@@ -226,6 +229,25 @@ class VehicleAgent:
         return record_final_response(self, user_text, answer)
 
     def chat(
+        self,
+        user_text: str,
+        debug: bool = True,
+    ) -> str:
+        started = time.perf_counter()
+        try:
+            return self._chat(user_text, debug=debug)
+        finally:
+            if self.trace_recorder is not None:
+                self.trace_recorder.emit(
+                    "task_status",
+                    latency_ms=(time.perf_counter() - started) * 1000,
+                    attributes={
+                        "status": self.task.status.value,
+                        "reason": self.task.reason,
+                    },
+                )
+
+    def _chat(
         self,
         user_text: str,
         debug: bool = True,
