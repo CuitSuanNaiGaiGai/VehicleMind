@@ -194,10 +194,16 @@ def validate_proposal(proposal: dict, text: str) -> str | None:
     if any(evidence and evidence not in text for evidence in evidence_items):
         return "SOURCE_EVIDENCE_MISMATCH"
 
+    valid_remove_distance_continuation = False
     for change in changes:
         error = _field_semantics(change, text, changes)
         if error:
             return error
+        if change["op"] == "REMOVE":
+            removal = parse_removal_source(change["field"], change["value"], text)
+            valid_remove_distance_continuation |= (
+                removal is not None and removal.continuation_distance_km is not None
+            )
     if intent in {"SELECT", "ASK_CANDIDATE"}:
         if reference["name"] is not None and reference["name"] not in text:
             return "SOURCE_REFERENCE_MISMATCH"
@@ -209,6 +215,10 @@ def validate_proposal(proposal: dict, text: str) -> str | None:
         error = _value_semantics(change, text)
         if error:
             return error
-    if intent != "UNCLEAR" and ambiguous_control(text):
+    if (
+        intent != "UNCLEAR"
+        and ambiguous_control(text)
+        and not (intent == "UPDATE_CONSTRAINTS" and valid_remove_distance_continuation)
+    ):
         return "AMBIGUOUS_CONTROL"
     return None

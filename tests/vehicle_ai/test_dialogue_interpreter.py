@@ -354,6 +354,37 @@ def test_distance_continuation_after_removal_requires_matching_set_change():
 
 
 @pytest.mark.parametrize(
+    "field,value,verb",
+    [
+        ("preferred_area", None, "取消区域偏好"),
+        ("unsupported", "按摩椅", "取消按摩椅"),
+        ("preferred_area", None, "移除区域偏好"),
+    ],
+)
+def test_valid_removal_and_distance_continuation_is_not_mixed_control(
+    field, value, verb
+):
+    text = f"{verb}，按15公里以内继续"
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [
+            change(field, value, verb, "REMOVE"),
+            change("max_distance_km", 15.0, "15公里以内"),
+        ],
+        evidence=text,
+    )
+
+    assert validate_proposal(item, text) is None
+
+
+def test_cancel_and_resume_controls_remain_ambiguous():
+    text = "取消，然后继续"
+    item = proposal("CANCEL", evidence=text)
+
+    assert validate_proposal(item, text) == "AMBIGUOUS_CONTROL"
+
+
+@pytest.mark.parametrize(
     "text,suffix_value",
     [("十五点五公里以内", 5.0), ("－15公里以内", 15.0)],
 )
