@@ -1,55 +1,34 @@
-# VehicleMind｜一页面试讲述卡
+# 基于 LangGraph 的多模态智能座舱 Agent 系统
 
-## 业务场景
+## 项目讲述
 
-驾驶员出现疲劳迹象时，系统把舱内状态与舱外道路观测转成统一语义上下文，触发风险提醒；用户要求找服务区后，Agent 可以搜索，但模拟导航必须等用户确认。首页提供[疲劳休息](../assets/scenarios/drowsy_rest_stop.yaml)、[正常状态播放音乐](../assets/scenarios/normal_driver_music.yaml)和[取消导航](../assets/scenarios/drowsy_rest_stop_cancel.yaml)三个无密钥离线主案例，可用[README 命令](../README.md#quickstart)回放并打开中文报告。
+座舱 Agent 要在驾驶员状态、道路观测和车机状态持续变化时，既理解当前上下文，又能把多步任务安全地推进到可验证的结果。这个项目将舱内外感知形成的语义观察接入 LangGraph 状态工作流，再由 Agent 选择工具、执行层授权敏感操作，并通过结构化轨迹和评测回放检查每一步。场景中的导航动作是模拟导航，完整链路覆盖风险识别、服务区搜索、用户确认、模拟执行与状态回读。
 
-## 架构取舍与个人负责
+## 模块职责
 
-- 感知层用离线视频、OpenCV、MediaPipe 和第三方预训练 YOLOPv2/ONNX Runtime；项目内实现[舱内状态证据](../modules/cabin/perception_service.py)、[道路输出整理](../modules/driving/perception_service.py)及[双路适配](../modules/vehicle_ai/integration/)。不把预训练权重说成自研模型。
-- Agent 不直接读取原始帧：[上下文管理](../modules/vehicle_ai/context/context_manager.py)处理语义状态和观测质量，[事件检测](../modules/vehicle_ai/events/event_detector.py)隔离高频噪声，[Agent](../modules/vehicle_ai/agent/vehicle_agent.py)选择上下文与工具。Qwen/GLM 是可替换的第三方在线服务。
-- [ToolRegistry](../modules/vehicle_ai/tools/registry.py)与 PendingAction 在执行层拦截敏感动作；[确定性回放](../modules/vehicle_ai/replay/runner.py)和中文报告让无密钥展示可复现。录制观测回放只验证下游协同，不代表本次真实视频推理。
-- 休息地点计划使用项目内显式状态机完成“搜索—候选—确认—执行—回读”；最多 9 步、最多 1 次恢复。首选地点不可用只生成新的待确认动作，不复用旧授权。可用[七场景报告](reports/2026-09-26-a5-bounded-plan-recovery.md)和[在线 HTML](reports/a5-bounded-plan-recovery/report.html)展示成功与故障路径。
+- **StateGraph 工作流状态**：`StateGraph` 管理用户请求、感知事件、暂停审批、恢复执行和结果路由，显式表达可恢复的任务流程。
+- **VehicleAgent 决策循环**：[VehicleAgent](../modules/vehicle_ai/agent/vehicle_agent.py) 在有界的模型与工具循环内选择上下文、规划下一步并组织答复。感知模块输出带质量信息的语义观察；Agent 消费这些语义状态与事件，不直接消费原始视频帧。
+- **ToolRegistry 与 PendingAction 授权**：[ToolRegistry](../modules/vehicle_ai/tools/registry.py) 执行敏感操作前检查当前策略。`PendingAction` 保存等待用户确认的动作；工作流恢复只继续审批流程，执行层仍重新检查授权条件。
+- **轨迹与评测**：结构化事件记录工作流节点、模型和工具调用、策略判断、待确认动作、恢复过程及最终状态；离线回放与专项评测据此核对任务行为。
 
-## 一次失败定位与修复
+我负责把感知观察、Agent 决策、审批边界和评测路径连接起来，并保留现有 Planner 的候选校验、步数预算和恢复约束。LangGraph 承载 control flow，VehicleAgent 处理 bounded model/tool loop，ToolRegistry 保持独立执行权限边界。
 
-M01 在线候选 pilot 中，`CONFIRMATION_REQUIRED` 曾被当成普通工具失败继续喂给模型：Qwen 误称“导航启动失败”，GLM 重复请求导航。修复后，有匹配待确认动作便停止工具循环，明确告诉用户“尚未执行，待确认”；两模型的单例复测均在显式确认后到达 `ACTIVE`。具体前后请求数及边界见[M01 技术复盘](reports/2026-09-23-agent-pilot-followup-review.md)；这只是单例改进，不推断稳定成功率。
+## M01 故障定位
 
-## 可信数字与局限
+M01 暴露了工具循环对审批状态的错误处理：`CONFIRMATION_REQUIRED` 被当成普通工具失败继续交给模型。Qwen 因此回复“导航启动失败”，GLM 再次请求 `start_navigation`。定位后，我调整循环逻辑：检测到匹配的待确认动作时，立即结束本轮工具循环并回复“车机操作已准备好，尚未执行，待确认后才会执行”；同批后续工具也停止执行，避免覆盖 `PendingAction`。显式确认后再执行原动作。
 
-| 可说的数字 | 证据与含义 |
-|---|---|
-| 无密钥成功回放 9/9 断言；取消回放 7/7 断言，未确认敏感动作执行 0 次 | [两个场景](../assets/scenarios/)与[自动化 smoke test](../tests/smoke/test_replay_demo.py)；证明录制观测下的流程与确认门，不是感知准确率 |
-| 正常驾驶状态下播放音乐 5/5 断言，最终媒体状态为播放中 | [独立回放场景](../assets/scenarios/normal_driver_music.yaml)；脚本模型与模拟媒体工具，证明工具链路，不代表在线语义准确率 |
-| A5 后在线回归：Qwen 80/120、GLM 90/120 Task Success（任务成功）；机械通过分别 116/120、107/120 | [A6 报告](reports/2026-09-26-a6-online-regression.md)：40 条内部 AI 自审冻结场景，每模型每条重复 3 次，由 Qwen 按 v4 rubric 辅助复核。历史预算缺项，前后任务通过变化为 N/A；不能归因于代码更新 |
-| A5 固定恢复场景 7/7；Recovery Success（恢复成功率）1/1；Safe Stop（安全停止）4/4；Confirmation Compliance（确认合规率）7/7；Safety Replay Consistency（安全回放一致率）7/7；Duplicate Write（重复写操作违规）0/7 | [七个确定性场景](reports/2026-09-26-a5-bounded-plan-recovery.md)：脚本模型 + 模拟 POI，不代表在线 LLM 或实车可靠性；替代链路用满 9 步预算 |
-| 提示注入专项 4/4 拦截，未确认敏感写入 0/4 | [注入安全核验](reports/2026-09-26-agent-prompt-injection-safety.md)：只测试 ToolRegistry 确认门，不代表模型具有通用注入识别能力 |
+复盘记录的 M01 单例复测中，Qwen 模型请求数从 4 次降到 3 次，GLM 从 5 次降到 3 次；两者修复后都只请求一次 `start_navigation`，并在显式确认后到达 `ACTIVE`。该复测记录了确认时序修复后的单例行为。[M01 技术复盘](reports/2026-09-23-agent-pilot-followup-review.md)
 
-当前是**离线视频/录制观测输入 + 模拟车机**原型，没有实时采集或真实车辆控制；舱内外小样本精度尚未测得，在线数字也不是独立人工 Golden Set 或量产可靠性。A5 的确定性分数不等同于 Qwen/GLM 线上规划稳定性。原始在线请求轨迹未随仓库公开，不能将汇总说成完全公开可复算的外部基准。[完整限制](project_limits.md)。
+## 验证结果
 
-## 60–90 秒口述提纲
+| 证据 | 结果 | 说明 |
+|---|---|---|
+| A5 固定故障恢复场景 | 7/7 场景通过；恢复成功 1/1；确认合规 7/7；重复写操作违规 0/7 | 最复杂的替代地点场景使用 9/9 步和 1/1 次恢复。使用脚本模型、模拟 POI 与注入故障，验证预设流程断言。[A5 报告](reports/2026-09-26-a5-bounded-plan-recovery.md) |
+| A6 Qwen 在线回归 | 任务成功 80/120（66.7%）；机械通过 116/120（96.7%） | 40 个冻结合成场景重复运行 3 次；任务成功同时要求机械规则和语义审核通过。[A6 报告](reports/2026-09-26-a6-online-regression.md) |
+| A6 GLM 在线回归 | 任务成功 90/120（75.0%）；机械通过 107/120（89.2%） | 与 Qwen 使用相同场景和重复次数，由同一 Qwen 审核器按冻结 rubric 辅助审核。 |
 
-“我做的是舱内外感知与车机 Agent 的协同原型。司机疲劳时，系统把视觉结果转换成带质量状态的上下文，再形成风险事件；用户要找服务区，Agent 可以搜索，但导航要经过执行层确认。我把在线决策与无密钥回放分开，便于展示并复核完整链路。A5 后我让 Qwen 和 GLM 在同一批 40 条合成场景各跑三次，Qwen 任务成功 80/120，GLM 90/120；机械通过分别是116/120和107/120。历史运行没记全预算，所以我不声称前后提升是由代码造成的。我的结果也不是视频感知准确率或独立人工金标。”
+这些证据分别说明受控故障下的流程约束和在线模型在冻结场景上的表现。
 
-新增一句可选的 A5 讲述：“我把服务区导航收敛成一个最多 9 步、最多一次恢复的任务计划。首选不可用时系统只提供一个新候选并重新请求确认，未知写入结果不会盲目重试。7 个固定故障场景全部通过；这证明状态机和确认流程满足预设断言，不代表在线模型或实车成功率。”
+## 60–90 秒口述稿
 
-还可以补充：“我用 4 类用户/检索提示注入载荷故意诱导脚本模型越权请求导航，执行层 4/4 均要求独立确认，未确认敏感写入为 0；这是确认门核验，不是模型防注入能力评测。”
-
-## LangGraph Stateful Agent：怎么讲这次升级
-
-**一句话：**我没有把原有 Tool Calling 逻辑简单套一层框架，而是把用户请求、语义感知事件、敏感操作审批和失败恢复抽象成 LangGraph 状态图，同时保留 ToolRegistry 作为独立执行权限边界。
-
-可以按下面的因果链讲：
-
-1. **问题**：原实现虽然已有 PendingAction 和有限状态 Planner，但“暂停、恢复、审批、失败分支”分散在过程代码里，难以直接表达可恢复工作流。
-2. **改造**：增加 `StateGraph` 外层 Runtime；用户请求和 VehicleEvent 分流进入图，VehicleAgent 仍负责 bounded LLM/tool loop。
-3. **HITL**：敏感动作先产生 PendingAction，在纯 `approval_gate` 节点调用 `interrupt()`；用户批准后用 `Command(resume=...)` 恢复到独立执行节点。
-4. **安全点**：LangGraph resume 不等于授权。执行仍由 ToolRegistry 根据当前车况重新 policy check，并消费与原工具/参数绑定的一次性 grant。
-5. **恢复点**：首选 POI 执行失败时，Planner 只能提出本轮候选中的替代项；替代项拥有新的 action ID，Graph 必须再次 interrupt，禁止自动重放写操作。
-6. **边界**：当前 checkpointer 是 `InMemorySaver`，因此我只把它定义为单座舱 Demo/测试级可恢复状态，不包装成跨进程生产持久化。
-7. **可观测性**：用统一结构化事件串起 `thread_id`、`task_id`、graph node、model call、tool call/result、policy decision、PendingAction、interrupt/resume、recovery 和最终任务状态；节点、模型、工具策略与任务轮次记录 latency。模型 trace 不存提示词/回复正文，工具事件只存参数字段名。
-8. **评测接入**：保留已有 replay 与 evaluation 结果格式，`run_trial(stateful=True)` 可在 LangGraph 状态图路径上记录审批/恢复过程，并把结构化 trace 附到 trial；没有外部 tracing 配置时仍可离线运行。可选 `TraceBackend` 由 recorder 级有界后台队列独立导出，失败或卡住只影响该 recorder 的导出，不改变 Agent 执行结果或阻塞其他 runtime。
-
-**面试追问：为什么不把所有 Planner 都删掉改成 LangGraph？** 业务 Planner 已有候选校验、步数预算和恢复约束，直接重写会扩大回归面。LangGraph 更适合作为 control-plane：显式化 checkpoint / HITL / routing；原 Planner 和 ToolRegistry 继续作为 domain logic 与 safety/data plane。这样升级成本更低，也能保持既有回归证据。
-
-**面试追问：如何验证 trace 不影响安全与主流程？** 我用确定性脚本模型覆盖普通请求、工具调用、拒绝、interrupt/resume、恢复后第二次审批，并让一个故意失败的 backend 在运行时抛错；Agent 仍按原策略完成或拒绝执行，trace 失败单独记录。LangGraph resume 仍不是授权，ToolRegistry 仍是执行权限边界。
+“我的项目叫‘基于 LangGraph 的多模态智能座舱 Agent 系统’，核心问题是驾驶员状态、道路观察和车机状态不断变化时，Agent 怎么持续理解上下文，并安全地完成多步操作。我把舱内外感知输出整理成带质量信息的语义观察，由 LangGraph 管理请求、事件、审批和恢复状态；VehicleAgent 在有界循环内选择工具，ToolRegistry 在敏感操作执行前重新检查授权，待确认动作由 PendingAction 保留。一次 M01 排查发现，系统把需要确认误当成工具失败，导致模型误报启动失败或重复请求导航。我让匹配待确认动作直接结束工具循环，等待明确确认后再执行。M01 单例复测中，Qwen 请求数从 4 次降到 3 次，GLM 从 5 次降到 3 次。A5 的 7 个固定故障场景全部通过；A6 在线回归中，Qwen 任务成功 80/120，GLM 90/120。现在我把它定位为离线观察和模拟车机上的 Agent 工程原型，重点展示工作流、授权和评测如何协同。”
