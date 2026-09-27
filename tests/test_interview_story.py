@@ -21,6 +21,8 @@ def test_interview_story_is_one_page_and_evidence_linked() -> None:
         "A5 固定故障恢复场景",
         "A6 Qwen 在线回归",
         "A6 GLM 在线回归",
+        "同一 Qwen 审核器",
+        "冻结 rubric",
         "60–90 秒口述稿",
         "模拟车机",
         "模拟导航",

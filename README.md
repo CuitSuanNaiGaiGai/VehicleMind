@@ -102,8 +102,9 @@ flowchart LR
     RS --> T
     X --> F{执行结果}
     F -- 成功 --> K[状态回读 / Verify]
-    F -- 可恢复失败 --> RC[Recovery Router]
-    RC --> A
+    F -- 可恢复失败 --> RC[Recovery Router：有界计划恢复]
+    RC -->|新候选待确认| W
+    RC -->|无待确认动作| K
     F -- 不确定/不可恢复 --> S[安全停止 / Reconcile]
     G --> O[结构化 Trace]
     T --> O

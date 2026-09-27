@@ -76,6 +76,16 @@ def test_showcase_maps_business_modules_to_implementation_and_sources() -> None:
     assert "modules/vehicle_ai/tools/registry.py" in stack
 
 
+def test_recovery_diagram_returns_new_candidates_to_approval() -> None:
+    text = README.read_text(encoding="utf-8")
+    architecture = text.split('<a id="architecture"></a>', 1)[1].split(
+        '<a id="stack"></a>', 1
+    )[0]
+    assert "RC -->|新候选待确认| W" in architecture
+    assert "RC -->|无待确认动作| K" in architecture
+    assert "RC --> A" not in architecture
+
+
 def test_showcase_evidence_has_success_refusal_and_bounded_agent_metrics() -> None:
     text = README.read_text(encoding="utf-8")
     evidence = text.split('<a id="evidence"></a>', 1)[1].split(
