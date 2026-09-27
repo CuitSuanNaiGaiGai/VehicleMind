@@ -38,6 +38,9 @@ class TrialResult:
     interaction_events: tuple[dict[str, Any], ...]
     agent_trace: tuple[dict[str, Any], ...] = ()
     policy_trace: tuple[dict[str, Any], ...] = ()
+    thread_id: str | None = None
+    task_id: str | None = None
+    structured_trace: tuple[dict[str, Any], ...] = ()
 
 
 class RecordingClient(BaseLLMClient):
@@ -91,6 +94,7 @@ def run_trial(
     turn_timeout_seconds: float = 90.0,
     max_tool_calls: int = 10,
     max_task_trace_events: int = 200,
+    stateful: bool = False,
 ) -> TrialResult:
     """Run one isolated trial; only the supplied client may access a provider."""
     recording = RecordingClient(client)
@@ -110,6 +114,7 @@ def run_trial(
     ).hexdigest()
     replies: list[str] = []
     interaction_events: list[dict[str, Any]] = []
+    stateful_waiting = False
     error = None
     started = time.perf_counter()
     try:
@@ -183,18 +188,49 @@ def run_trial(
                     )
                 runtime.update_vehicle(**vehicle)
             if "user_text" in step:
-                reply = runtime.chat(step["user_text"], debug=False)
+                if stateful:
+                    workflow_result = runtime.chat_stateful(
+                        step["user_text"], debug=False
+                    )
+                    stateful_waiting = workflow_result.interrupted
+                    reply = workflow_result.response
+                else:
+                    reply = runtime.chat(step["user_text"], debug=False)
                 replies.append(reply)
                 interaction_events.append(
                     {
                         "kind": "agent_reply",
                         "at_ms": step.get("at_ms"),
                         "text": reply,
+                        "thread_id": (runtime.workflow.thread_id if stateful else None),
+                        "status": (workflow_result.status if stateful else None),
                     }
                 )
             if step.get("confirm_pending"):
                 pending = runtime.agent.pending_actions.get()
-                if pending is not None:
+                if stateful and stateful_waiting:
+                    resumed = runtime.resume_stateful("approve")
+                    stateful_waiting = resumed.interrupted
+                    outcome = resumed.tool_result or {}
+                    interaction_events.append(
+                        {
+                            "kind": "confirmation",
+                            "at_ms": step.get("at_ms"),
+                            "success": bool(outcome.get("success")),
+                            "error": outcome.get("error"),
+                            "result": plain_value(outcome),
+                        }
+                    )
+                elif stateful:
+                    interaction_events.append(
+                        {
+                            "kind": "confirmation",
+                            "at_ms": step.get("at_ms"),
+                            "success": False,
+                            "error": "NO_PENDING_ACTION",
+                        }
+                    )
+                elif pending is not None:
                     confirmation = runtime.agent.confirm_pending(pending.action_id)
                     interaction_events.append(
                         {
@@ -216,7 +252,28 @@ def run_trial(
                     )
             if step.get("reject_pending"):
                 pending = runtime.agent.pending_actions.get()
-                if pending is not None:
+                if stateful and stateful_waiting:
+                    resumed = runtime.resume_stateful("reject")
+                    stateful_waiting = resumed.interrupted
+                    outcome = resumed.tool_result or {}
+                    interaction_events.append(
+                        {
+                            "kind": "rejection",
+                            "at_ms": step.get("at_ms"),
+                            "success": bool(outcome.get("success")),
+                            "error": outcome.get("error"),
+                        }
+                    )
+                elif stateful:
+                    interaction_events.append(
+                        {
+                            "kind": "rejection",
+                            "at_ms": step.get("at_ms"),
+                            "success": False,
+                            "error": "NO_PENDING_ACTION",
+                        }
+                    )
+                elif pending is not None:
                     rejection = runtime.agent.reject_pending(pending.action_id)
                     interaction_events.append(
                         {
@@ -300,6 +357,7 @@ def run_trial(
             "turn_timeout_seconds": turn_timeout_seconds,
             "max_tool_calls": max_tool_calls,
             "max_task_trace_events": max_task_trace_events,
+            "stateful": stateful,
             "client_max_retries": 0,
         },
         interaction_events=tuple(interaction_events),
@@ -308,4 +366,7 @@ def run_trial(
             plain_value(asdict(item))
             for item in runtime.recommendation_coordinator.trace
         ),
+        thread_id=runtime.workflow.thread_id,
+        task_id=runtime.agent.task.task_id,
+        structured_trace=runtime.tracing.recorder.to_dicts(),
     )
