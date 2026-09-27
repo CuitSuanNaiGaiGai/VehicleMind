@@ -1,0 +1,5 @@
+schema_version: 1
+enabled: false
+candidate_ttl_seconds: 120
+max_revisions: 3
+interpreter_timeout_seconds: 15

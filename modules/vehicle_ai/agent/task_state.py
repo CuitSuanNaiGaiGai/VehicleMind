@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
+from modules.vehicle_ai.agent.dialogue_state import ConstraintValue
 from modules.vehicle_ai.agent.plan import TaskPlan
 
 
@@ -31,6 +32,11 @@ class AgentTask:
     tool_results: list[dict[str, Any]] = field(default_factory=list)
     transitions: list[dict[str, Any]] = field(default_factory=list)
     plan: TaskPlan | None = None
+    revision: int = 0
+    constraints: dict[str, ConstraintValue] = field(default_factory=dict)
+    unresolved_constraints: list[ConstraintValue] = field(default_factory=list)
+    clarification: str | None = None
+    last_presented_candidate_set_id: str | None = None
 
     def transition(self, status: TaskStatus, reason: str | None = None) -> None:
         self.transitions.append({"from": self.status, "to": status, "reason": reason})

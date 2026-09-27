@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import time
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
+
+from modules.vehicle_ai.agent.dialogue_state import CandidateSnapshot
 
 
 class PlanStatus(StrEnum):
@@ -63,6 +65,7 @@ class TaskPlan:
     recovery_reasons: list[str] = field(default_factory=list)
     status: PlanStatus = PlanStatus.RUNNING
     terminal_reason: str | None = None
+    candidate_snapshot: CandidateSnapshot | None = None
 
     def __post_init__(self) -> None:
         if not self.goal.strip():
@@ -171,6 +174,11 @@ class TaskPlan:
             "remaining_step_budget": self.remaining_step_budget,
             "remaining_recovery_budget": self.remaining_recovery_budget,
             "terminal_reason": self.terminal_reason,
+            "candidate_snapshot": (
+                asdict(self.candidate_snapshot)
+                if self.candidate_snapshot is not None
+                else None
+            ),
         }
 
     def _active_step(self, name: str) -> PlanStep:
