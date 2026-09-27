@@ -56,7 +56,7 @@
   <img src="assets/demo/driving_perception.gif" width="48%" alt="舱外目标、车道与可行驶区域感知演示"/>
 </p>
 
-**Agent Runtime 升级：**在原有 ToolRegistry、PendingAction 和受限 Planner 之上增加 LangGraph `StateGraph`，把用户请求、语义感知事件、敏感动作审批和恢复路径纳入同一可检查点工作流。敏感写操作通过 `interrupt()` 暂停，用户明确批准后用 `Command(resume=...)` 恢复；恢复得到的新候选必须生成新的 PendingAction 并再次审批，不能自动重放写操作。结构化 Agent trace 关联 `thread_id` / `task_id`，记录 graph node、model/tool call、policy、审批、interrupt/resume、recovery、任务状态和耗时；默认保存在进程内，可通过可选 `TraceBackend` 导出，导出异常不会中断 Agent。trace 不保存模型提示词/回复正文或工具参数值。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化；详见[LangGraph Runtime 设计](docs/guide/langgraph-stateful-agent.md)。
+**Agent Runtime 升级：**在原有 ToolRegistry、PendingAction 和受限 Planner 之上增加 LangGraph `StateGraph`，把用户请求、语义感知事件、敏感动作审批和恢复路径纳入同一可检查点工作流。敏感写操作通过 `interrupt()` 暂停，用户明确批准后用 `Command(resume=...)` 恢复；恢复得到的新候选必须生成新的 PendingAction 并再次审批，不能自动重放写操作。结构化 Agent trace 关联 `thread_id` / `task_id`，记录 graph node、model/tool call、policy、审批、interrupt/resume、recovery、任务状态和耗时；默认保存在进程内，可通过可选 `TraceBackend` 导出，每个 recorder 使用独立的有界后台队列，导出异常或卡住不会中断 Agent 或阻塞其他 runtime。trace 不保存模型提示词/回复正文或工具参数值。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化；详见[LangGraph Runtime 设计](docs/guide/langgraph-stateful-agent.md)。
 
 <a id="capabilities"></a>
 ## 🌟 核心能力

@@ -14,6 +14,22 @@ class TracingLLMClient(BaseLLMClient):
         self.inner = inner
         self.recorder = recorder
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "chat":
+            # Treat per-instance chat replacements as wrapper hooks. Forwarding
+            # a wrapper-bound method to inner.chat would make it call itself.
+            object.__setattr__(self, name, value)
+            return
+        inner = self.__dict__.get("inner")
+        if (
+            name not in {"inner", "recorder"}
+            and inner is not None
+            and hasattr(inner, name)
+        ):
+            setattr(inner, name, value)
+            return
+        object.__setattr__(self, name, value)
+
     def __getattr__(self, name: str) -> Any:
         # Preserve provider-specific diagnostics and test hooks exposed by clients.
         return getattr(self.inner, name)
@@ -32,6 +48,10 @@ class TracingLLMClient(BaseLLMClient):
         *,
         timeout_seconds: float,
     ) -> LLMResponse:
+        if "chat" in self.__dict__:
+            # Wrapping hooks commonly call the saved TracingLLMClient.chat
+            # method, which records the underlying call itself.
+            return self.__dict__["chat"](messages, tools)
         return self._call(
             lambda: self.inner.chat_with_timeout(
                 messages, tools, timeout_seconds=timeout_seconds

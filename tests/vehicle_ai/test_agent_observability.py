@@ -34,6 +34,16 @@ class BlockingTraceBackend:
         self.release.wait()
 
 
+class RecordingTraceBackend:
+    def __init__(self) -> None:
+        self.called = Event()
+        self.events = []
+
+    def emit(self, event) -> None:
+        self.events.append(event)
+        self.called.set()
+
+
 def _tool_call(name: str, arguments: dict | None = None) -> LLMToolCall:
     values = arguments or {}
     return LLMToolCall(
@@ -279,6 +289,27 @@ def test_trace_backend_failure_does_not_change_agent_execution() -> None:
     )
 
 
+def test_tracing_llm_forwards_mutable_client_hooks() -> None:
+    app = _runtime(ScriptedResponse(content="当前无需执行车机操作。"))
+    original_chat = app.agent.llm.chat
+    calls = 0
+
+    def patched_chat(messages, tools=None):
+        nonlocal calls
+        calls += 1
+        return original_chat(messages, tools)
+
+    app.agent.llm.chat = patched_chat
+
+    result = app.chat_stateful("现在车况怎么样？", debug=False)
+
+    assert result.status == "COMPLETED"
+    assert calls == 1
+    assert (
+        sum(event["event_type"] == "model_call" for event in result.trace_events) == 1
+    )
+
+
 def test_event_ingress_preserves_an_outstanding_approval_checkpoint() -> None:
     app = _runtime(
         ScriptedResponse(
@@ -358,6 +389,45 @@ def test_slow_backend_does_not_block_agent_execution() -> None:
         backend.release.set()
         request.join(timeout=2)
     assert app.tracing.recorder.flush_backend(timeout_seconds=2)
+
+
+def test_stalled_backend_does_not_block_another_runtime_exporter() -> None:
+    blocked_backend = BlockingTraceBackend()
+    blocked_app = _runtime(
+        ScriptedResponse(content="第一个 runtime 已完成。"),
+        trace_backend=blocked_backend,
+    )
+    healthy_backend = RecordingTraceBackend()
+    healthy_app = _runtime(
+        ScriptedResponse(content="第二个 runtime 已完成。"),
+        trace_backend=healthy_backend,
+    )
+    blocked_finished = Event()
+
+    def run_blocked_request() -> None:
+        try:
+            assert (
+                blocked_app.chat_stateful("请求一", debug=False).status == "COMPLETED"
+            )
+        finally:
+            blocked_finished.set()
+
+    request = Thread(target=run_blocked_request, daemon=True)
+    request.start()
+    try:
+        assert blocked_backend.started.wait(timeout=2)
+        assert blocked_finished.wait(timeout=2)
+        assert healthy_app.chat_stateful("请求二", debug=False).status == "COMPLETED"
+        assert healthy_backend.called.wait(timeout=2)
+        assert healthy_app.tracing.recorder.flush_backend(timeout_seconds=1)
+        assert healthy_backend.events
+        assert all(
+            event.thread_id == healthy_app.thread_id for event in healthy_backend.events
+        )
+    finally:
+        blocked_backend.release.set()
+        request.join(timeout=2)
+    assert blocked_app.tracing.recorder.flush_backend(timeout_seconds=2)
 
 
 def test_stateful_evaluation_trial_contains_structured_graph_trace() -> None:

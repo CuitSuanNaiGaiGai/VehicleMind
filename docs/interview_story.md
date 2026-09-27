@@ -48,7 +48,7 @@ M01 在线候选 pilot 中，`CONFIRMATION_REQUIRED` 曾被当成普通工具失
 5. **恢复点**：首选 POI 执行失败时，Planner 只能提出本轮候选中的替代项；替代项拥有新的 action ID，Graph 必须再次 interrupt，禁止自动重放写操作。
 6. **边界**：当前 checkpointer 是 `InMemorySaver`，因此我只把它定义为单座舱 Demo/测试级可恢复状态，不包装成跨进程生产持久化。
 7. **可观测性**：用统一结构化事件串起 `thread_id`、`task_id`、graph node、model call、tool call/result、policy decision、PendingAction、interrupt/resume、recovery 和最终任务状态；节点、模型、工具策略与任务轮次记录 latency。模型 trace 不存提示词/回复正文，工具事件只存参数字段名。
-8. **评测接入**：保留已有 replay 与 evaluation 结果格式，`run_trial(stateful=True)` 可在 LangGraph 状态图路径上记录审批/恢复过程，并把结构化 trace 附到 trial；没有外部 tracing 配置时仍可离线运行。可选 `TraceBackend` 失败只记为观测错误，不改变 Agent 执行结果。
+8. **评测接入**：保留已有 replay 与 evaluation 结果格式，`run_trial(stateful=True)` 可在 LangGraph 状态图路径上记录审批/恢复过程，并把结构化 trace 附到 trial；没有外部 tracing 配置时仍可离线运行。可选 `TraceBackend` 由 recorder 级有界后台队列独立导出，失败或卡住只影响该 recorder 的导出，不改变 Agent 执行结果或阻塞其他 runtime。
 
 **面试追问：为什么不把所有 Planner 都删掉改成 LangGraph？** 业务 Planner 已有候选校验、步数预算和恢复约束，直接重写会扩大回归面。LangGraph 更适合作为 control-plane：显式化 checkpoint / HITL / routing；原 Planner 和 ToolRegistry 继续作为 domain logic 与 safety/data plane。这样升级成本更低，也能保持既有回归证据。
 

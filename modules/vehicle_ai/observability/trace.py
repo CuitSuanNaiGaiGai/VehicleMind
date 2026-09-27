@@ -63,6 +63,7 @@ class AgentTraceRecorder:
         self._backend_errors: list[dict[str, str]] = []
         self._sequence = 0
         self._lock = Lock()
+        self._exporter = _TraceExportDispatcher() if backend is not None else None
 
     def emit(
         self,
@@ -88,8 +89,8 @@ class AgentTraceRecorder:
                 self._sequence += 1
                 self._events.append(event)
                 del self._events[: -self.max_events]
-                if self.backend is not None:
-                    error_type = _TRACE_EXPORTER.submit(self, event)
+                if self._exporter is not None:
+                    error_type = self._exporter.submit(self, event)
                     if error_type is not None:
                         self._record_backend_error_locked(event_type, error_type)
         except Exception as error:
@@ -109,9 +110,9 @@ class AgentTraceRecorder:
 
     def flush_backend(self, timeout_seconds: float = 1.0) -> bool:
         """Wait for events queued before this call, bounded by the supplied timeout."""
-        if self.backend is None:
+        if self._exporter is None:
             return True
-        return _TRACE_EXPORTER.flush(timeout_seconds)
+        return self._exporter.flush(timeout_seconds)
 
     def records(self) -> tuple[TraceEvent, ...]:
         with self._lock:
@@ -139,7 +140,7 @@ class _FlushMarker:
 
 
 class _TraceExportDispatcher:
-    """Bounded daemon exporter keeps optional backends off the agent call path."""
+    """Per-recorder bounded daemon exporter isolates backend stalls."""
 
     def __init__(self, max_queue_size: int = 256) -> None:
         self._queue: Queue[_ExportItem | _FlushMarker] = Queue(maxsize=max_queue_size)
@@ -199,6 +200,3 @@ class _TraceExportDispatcher:
                     )
             finally:
                 self._queue.task_done()
-
-
-_TRACE_EXPORTER = _TraceExportDispatcher()
