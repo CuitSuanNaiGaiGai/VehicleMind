@@ -8,10 +8,12 @@ from dataclasses import dataclass
 
 from modules.vehicle_ai.agent.budget import BudgetExceeded, TurnBudget
 from modules.vehicle_ai.agent.dialogue_state import DialogueIntent
-from modules.vehicle_ai.agent.dialogue_validation import (
-    PROPOSAL_SCHEMA,
+from modules.vehicle_ai.agent.dialogue_source import (
     ordinal_number,
     strip_terminal_punctuation,
+)
+from modules.vehicle_ai.agent.dialogue_validation import (
+    PROPOSAL_SCHEMA,
     validate_proposal,
 )
 
@@ -50,8 +52,16 @@ def _rule_proposal(text: str) -> dict | None:
         match = selected or asked
         if not match:
             return None
-        intent = DialogueIntent.SELECT.value if selected else DialogueIntent.ASK_CANDIDATE.value
-        reference = {"index": ordinal_number(match.group(1)), "name": None, "evidence": source}
+        intent = (
+            DialogueIntent.SELECT.value
+            if selected
+            else DialogueIntent.ASK_CANDIDATE.value
+        )
+        reference = {
+            "index": ordinal_number(match.group(1)),
+            "name": None,
+            "evidence": source,
+        }
     return {
         "intent": intent,
         "changes": [],
@@ -87,7 +97,11 @@ def _safe_summary(summary: dict) -> dict:
                 constraints[key] = item
     raw_unresolved = summary.get("unresolved_constraints")
     unresolved = (
-        [item for value in raw_unresolved if (item := _safe_constraint(value, unresolved=True))]
+        [
+            item
+            for value in raw_unresolved
+            if (item := _safe_constraint(value, unresolved=True))
+        ]
         if type(raw_unresolved) is list
         else []
     )
@@ -111,11 +125,15 @@ def _safe_summary(summary: dict) -> dict:
                 break
             candidates.append({"index": index, "name": name, "aliases": list(aliases)})
     goal, status, revision = (
-        summary.get("goal"), summary.get("status"), summary.get("revision")
+        summary.get("goal"),
+        summary.get("status"),
+        summary.get("revision"),
     )
     return {
         "goal": goal if type(goal) is str else "",
-        "status": status if type(status) is str and status in _TASK_STATUSES else "IDLE",
+        "status": status
+        if type(status) is str and status in _TASK_STATUSES
+        else "IDLE",
         "revision": revision if type(revision) is int and revision >= 0 else 0,
         "constraints": constraints,
         "unresolved_constraints": unresolved,
@@ -149,14 +167,22 @@ def _messages(text: str, summary: dict) -> list[dict[str, str]]:
         {
             "role": "user",
             "content": json.dumps(
-                {"summary": _safe_summary(summary), "current_text": text}, ensure_ascii=False
+                {"summary": _safe_summary(summary), "current_text": text},
+                ensure_ascii=False,
             ),
         },
     ]
 
 
-def _result(proposal: dict, valid: bool, reason: str | None, source: str, started: float,
-            usage: dict | None = None, response_model: str | None = None) -> Interpretation:
+def _result(
+    proposal: dict,
+    valid: bool,
+    reason: str | None,
+    source: str,
+    started: float,
+    usage: dict | None = None,
+    response_model: str | None = None,
+) -> Interpretation:
     return Interpretation(
         proposal,
         valid,
@@ -168,8 +194,9 @@ def _result(proposal: dict, valid: bool, reason: str | None, source: str, starte
     )
 
 
-def interpret_turn(llm, text: str, summary: dict, budget: TurnBudget, *,
-                   timeout_seconds: float = 15.0) -> Interpretation:
+def interpret_turn(
+    llm, text: str, summary: dict, budget: TurnBudget, *, timeout_seconds: float = 15.0
+) -> Interpretation:
     started = time.perf_counter()
     rule = _rule_proposal(text)
     if rule is not None:
@@ -182,11 +209,23 @@ def interpret_turn(llm, text: str, summary: dict, budget: TurnBudget, *,
         response = llm.chat_with_timeout(
             messages, tools=[], timeout_seconds=min(timeout_seconds, remaining)
         )
-        usage = dict(response.usage) if type(getattr(response, "usage", None)) is dict else None
+        usage = (
+            dict(response.usage)
+            if type(getattr(response, "usage", None)) is dict
+            else None
+        )
         response_model = getattr(response, "response_model", None)
         budget.remaining()
     except BudgetExceeded as exc:
-        return _result({}, False, str(exc) or "BUDGET_EXCEEDED", "model", started, usage, response_model)
+        return _result(
+            {},
+            False,
+            str(exc) or "BUDGET_EXCEEDED",
+            "model",
+            started,
+            usage,
+            response_model,
+        )
     except Exception as exc:
         if "timeout" in type(exc).__name__.lower() or "timeout" in str(exc).lower():
             reason = "INTERPRETER_TIMEOUT"
@@ -194,13 +233,21 @@ def interpret_turn(llm, text: str, summary: dict, budget: TurnBudget, *,
             reason = "INTERPRETER_ERROR"
         return _result({}, False, reason, "model", started, usage, response_model)
     if getattr(response, "tool_calls", None):
-        return _result({}, False, "INTERPRETER_TOOL_CALL", "model", started, usage, response_model)
+        return _result(
+            {}, False, "INTERPRETER_TOOL_CALL", "model", started, usage, response_model
+        )
     try:
         raw = json.loads(getattr(response, "content", None) or "")
         candidate = raw if type(raw) is dict else {}
         error = validate_proposal(raw, text)
     except (json.JSONDecodeError, TypeError, ValueError):
-        return _result({}, False, "INVALID_PROPOSAL", "model", started, usage, response_model)
+        return _result(
+            {}, False, "INVALID_PROPOSAL", "model", started, usage, response_model
+        )
     except Exception:
-        return _result({}, False, "INVALID_PROPOSAL", "model", started, usage, response_model)
-    return _result(candidate, error is None, error, "model", started, usage, response_model)
+        return _result(
+            {}, False, "INVALID_PROPOSAL", "model", started, usage, response_model
+        )
+    return _result(
+        candidate, error is None, error, "model", started, usage, response_model
+    )

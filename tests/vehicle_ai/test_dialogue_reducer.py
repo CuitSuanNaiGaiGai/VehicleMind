@@ -230,7 +230,9 @@ def test_updates_resume_and_selection_cannot_revive_terminal_tasks():
 
 
 def test_side_question_preserves_business_state():
-    task = AgentTask(goal="找服务区", status=TaskStatus.AWAITING_CONFIRMATION, revision=2)
+    task = AgentTask(
+        goal="找服务区", status=TaskStatus.AWAITING_CONFIRMATION, revision=2
+    )
     task.constraints["preferred_area"] = ConstraintValue("西湖", 1, "西湖附近")
     task.pending_action = {"action_id": "opaque-action", "kind": "navigation"}
     before = deepcopy(task.to_dict())
@@ -284,7 +286,10 @@ def test_conflicting_changes_and_selection_with_changes_are_rejected_as_a_group(
 
 
 def test_selection_and_candidate_question_preserve_user_reference():
-    for intent, operation in (("SELECT", "select"), ("ASK_CANDIDATE", "candidate_answer")):
+    for intent, operation in (
+        ("SELECT", "select"),
+        ("ASK_CANDIDATE", "candidate_answer"),
+    ):
         reference = {"index": 2, "name": None, "evidence": "第2个"}
         task = AgentTask(status=TaskStatus.RUNNING)
         decision = reduce_dialogue(

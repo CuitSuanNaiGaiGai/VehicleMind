@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from modules.vehicle_ai.agent.budget import TurnBudget
 from modules.vehicle_ai.agent.dialogue_interpreter import (
     DialogueIntent,
@@ -96,6 +98,8 @@ def test_kilometers_and_meters_normalize_to_the_same_distance():
         ("15公里以内", 15.0),
         ("99公里以内", 99.0),
         ("1.5公里以内", 1.5),
+        ("15.5公里以内", 15.5),
+        ("１５公里以内", 15.0),
         ("15000米以内", 15.0),
     ):
         item = proposal(
@@ -160,6 +164,16 @@ def test_distance_source_value_must_match_even_when_the_quote_is_present():
         evidence="15公里以内",
     )
     assert validate_proposal(item, "15公里以内") == "SOURCE_VALUE_MISMATCH"
+
+
+def test_distance_evidence_must_cover_the_complete_number_and_unit():
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", 15.0, "以内")],
+        evidence="15公里以内",
+    )
+
+    assert validate_proposal(item, "15公里以内") == "SOURCE_EVIDENCE_MISMATCH"
 
 
 def test_ambiguous_distance_is_not_resolved_by_picking_one_value():
@@ -246,6 +260,8 @@ def test_remove_must_be_affirmative_in_the_full_source_not_just_its_quote():
         ("不要放弃按摩椅", "放弃按摩椅", "unsupported", "按摩椅"),
         ("并非要取消区域偏好", "取消区域偏好", "preferred_area", None),
         ("如果需要放弃按摩椅", "放弃按摩椅", "unsupported", "按摩椅"),
+        ("先别取消距离限制", "取消距离限制", "max_distance_km", None),
+        ("放弃按摩椅吗", "放弃按摩椅", "unsupported", "按摩椅"),
         ("按摩椅要不要放弃", "按摩椅要不要放弃", "unsupported", "按摩椅"),
     ]
     for text, evidence, field, value in cases:
@@ -254,6 +270,130 @@ def test_remove_must_be_affirmative_in_the_full_source_not_just_its_quote():
             [change(field, value, evidence, "REMOVE")],
         )
         assert validate_proposal(item, text) == "SOURCE_OPERATION_MISMATCH"
+
+
+@pytest.mark.parametrize("text", ("按摩椅，别放弃", "如果没有合适的，就放弃按摩椅"))
+def test_remove_does_not_split_negation_or_condition_scope_at_commas(text):
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("unsupported", "按摩椅", text, "REMOVE")],
+        evidence=text,
+    )
+    assert validate_proposal(item, text) == "SOURCE_OPERATION_MISMATCH"
+
+
+def test_remove_accepts_only_documented_full_sentence_forms():
+    simple = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("unsupported", "按摩椅", "放弃按摩椅", "REMOVE")],
+        evidence="放弃按摩椅",
+    )
+    please = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", None, "请取消距离限制", "REMOVE")],
+        evidence="请取消距离限制",
+    )
+    clear_all = proposal(
+        "UPDATE_CONSTRAINTS",
+        [
+            change(
+                "unsupported",
+                "*",
+                "按已支持条件继续，放弃其他要求",
+                "REMOVE",
+            )
+        ],
+        evidence="按已支持条件继续，放弃其他要求",
+    )
+    retain_name_preference = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", None, "取消距离限制", "REMOVE")],
+        evidence="取消距离限制，仍保留西湖偏好",
+    )
+    replace_with_distance = proposal(
+        "UPDATE_CONSTRAINTS",
+        [
+            change("unsupported", "按摩椅", "放弃按摩椅", "REMOVE"),
+            change("max_distance_km", 15.0, "15公里以内"),
+        ],
+        evidence="放弃按摩椅，按15公里以内继续",
+    )
+
+    assert validate_proposal(simple, "放弃按摩椅") is None
+    assert validate_proposal(please, "请取消距离限制") is None
+    assert validate_proposal(clear_all, "按已支持条件继续，放弃其他要求") is None
+    assert (
+        validate_proposal(retain_name_preference, "取消距离限制，仍保留西湖偏好")
+        is None
+    )
+    assert (
+        validate_proposal(replace_with_distance, "放弃按摩椅，按15公里以内继续") is None
+    )
+
+
+@pytest.mark.parametrize("text", ("先取消距离限制", "取消距离限制然后搜索"))
+def test_remove_rejects_unconsumed_source_prefix_and_suffix(text):
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", None, text, "REMOVE")],
+        evidence=text,
+    )
+
+    assert validate_proposal(item, text) == "SOURCE_OPERATION_MISMATCH"
+
+
+def test_distance_continuation_after_removal_requires_matching_set_change():
+    text = "放弃按摩椅，按15公里以内继续"
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("unsupported", "按摩椅", "放弃按摩椅", "REMOVE")],
+        evidence=text,
+    )
+
+    assert validate_proposal(item, text) == "SOURCE_OPERATION_MISMATCH"
+
+
+@pytest.mark.parametrize(
+    "text,suffix_value",
+    [("十五点五公里以内", 5.0), ("－15公里以内", 15.0)],
+)
+def test_distance_parser_rejects_chinese_decimal_and_full_width_negative_suffixes(
+    text, suffix_value
+):
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", suffix_value, text)],
+        evidence=text,
+    )
+    assert validate_proposal(item, text) == "INVALID_DISTANCE"
+
+
+@pytest.mark.parametrize(
+    "text,suffix_value",
+    [
+        ("一百五十公里以内", 50.0),
+        ("1 5公里以内", 5.0),
+        ("−15公里以内", 15.0),
+    ],
+)
+def test_distance_parser_rejects_whole_unsupported_numeric_tokens(text, suffix_value):
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", suffix_value, text)],
+        evidence=text,
+    )
+    assert validate_proposal(item, text) == "INVALID_DISTANCE"
+
+
+def test_distance_parser_rejects_multiple_values_within_one_unit_phrase():
+    text = "15或10公里以内"
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", 10.0, text)],
+        evidence=text,
+    )
+
+    assert validate_proposal(item, text) == "AMBIGUOUS_VALUE"
 
 
 def test_extra_model_tool_and_authorization_fields_are_rejected():
@@ -288,9 +428,7 @@ def test_nested_schema_rejects_missing_keys_extra_keys_and_non_exact_types():
         "UPDATE_CONSTRAINTS",
         [{**change("max_distance_km", 15.0, "15公里"), "tool": "search"}],
     )
-    invalid_enum = proposal(
-        "UPDATE_CONSTRAINTS", [change("poi_id", "poi-1", "poi-1")]
-    )
+    invalid_enum = proposal("UPDATE_CONSTRAINTS", [change("poi_id", "poi-1", "poi-1")])
     bad_index = proposal(
         "SELECT",
         reference={"index": True, "name": None, "evidence": "第1个"},
@@ -359,9 +497,7 @@ def test_interpreter_does_not_forward_ids_history_or_authority_from_summary():
             }
         },
         "unresolved_constraints": [],
-        "candidates": [
-            {"index": 1, "name": "西湖服务区", "aliases": ["西湖服务区"]}
-        ],
+        "candidates": [{"index": 1, "name": "西湖服务区", "aliases": ["西湖服务区"]}],
         "task_id": "private-task-id",
         "trace": ["private history"],
         "pending_action_id": "private-action-id",
@@ -373,7 +509,15 @@ def test_interpreter_does_not_forward_ids_history_or_authority_from_summary():
     safe_summary = json.loads(request[1]["content"])["summary"]
 
     assert result.valid
-    assert all(secret not in prompt for secret in ("private-task-id", "private history", "private-action-id", "not for model"))
+    assert all(
+        secret not in prompt
+        for secret in (
+            "private-task-id",
+            "private history",
+            "private-action-id",
+            "not for model",
+        )
+    )
     assert set(safe_summary) == {
         "goal",
         "status",
@@ -418,7 +562,9 @@ def test_deadline_is_checked_after_the_single_response_and_metadata_is_kept():
 
     class LateClient(Client):
         def chat_with_timeout(self, messages, tools=None, *, timeout_seconds):
-            response = super().chat_with_timeout(messages, tools, timeout_seconds=timeout_seconds)
+            response = super().chat_with_timeout(
+                messages, tools, timeout_seconds=timeout_seconds
+            )
             now[0] = 2.0
             return response
 

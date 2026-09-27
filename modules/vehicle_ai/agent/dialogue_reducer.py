@@ -19,7 +19,12 @@ class DialogueDecision:
     changed: bool = False
 
 
-_TERMINAL = {TaskStatus.IDLE, TaskStatus.CANCELLED, TaskStatus.COMPLETED, TaskStatus.FAILED}
+_TERMINAL = {
+    TaskStatus.IDLE,
+    TaskStatus.CANCELLED,
+    TaskStatus.COMPLETED,
+    TaskStatus.FAILED,
+}
 
 
 def _copy_state(task: AgentTask) -> tuple[dict, list]:
@@ -36,9 +41,11 @@ def _conflicting_changes(intent: str, changes: list[dict]) -> bool:
         signatures = {(item["op"], item["value"]) for item in group}
         if field != "unsupported" and len(signatures) > 1:
             return True
-        if field == "unsupported" and any(
-            (item["op"] == "REMOVE" and item["value"] == "*") for item in group
-        ) and len(group) > 1:
+        if (
+            field == "unsupported"
+            and any((item["op"] == "REMOVE" and item["value"] == "*") for item in group)
+            and len(group) > 1
+        ):
             return True
         if field == "unsupported" and any(
             item["op"] == "SET" and ("REMOVE", item["value"]) in signatures
@@ -48,7 +55,9 @@ def _conflicting_changes(intent: str, changes: list[dict]) -> bool:
     return False
 
 
-def _apply_changes(constraints: dict, unresolved: list, changes: list[dict], turn_id: int) -> bool:
+def _apply_changes(
+    constraints: dict, unresolved: list, changes: list[dict], turn_id: int
+) -> bool:
     changed = False
     for item in changes:
         field, op, value = item["field"], item["op"], item["value"]
@@ -59,7 +68,9 @@ def _apply_changes(constraints: dict, unresolved: list, changes: list[dict], tur
                     changed = True
             elif field not in constraints or constraints[field].value != value:
                 stored_value = float(value) if field == "max_distance_km" else value
-                constraints[field] = ConstraintValue(stored_value, turn_id, item["evidence"])
+                constraints[field] = ConstraintValue(
+                    stored_value, turn_id, item["evidence"]
+                )
                 changed = True
         elif op == "SET":
             if not any(current.value == value for current in unresolved):
@@ -90,30 +101,63 @@ def _message(reason: str, unresolved: list[ConstraintValue], proposal: dict) -> 
     return proposal.get("clarification_reason") or "我不确定你的意思，请再说明一次。"
 
 
-def _decision(task: AgentTask, operation: str, reason: str | None, goal: str,
-              constraints: dict, unresolved: list, revision: int, reference: dict | None,
-              clarification: str | None, changed: bool = False) -> DialogueDecision:
+def _decision(
+    task: AgentTask,
+    operation: str,
+    reason: str | None,
+    goal: str,
+    constraints: dict,
+    unresolved: list,
+    revision: int,
+    reference: dict | None,
+    clarification: str | None,
+    changed: bool = False,
+) -> DialogueDecision:
     return DialogueDecision(
-        operation, reason, goal, dict(constraints), list(unresolved), revision,
-        dict(reference) if reference is not None else None, clarification, changed
+        operation,
+        reason,
+        goal,
+        dict(constraints),
+        list(unresolved),
+        revision,
+        dict(reference) if reference is not None else None,
+        clarification,
+        changed,
     )
 
 
-def _clarify(task: AgentTask, reason: str, proposal: dict, *, goal: str | None = None,
-             constraints: dict | None = None, unresolved: list | None = None,
-             revision: int | None = None, changed: bool = False) -> DialogueDecision:
+def _clarify(
+    task: AgentTask,
+    reason: str,
+    proposal: dict,
+    *,
+    goal: str | None = None,
+    constraints: dict | None = None,
+    unresolved: list | None = None,
+    revision: int | None = None,
+    changed: bool = False,
+) -> DialogueDecision:
     current_constraints, current_unresolved = _copy_state(task)
     constraints = current_constraints if constraints is None else constraints
     unresolved = current_unresolved if unresolved is None else unresolved
     message = _message(reason, unresolved, proposal)
     return _decision(
-        task, "clarify", reason, task.goal if goal is None else goal, constraints,
-        unresolved, task.revision if revision is None else revision, None, message, changed
+        task,
+        "clarify",
+        reason,
+        task.goal if goal is None else goal,
+        constraints,
+        unresolved,
+        task.revision if revision is None else revision,
+        None,
+        message,
+        changed,
     )
 
 
-def reduce_dialogue(task: AgentTask, proposal: dict, *, turn_id: int,
-                    max_revisions: int = 3) -> DialogueDecision:
+def reduce_dialogue(
+    task: AgentTask, proposal: dict, *, turn_id: int, max_revisions: int = 3
+) -> DialogueDecision:
     """Return a proposed task state without mutating the input task."""
     intent = proposal["intent"]
     changes = proposal["changes"]
@@ -123,27 +167,67 @@ def reduce_dialogue(task: AgentTask, proposal: dict, *, turn_id: int,
         return _clarify(task, "AMBIGUOUS_REQUEST", proposal)
     if intent == "SIDE_QUESTION":
         constraints, unresolved = _copy_state(task)
-        return _decision(task, "side_question", None, task.goal, constraints, unresolved,
-                         task.revision, None, None)
+        return _decision(
+            task,
+            "side_question",
+            None,
+            task.goal,
+            constraints,
+            unresolved,
+            task.revision,
+            None,
+            None,
+        )
     if intent == "CANCEL":
         constraints, unresolved = _copy_state(task)
-        return _decision(task, "cancel", None, task.goal, constraints, unresolved,
-                         task.revision, None, None)
-    if task.status in _TERMINAL and intent in {"UPDATE_CONSTRAINTS", "RESUME", "SELECT"}:
+        return _decision(
+            task,
+            "cancel",
+            None,
+            task.goal,
+            constraints,
+            unresolved,
+            task.revision,
+            None,
+            None,
+        )
+    if task.status in _TERMINAL and intent in {
+        "UPDATE_CONSTRAINTS",
+        "RESUME",
+        "SELECT",
+    }:
         return _clarify(task, "NEW_TASK_REQUIRED", proposal)
     if intent == "RESUME":
         constraints, unresolved = _copy_state(task)
         if unresolved:
             return _clarify(task, "UNSUPPORTED_CONSTRAINT", proposal)
-        return _decision(task, "resume", None, task.goal, constraints, unresolved,
-                         task.revision, None, None)
+        return _decision(
+            task,
+            "resume",
+            None,
+            task.goal,
+            constraints,
+            unresolved,
+            task.revision,
+            None,
+            None,
+        )
     if intent in {"SELECT", "ASK_CANDIDATE"}:
         constraints, unresolved = _copy_state(task)
         if unresolved:
             return _clarify(task, "UNSUPPORTED_CONSTRAINT", proposal)
         operation = "select" if intent == "SELECT" else "candidate_answer"
-        return _decision(task, operation, None, task.goal, constraints, unresolved,
-                         task.revision, proposal["reference"], None)
+        return _decision(
+            task,
+            operation,
+            None,
+            task.goal,
+            constraints,
+            unresolved,
+            task.revision,
+            proposal["reference"],
+            None,
+        )
     if intent not in {"START", "UPDATE_CONSTRAINTS"}:
         return _clarify(task, "AMBIGUOUS_REQUEST", proposal)
 
@@ -161,8 +245,25 @@ def reduce_dialogue(task: AgentTask, proposal: dict, *, turn_id: int,
     revision = 0 if is_new else task.revision + int(changed)
     operation = "start" if is_new else ("search" if changed else "resume")
     if unresolved:
-        return _clarify(task, "UNSUPPORTED_CONSTRAINT", proposal, goal=goal,
-                        constraints=constraints, unresolved=unresolved, revision=revision,
-                        changed=changed)
-    return _decision(task, operation, None, goal, constraints, unresolved, revision,
-                     None, None, changed)
+        return _clarify(
+            task,
+            "UNSUPPORTED_CONSTRAINT",
+            proposal,
+            goal=goal,
+            constraints=constraints,
+            unresolved=unresolved,
+            revision=revision,
+            changed=changed,
+        )
+    return _decision(
+        task,
+        operation,
+        None,
+        goal,
+        constraints,
+        unresolved,
+        revision,
+        None,
+        None,
+        changed,
+    )
