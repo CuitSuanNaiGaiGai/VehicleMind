@@ -30,7 +30,7 @@
 <a id="overview"></a>
 ## ✨ 项目简介
 
-VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工作流。视频感知把舱内驾驶员状态与舱外道路画面转换为**语义观测**；Agent 消费这些观测、车辆状态和用户请求，形成上下文并处理风险事件、信息查询与车机动作。敏感写操作会暂停并等待用户批准；批准后工作流恢复，再由 ToolRegistry 执行授权检查与工具调用。
+VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工作流。视频感知把舱内驾驶员状态与舱外道路画面转换为**语义观测**；Agent 消费这些观测、车辆状态和用户请求，形成上下文并处理风险事件、信息查询与车机动作。LangGraph `StateGraph` 管理请求、事件、审批暂停与恢复；敏感写操作形成待确认动作，恢复后再由 ToolRegistry 检查授权并执行工具。
 
 **两条输入路径、同一套 Agent 工作流：**真实视频路径使用本地离线视频和模型权重生成语义观测；录制语义观测回放读取场景中的观测，以确定性脚本模型无密钥复现 Agent 流程。两条路径均从统一上下文进入 Agent 决策与工具执行，见[系统架构](#architecture)。
 
@@ -120,7 +120,7 @@ flowchart LR
 
 | Agent 主线 | 技术与项目内工作 | 实现与设计 |
 |---|---|---|
-| **上下文与 Runtime** | 语义观测和车辆状态汇入统一上下文；LangGraph `StateGraph` 编排用户/事件双入口，连接 Qwen / GLM API 与工具调用 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [Graph Runtime](modules/vehicle_ai/workflow/runtime.py) · [设计指南](docs/guide/langgraph-stateful-agent.md) |
+| **上下文与 Runtime** | 语义观测和车辆状态汇入统一上下文；LangGraph `StateGraph` 编排用户/事件双入口，VehicleAgent 在有界模型/工具循环中连接 Qwen / GLM API 并选择工具 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [Graph Runtime](modules/vehicle_ai/workflow/runtime.py) · [VehicleAgent](modules/vehicle_ai/agent/vehicle_agent.py) · [设计指南](docs/guide/langgraph-stateful-agent.md) |
 | **执行时授权** | ToolRegistry 执行策略检查；敏感动作形成 PendingAction，经 `interrupt()` 等待批准，再以 `Command(resume=...)` 恢复并执行 | [工具注册表](modules/vehicle_ai/tools/registry.py) · [确认设计](docs/agent_pending_actions.md) |
 | **有界计划与恢复** | 搜索、候选核验、确认、模拟导航与状态回读；最多 9 步 / 1 次恢复，替代候选需要重新确认 | [计划与恢复指南](docs/guide/agent-plan-recovery.md) |
 | **结构化 Trace** | 关联 `thread_id` / `task_id`，记录图节点、模型/工具调用、策略、审批、恢复、状态和耗时；支持可选导出 backend | [Trace](modules/vehicle_ai/observability/trace.py) · [Runtime 集成](modules/vehicle_ai/observability/runtime.py) |

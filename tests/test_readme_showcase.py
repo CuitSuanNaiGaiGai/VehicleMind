@@ -8,6 +8,7 @@ README = ROOT / "README.md"
 
 def test_showcase_has_scannable_chinese_sections() -> None:
     text = README.read_text(encoding="utf-8")
+    assert "# 🚗 VehicleMind：基于 LangGraph 的多模态智能座舱 Agent 系统" in text
     for heading in (
         "## ✨ 项目简介",
         "## 🎬 演示效果",
@@ -20,48 +21,57 @@ def test_showcase_has_scannable_chinese_sections() -> None:
         assert heading in text
     assert "```mermaid" in text
     assert "候选 pilot" in text
-    assert "正式成功率" in text
+    assert "Task Success" in text
+    assert "阶段记录" in text
 
 
 def test_showcase_first_screen_tells_a_verifiable_business_story() -> None:
     text = README.read_text(encoding="utf-8")
-    first_screen = text.split('<a id="demo"></a>', 1)[0]
+    first_screen = text.split('<a id="capabilities"></a>', 1)[0]
     for detail in (
-        "疲劳驾驶",
-        "搜索服务区",
-        "用户确认",
-        "模拟导航",
-        "真实视频感知",
+        "基于 LangGraph 的多模态智能座舱 Agent 系统",
+        "LangGraph `StateGraph`",
+        "ToolRegistry",
+        "PendingAction",
+        "真实视频路径",
         "录制语义观测回放",
-        "assets/scenarios/drowsy_rest_stop.yaml",
+        "结构化 trace",
         'href="#demo"',
         'href="#architecture"',
         'href="#evidence"',
     ):
         assert detail in first_screen, detail
-    assert "截图来自录制语义观测回放" in text
-    assert "GIF 来自独立的真实视频感知演示" in text
+    demo = text.split('<a id="demo"></a>', 1)[1].split('<a id="capabilities"></a>', 1)[
+        0
+    ]
+    for detail in (
+        "疲劳风险",
+        "搜索服务区",
+        "用户批准",
+        "模拟导航",
+        "assets/scenarios/drowsy_rest_stop.yaml",
+    ):
+        assert detail in demo, detail
+    assert "截图展示录制语义观测驱动的 Agent 回放" in demo
+    assert "独立运行的舱内驾驶员状态感知与舱外道路感知" in demo
 
 
 def test_showcase_maps_business_modules_to_implementation_and_sources() -> None:
     text = README.read_text(encoding="utf-8")
     stack = text.split('<a id="stack"></a>', 1)[1].split('<a id="evidence"></a>', 1)[0]
-    assert (
-        "| 业务模块 | 输入 → 输出 / 业务作用 | 技术与项目内工作 | 可核查实现 |" in stack
-    )
+    assert "| Agent 主线 | 技术与项目内工作 | 实现与设计 |" in stack
     for module in (
-        "舱内感知",
-        "舱外感知",
-        "统一上下文与事件",
-        "Agent 编排",
-        "工具确认门",
-        "回放与验证",
+        "上下文与 Runtime",
+        "执行时授权",
+        "有界计划与恢复",
+        "结构化 Trace",
+        "评测与回放",
     ):
-        assert f"| **{module}** |" in stack, module
+        assert f"**{module}**" in stack, module
     for technology in ("OpenCV", "MediaPipe", "ONNX Runtime", "YOLOPv2", "Qwen", "GLM"):
         assert technology in stack, technology
-    assert "第三方预训练" in stack
-    assert "项目内实现" in stack
+    assert "支持输入" in stack
+    assert "SQLite 行程记忆" in stack
     assert "modules/vehicle_ai/agent/vehicle_agent.py" in stack
     assert "modules/vehicle_ai/tools/registry.py" in stack
 
@@ -76,16 +86,18 @@ def test_showcase_evidence_has_success_refusal_and_bounded_agent_metrics() -> No
         "assets/scenarios/drowsy_rest_stop_cancel.yaml",
         "assets/scenarios/normal_driver_music.yaml",
         "scenarios/agent_eval/golden/cases/R03.yaml",
-        "82/120",
-        "85/120",
+        "80/120",
+        "90/120",
         "40 条冻结场景",
         "每条重复 3 次",
-        "80 条开发回归变体不计入",
-        "AI 自审",
+        "80 条开发回归变体另行记录",
+        "Codex AI 自审",
         "在线 AI 辅助",
         "合成语义观测",
         "模拟车机",
         "docs/reports/2026-09-24-online-agent-internal-evaluation.md",
+        "82/120",
+        "85/120",
     ):
         assert detail in evidence, detail
 
@@ -99,8 +111,8 @@ def test_quickstart_documents_all_three_offline_showcase_scenarios() -> None:
         "assets/scenarios/drowsy_rest_stop_cancel.yaml",
     ):
         assert scenario in quickstart
-    assert "三条回放都使用" in quickstart
-    assert "不调用在线模型" in quickstart
+    assert "确定性脚本模型" in quickstart
+    assert "依赖安装完成后即可离线运行" in quickstart
 
 
 def test_showcase_images_exist_and_keep_cabin_road_gifs() -> None:
