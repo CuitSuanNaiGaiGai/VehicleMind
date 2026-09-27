@@ -129,7 +129,7 @@ def claim_model(self) -> float:
 
 - `DialogueIntent(StrEnum)` 精确八值 `START UPDATE_CONSTRAINTS SELECT ASK_CANDIDATE SIDE_QUESTION RESUME CANCEL UNCLEAR`；可置于 `dialogue_state.py`。
 - `Interpretation` 不含授权：`proposal: dict`、`valid: bool`、`reason: str | None`、`source: str`（`rule`/`model`）、`elapsed_ms: float`、`usage: dict | None`、`response_model: str | None`。定义于解释器。
-- `interpret_turn(llm, text: str, summary: dict, budget: TurnBudget, *, timeout_seconds: float=15.0) -> Interpretation`。`summary` 仅含任务 goal/status/revision、支持/未解决条件、最后展示的编号和名称/别名；没有 trace/history、task ID、pending action ID 或授权。
+- `interpret_turn(llm, text: str, summary: dict, budget: TurnBudget, *, timeout_seconds: float=15.0) -> Interpretation`。`summary` 精确六键：`goal: str`、`status: str`（现有 TaskStatus.value）、`revision: int`、`constraints: dict[str, dict]`、`unresolved_constraints: list[dict]`、`candidates: list[dict]`。constraints 只含已接受的支持字段，每个值精确 `{value: float | str, source_turn_id: int, evidence: str}`；unresolved_constraints 每项同结构、value 为未支持需求原文。candidates 每项精确 `{index: int, name: str, aliases: list[str]}`，index 从1起且按最后实际展示映射顺序连续编号，name 为候选中文展示名，aliases 仅取该实际候选的原有字符串别名。无有效且已展示的候选时 candidates=[]；新任务为空 goal、IDLE、revision=0、空条件容器。Task2 只接受该契约，不添加字段别名或兼容推断，不向模型发送额外键、trace/history、POI/task/action ID 或授权。
 - `validate_proposal(proposal: dict, text: str) -> str | None` 返回稳定错误码或 None；任何 dict 外对象、额外键、互斥组合、原文/数值不一致均失败。
 - `DialogueDecision` 定义于 reducer：`operation: str`、`reason: str | None`、`goal: str`、`constraints: dict[str, ConstraintValue]`、`unresolved_constraints: list[ConstraintValue]`、`revision: int`、`reference: dict | None`、`clarification: str | None`、`changed: bool=False`。goal 使用本轮 START evidence 或原 task.goal；单纯条件修改不替换业务目标。
 - `reduce_dialogue(task: AgentTask, proposal: dict, *, turn_id: int, max_revisions: int=3) -> DialogueDecision`。operation 仅 `start search select candidate_answer side_question resume cancel clarify`。只返回决策，不改变传入 task。
@@ -303,7 +303,7 @@ def test_select_second_requires_one_explicit_confirmation():
 
 确认入口在旧 `begin_confirmation` 之前调用候选模块的 `validate_pending_candidate(agent, action_id: str) -> bool`：仅对启用 B1 的导航 pending，检验快照/版本/选择 ID/pending metadata；失败清 store/同步快照/转 AWAITING_INPUT，并返回 `ToolResult(False, "候选已失效，请重新查询后选择。", error="INVALID_CONFIRMATION")`。通过后仍交原 `confirm_pending()` 完成签发、执行、验证。旧 action ID 不因当前另一个有效 pending 而误清新动作；ID 不匹配直接交原 invalid confirmation 路径。取消/拒绝终止任务后旧候选即使残留报告快照也无执行资格。
 
-- [ ] **Step 4 — 实现协调器入口。** chat 先 strip；空输入不增轮。每个 B1 非空回合 `next_turn()` 并设置 current_user_intent、重置 music 提示；建立一次 `TurnBudget(min(90, agent.turn_timeout_seconds), min(10, agent.max_tool_calls), agent.budget_clock, max_model_calls=min(5, agent.max_tool_rounds))`。独立处理自然过期，再记录 user_request。解释→验证→reducer→一次提交；无效解释记录澄清回复和单次问答错误，不写 task。业务操作按下表接入：
+- [ ] **Step 4 — 实现协调器入口。** chat 先 strip；空输入不增轮。每个 B1 非空回合 `next_turn()` 并设置 current_user_intent、重置 music 提示；建立一次 `TurnBudget(min(90, agent.turn_timeout_seconds), min(10, agent.max_tool_calls), agent.budget_clock, max_model_calls=min(5, agent.max_tool_rounds))`。独立处理自然过期，再记录 user_request。coordinator 按 Task2 的精确六键契约构造 summary：条件来源用 ConstraintValue 的三个字段；候选须先通过 candidate_is_current，再按 snapshot.presented_poi_ids 回查 TaskPlan.candidates，以 enumerate(..., start=1) 生成 index，以 plan_flow.display_name(candidate) 生成 name，并复制其字符串 aliases。不得传完整 task.to_dict()/候选dict或额外 ID，不生成别名字段；无有效展示则 candidates=[]。解释→验证→reducer→一次提交；无效解释记录澄清回复和单次问答错误，不写 task。业务操作按下表接入：
 
 | operation | 协调器提交与回复 |
 |---|---|
