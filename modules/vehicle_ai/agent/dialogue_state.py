@@ -1,7 +1,19 @@
 """Small immutable records for state shared across dialogue turns."""
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from uuid import uuid4
+
+
+class DialogueIntent(StrEnum):
+    START = "START"
+    UPDATE_CONSTRAINTS = "UPDATE_CONSTRAINTS"
+    SELECT = "SELECT"
+    ASK_CANDIDATE = "ASK_CANDIDATE"
+    SIDE_QUESTION = "SIDE_QUESTION"
+    RESUME = "RESUME"
+    CANCEL = "CANCEL"
+    UNCLEAR = "UNCLEAR"
 
 
 @dataclass(frozen=True)
