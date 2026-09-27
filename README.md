@@ -1,8 +1,6 @@
 <div align="center">
 
-# 🚗 VehicleMind
-
-### 舱内外感知与车机 Agent 协同原型
+# 🚗 VehicleMind：基于 LangGraph 的多模态智能座舱 Agent 系统
 
 **离线视频感知 · LangGraph Stateful Agent · 风险事件 · Human-in-the-loop · RAG / Memory · 可复现评测**
 
@@ -32,16 +30,16 @@
 <a id="overview"></a>
 ## ✨ 项目简介
 
-**一个具体场景：**驾驶员出现疲劳驾驶迹象，舱内状态与舱外道路观测进入统一上下文；风险事件触发提醒。用户提出休息需求后，Agent 搜索服务区，但只有经过用户确认，才会启动**模拟导航**。[查看可复现场景](assets/scenarios/drowsy_rest_stop.yaml) · [看演示画面](#demo) · [核对结果与边界](#evidence)。这条业务链路展示的是感知结果如何参与 Agent 决策和受控车机动作，不是真实车辆控制。
+VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工作流。视频感知把舱内驾驶员状态与舱外道路画面转换为**语义观测**；Agent 消费这些观测、车辆状态和用户请求，形成上下文并处理风险事件、信息查询与车机动作。敏感写操作会暂停并等待用户批准；批准后工作流恢复，再由 ToolRegistry 执行授权检查与工具调用。
 
-**两条输入路径、同一套下游协同：**真实视频感知使用本地离线视频和模型权重生成观测，适合展示舱内外算法；录制语义观测回放（下称录制观测）直接读取场景内的观测，不运行感知模型，适合无密钥复现“统一上下文 → 风险事件 → Agent 决策 → 用户确认 → 模拟车机动作”。两条路径汇入同一语义上下文，见[系统架构](#architecture)。回放截图不能作为感知精度证据。
+**两条输入路径、同一套 Agent 工作流：**真实视频路径使用本地离线视频和模型权重生成语义观测；录制语义观测回放直接读取场景中的观测，不运行感知模型，可无密钥复现下游 Agent 流程。视频感知提供观测，不代替 Agent 决策；回放截图也不能作为感知精度证据。见[系统架构](#architecture)。
 
 <a id="demo"></a>
 ## 🎬 演示效果
 
-### 一条完整的感知到动作链路
+### 疲劳风险下的休息服务区协助
 
-录制的驾驶员疲劳与道路观测 → 高风险事件 → 用户请求服务区 → Agent 搜索 → 用户确认 → **模拟导航启动**。以下截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成。上方媒体停在较早视频画面（仍显示 NORMAL），下方统一上下文是场景末尾的 DROWSY / HIGH 与导航 ACTIVE；不要把两处当作同一时刻的推理结果。
+舱内外感知产生疲劳与道路语义观测 → Agent 汇总车辆状态并识别高风险事件 → 用户提出休息需求 → Agent 搜索服务区 → 敏感导航写入形成 PendingAction 并暂停 → 用户批准 → 图恢复并由 ToolRegistry 执行 → 返回**模拟导航结果**。以下截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成。上方媒体停在较早视频画面（仍显示 NORMAL），下方统一上下文是场景末尾的 DROWSY / HIGH 与导航 ACTIVE；不要把两处当作同一时刻的推理结果。
 
 <p align="center">
   <a href="assets/demo/vehiclemind_report_full.png"><img src="assets/demo/vehiclemind_report.png" width="95%" alt="VehicleMind 中文离线回放报告，含舱内外画面与最终统一上下文；点击查看完整时间线和断言"/></a>
@@ -56,53 +54,64 @@
   <img src="assets/demo/driving_perception.gif" width="48%" alt="舱外目标、车道与可行驶区域感知演示"/>
 </p>
 
-**Agent Runtime 升级：**在原有 ToolRegistry、PendingAction 和受限 Planner 之上增加 LangGraph `StateGraph`，把用户请求、语义感知事件、敏感动作审批和恢复路径纳入同一可检查点工作流。敏感写操作通过 `interrupt()` 暂停，用户明确批准后用 `Command(resume=...)` 恢复；恢复得到的新候选必须生成新的 PendingAction 并再次审批，不能自动重放写操作。结构化 Agent trace 关联 `thread_id` / `task_id`，记录 graph node、model/tool call、policy、审批、interrupt/resume、recovery、任务状态和耗时；默认保存在进程内，可通过可选 `TraceBackend` 导出，每个 recorder 使用独立的有界后台队列，导出异常或卡住不会中断 Agent 或阻塞其他 runtime。trace 不保存模型提示词/回复正文或工具参数值。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化；详见[LangGraph Runtime 设计](docs/guide/langgraph-stateful-agent.md)。
+**Agent 工程要点**
+
+- **有状态工作流：**用户请求与语义事件进入 LangGraph `StateGraph`，checkpoint 保存可恢复状态；见 [LangGraph Runtime](modules/vehicle_ai/workflow/runtime.py) 和[设计指南](docs/guide/langgraph-stateful-agent.md)。
+- **执行时授权：**敏感写操作先形成 PendingAction 并由 `interrupt()` 暂停；批准后图以 `Command(resume=...)` 继续，ToolRegistry 仍是实际工具执行与策略检查边界；见[工具注册表](modules/vehicle_ai/tools/registry.py)和[确认设计](docs/agent_pending_actions.md)。
+- **有界恢复并重新确认：**失败恢复产生的新候选需要新的 PendingAction 和用户批准，不会自动重放写操作；见[计划与恢复指南](docs/guide/agent-plan-recovery.md)。
+- **关联追踪与评测：**结构化 trace 关联 `thread_id` / `task_id`，记录图节点、模型/工具调用、策略、审批、恢复、状态和耗时，并可附到 trial 结果；见[Trace 实现](modules/vehicle_ai/observability/trace.py)与[评测运行器](modules/vehicle_ai/evaluation/runner.py)。
+
+trace 默认保存在进程内，可通过可选 `TraceBackend` 导出；trace 不保存模型提示词/回复正文或工具参数值。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化。
 
 <a id="capabilities"></a>
 ## 🌟 核心能力
 
 | 能力 | 项目中的实现与可见结果 |
 |---|---|
-| **舱内状态感知** | 面部关键点、眼口状态、PERCLOS、哈欠等时序证据形成驾驶员状态；见[算法说明](docs/cabin_perception.md)与上方 GIF |
-| **舱外道路感知** | 目标、车道和可行驶区域转为结构化观测；支持 YOLOPv2 多任务路径与可选传统车道路径，见[算法说明](docs/road_perception.md) |
-| **统一上下文** | Driver / Road / Vehicle 语义状态集中管理，区分未知、无效和过期观测 |
-| **事件驱动 Stateful Agent** | LangGraph `StateGraph` 接收用户请求或语义感知事件；通过 Checkpoint 保存图状态，敏感动作 `interrupt/resume`，失败恢复后新写操作再次确认；结构化 trace 关联任务、模型、工具策略与延迟 |
-| **受控车机动作** | 搜索、空调、媒体和模拟导航等工具由注册表执行；导航进入待确认状态后才可执行，见[确认设计](docs/agent_pending_actions.md) |
-| **可复现结果** | 离线回放保存配置快照、语义 trace、断言和中文 HTML 报告；在线 Agent 使用 40 条 AI 自审内部基准、80 条开发回归变体和逐 trial 语义审查 |
+| **多模态语义观测** | 舱内驾驶员状态与舱外道路画面经感知适配成为结构化观测；Agent 消费语义观测，不直接把视频帧作为工具动作 |
+| **统一决策上下文** | Driver / Road / Vehicle 语义状态集中管理，区分未知、无效和过期观测，并与用户请求一起提供给 Agent；见[上下文管理](modules/vehicle_ai/context/context_manager.py) |
+| **Stateful Agent 编排** | LangGraph `StateGraph` 连接请求/事件、VehicleAgent、工具策略、审批中断与恢复；见[Graph Runtime](modules/vehicle_ai/workflow/runtime.py) |
+| **受控工具执行** | ToolRegistry 是策略检查和工具调用边界；敏感写操作先形成 PendingAction、暂停等待用户批准，恢复后仍须经过注册表执行；见[工具注册表](modules/vehicle_ai/tools/registry.py)与[确认设计](docs/agent_pending_actions.md) |
+| **支持模块** | 可选 LightRAG 提供知识检索，SQLite 行程记忆提供只读历史事件查询；见[知识工具](modules/vehicle_ai/knowledge/tool.py)与[事件存储](modules/vehicle_ai/memory/event_store.py) |
+| **追踪与评测** | 结构化 trace 关联 Agent 工作流与 trial；离线回放保留配置快照、断言和中文 HTML 报告，见[Trace](modules/vehicle_ai/observability/trace.py)与[评测运行器](modules/vehicle_ai/evaluation/runner.py) |
 
 <a id="architecture"></a>
 ## 🧠 系统架构
 
 ```mermaid
 flowchart LR
-    V[本地离线视频] --> P[舱内 / 舱外感知适配]
-    R[录制语义观测] --> C[统一 Context Manager]
-    P --> C
+    V[本地离线视频] --> P[舱内 / 舱外感知]
+    P -->|语义观测| C[Context Manager]
+    R[录制语义观测] --> C
+    VS[车辆状态] --> C
     C --> E[语义风险事件]
+    C --> G[LangGraph StateGraph]
+    E --> G
     U[用户请求] --> G
-    E --> G[LangGraph StateGraph]
-    C --> G
-    G --> A[VehicleAgent\nContext / RAG / Memory / Plan]
-    A --> T[ToolRegistry + Policy]
+    G --> A[VehicleAgent]
+    A -. 可选知识支持 .-> L[LightRAG]
+    A -. 可选历史支持 .-> M[SQLite 行程记忆]
+    A --> T[ToolRegistry：策略检查与执行边界]
     T --> Q{敏感写操作?}
-    Q -- 否 --> X[模拟车机执行]
+    Q -- 否 --> X[工具执行]
     Q -- 是 --> W[PendingAction]
     W --> I[interrupt + Checkpoint]
     I --> H{用户决定}
-    H -- reject --> Z[取消并结束]
-    H -- approve --> RS[Command resume]
-    RS --> X
+    H -- 拒绝 --> Z[取消并结束]
+    H -- 批准 --> RS[Command resume：图工作流继续]
+    RS --> A
     X --> F{执行结果}
     F -- 成功 --> K[状态回读 / Verify]
     F -- 可恢复失败 --> RC[Recovery Router]
-    RC --> W
+    RC --> A
     F -- 不确定/不可恢复 --> S[安全停止 / Reconcile]
-    G --> O[Graph Trace / Task Trace]
+    G --> O[结构化 Trace]
     T --> O
     K --> O
+    O --> EV[Evaluation / Trial]
 ```
 
-真实视频路径调用本地感知模型；录制观测路径跳过推理，只验证下游协同。两者共用语义上下文与工具边界，但**不能用录制观测回放估计感知准确率**。Agent 可接 Qwen / GLM 在线 API；无网络的演示使用确定性离线 Agent，以保证复现。
+真实视频路径调用本地感知模型并输出语义观测；录制观测路径跳过推理，只验证下游 Agent 协同。用户批准后，图从中断处继续，但实际工具调用仍通过 ToolRegistry 的策略检查与执行边界。两种路径共用语义上下文，但**不能用录制观测回放估计感知准确率**。Agent 可接 Qwen / GLM 在线 API；无网络的演示使用确定性离线 Agent，以保证复现。
 
 <a id="stack"></a>
 ## 🛠️ 技术栈与个人工作
