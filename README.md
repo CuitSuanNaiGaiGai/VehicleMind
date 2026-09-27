@@ -34,8 +34,6 @@
 
 **一个具体场景：**驾驶员出现疲劳驾驶迹象，舱内状态与舱外道路观测进入统一上下文；风险事件触发提醒。用户提出休息需求后，Agent 搜索服务区，但只有经过用户确认，才会启动**模拟导航**。[查看可复现场景](assets/scenarios/drowsy_rest_stop.yaml) · [看演示画面](#demo) · [核对结果与边界](#evidence)。这条业务链路展示的是感知结果如何参与 Agent 决策和受控车机动作，不是真实车辆控制。
 
-**Agent Runtime 升级：**在原有 ToolRegistry、PendingAction 和受限 Planner 之上增加 LangGraph `StateGraph`，把用户请求、语义感知事件、敏感动作审批和恢复路径纳入同一可检查点工作流。敏感写操作通过 `interrupt()` 暂停，用户明确批准后用 `Command(resume=...)` 恢复；恢复得到的新候选必须生成新的 PendingAction 并再次审批，不能自动重放写操作。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化；详见[LangGraph Runtime 设计](docs/guide/langgraph-stateful-agent.md)。
-
 **两条输入路径、同一套下游协同：**真实视频感知使用本地离线视频和模型权重生成观测，适合展示舱内外算法；录制语义观测回放（下称录制观测）直接读取场景内的观测，不运行感知模型，适合无密钥复现“统一上下文 → 风险事件 → Agent 决策 → 用户确认 → 模拟车机动作”。两条路径汇入同一语义上下文，见[系统架构](#architecture)。回放截图不能作为感知精度证据。
 
 <a id="demo"></a>
@@ -57,6 +55,8 @@
   <img src="assets/demo/cabin_demo.gif" width="48%" alt="舱内驾驶员状态感知演示"/>
   <img src="assets/demo/driving_perception.gif" width="48%" alt="舱外目标、车道与可行驶区域感知演示"/>
 </p>
+
+**Agent Runtime 升级：**在原有 ToolRegistry、PendingAction 和受限 Planner 之上增加 LangGraph `StateGraph`，把用户请求、语义感知事件、敏感动作审批和恢复路径纳入同一可检查点工作流。敏感写操作通过 `interrupt()` 暂停，用户明确批准后用 `Command(resume=...)` 恢复；恢复得到的新候选必须生成新的 PendingAction 并再次审批，不能自动重放写操作。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化；详见[LangGraph Runtime 设计](docs/guide/langgraph-stateful-agent.md)。
 
 <a id="capabilities"></a>
 ## 🌟 核心能力
@@ -112,7 +112,7 @@ flowchart LR
 | **舱内感知** | 离线驾驶员视频 → 面部特征、时序疲劳证据和驾驶员风险；为提醒提供状态依据 | OpenCV 处理视频帧、第三方 MediaPipe 提取关键点；项目内实现眼口与头姿特征、PERCLOS/哈欠累计和状态判定，不宣称自研关键点模型 | [感知服务](modules/cabin/perception_service.py) · [算法说明](docs/cabin_perception.md) |
 | **舱外感知** | 离线道路视频 → 目标、车道、可行驶区；为道路上下文提供观测 | 第三方预训练 YOLOPv2 经 ONNX Runtime 推理，CoreML 可用时优先、CPU 回退；项目内实现预处理、后处理及结构化输出，另有 OpenCV 传统车道路径，不宣称自研模型训练 | [道路感知服务](modules/driving/perception_service.py) · [算法说明](docs/road_perception.md) |
 | **统一上下文与事件** | 舱内外语义观测 + 车辆状态 → Driver/Road/Vehicle 上下文与风险事件；隔离低层帧和决策层 | 项目内实现[舱内适配](modules/vehicle_ai/integration/cabin_adapter.py)、[舱外适配](modules/vehicle_ai/integration/driving_adapter.py)、字段契约、质量/过期状态及事件去抖 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [事件检测](modules/vehicle_ai/events/event_detector.py) |
-| **Stateful Agent 编排** | 用户请求 / 语义事件 → Graph State → LLM/工具 → 审批 / 恢复 / 验证 | LangGraph `StateGraph` + Checkpointer；项目内定义用户/事件双入口、条件路由、`interrupt()` 审批、`Command(resume=...)` 恢复；既有 VehicleAgent 保留有界模型/工具循环 | [Graph Runtime](modules/vehicle_ai/workflow/runtime.py) · [Agent](modules/vehicle_ai/agent/vehicle_agent.py) · [设计说明](docs/guide/langgraph-stateful-agent.md) |
+| **Agent 编排** | 用户请求 / 语义事件 → Graph State → LLM/工具 → 审批 / 恢复 / 验证 | LangGraph `StateGraph` + Checkpointer；项目内定义用户/事件双入口、条件路由、`interrupt()` 审批、`Command(resume=...)` 恢复；既有 VehicleAgent 保留有界模型/工具循环 | [Graph Runtime](modules/vehicle_ai/workflow/runtime.py) · [Agent](modules/vehicle_ai/agent/vehicle_agent.py) · [设计说明](docs/guide/langgraph-stateful-agent.md) |
 | **可选知识增强** | 问题 + 有效车况 → 有来源的知识片段 → Agent 引用回答；未知或过期状态不参与查询 | LightRAG 1.5.7；tiktoken `o200k_base` 编码、`text-embedding-v3` / 1024 维；NetworkX 图谱 + NanoVectorDB 余弦检索，以 `mix` 合并实体/关系/文本证据、去重取 Top-5；当前未启用 reranker。项目内实现双 profile 隔离、来源校验与只读取证工具 | [具体技术与指标](docs/guide/rag-agent-technical-details.md) · [运行指南](docs/guide/knowledge-rag-demo.md) · [知识工具](modules/vehicle_ai/knowledge/tool.py) |
 | **行程事件记忆** | 风险、提醒、用户选择与动作结果 → 可按当前行程和时间范围检索的历史证据 | Python `sqlite3` 持久化、事件 ID 去重、按行程隔离；Agent 只读查询，不将旧风险当作当前感知 | [运行指南](docs/guide/trip-memory-demo.md) · [事件存储](modules/vehicle_ai/memory/event_store.py) |
 | **受限计划与恢复** | 休息地点搜索 → 候选核验 → 用户确认 → 模拟导航 → 状态回读；失败时安全停止或提供一个需重新确认的候选 | 项目内有限状态计划，最多 9 步 / 1 次恢复；A4 SQLite 保存 `TASK_STEP`；确定性七场景验收：恢复 **1/1**、安全停止 **4/4**、预算 **7/7**、重复写违规 **0/7** | [运行指南](docs/guide/agent-plan-recovery.md) · [验收报告](docs/reports/2026-09-26-a5-bounded-plan-recovery.md) |
