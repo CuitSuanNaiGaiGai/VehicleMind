@@ -70,7 +70,22 @@
 - [ ] **Step 4: Retain a small set of verified results** with links to the A5/A6 source reports and write one 60–90 second pitch without repetitive disclaimers.
 - [ ] **Step 5: Run `git diff -- docs/interview_story.md`** and check that each numeric claim still matches its linked source report.
 
-## Task 4: Verify and Commit the Documentation Update
+## Task 4: Remove Repeated Defensive Wording from the Homepage
+
+**Files:**
+- Modify: `README.md`
+
+**Interfaces:**
+- Consumes: the approved Agent-focused homepage and its existing demo commands.
+- Produces: concise, factual run-mode descriptions that preserve operating instructions without repeated negation or caveat blocks.
+
+- [ ] **Step 1: Rewrite the input-path and demo captions** as direct descriptions of local-video perception and recorded-observation replay; preserve what each path runs and where it enters the Agent workflow.
+- [ ] **Step 2: State runtime behavior positively and precisely**: name the process-local `InMemorySaver` and optional trace export behavior without contrasting it with a production system.
+- [ ] **Step 3: Tighten explanatory prose around replay and optional modules** while preserving every current run command, target scenario, and guide link. Move detailed perception-audit procedures behind a disclosure block if needed to keep the Agent homepage concise.
+- [ ] **Step 4: Replace the limitations-heavy ending** with a short “运行范围与后续方向” section describing the three project run modes, simulated tool state, and existing roadmap link in plain factual language.
+- [ ] **Step 5: Run `git diff -- README.md`** and confirm only explanatory prose/headings changed; all shell commands, scenario paths, report links, and assets remain present.
+
+## Task 5: Verify and Commit the Documentation Update
 
 **Files:**
 - Review: `README.md`
