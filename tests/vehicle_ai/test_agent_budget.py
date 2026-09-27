@@ -134,3 +134,41 @@ def test_turn_budget_retry_counts_against_total_tool_limit():
 
     with pytest.raises(BudgetExceeded, match="TOOL_BUDGET"):
         budget.claim_retry("search_nearby_rest_area", {})
+
+
+def test_turn_budget_claims_model_calls_with_independent_limit():
+    budget = TurnBudget(10.0, 1, lambda: 0.0, max_model_calls=2)
+
+    assert budget.claim_model() == 10.0
+    assert budget.claim_model() == 10.0
+    assert budget.model_calls == 2
+    with pytest.raises(BudgetExceeded, match="MODEL_BUDGET"):
+        budget.claim_model()
+    assert budget.calls == 0
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_model_calls": 0},
+        {"max_model_calls": -1},
+        {"max_model_calls": True},
+        {"max_model_calls": 2.0},
+        {"model_calls": -1},
+        {"model_calls": True},
+        {"model_calls": 1.0},
+    ],
+)
+def test_turn_budget_rejects_invalid_model_call_counts(kwargs):
+    with pytest.raises(ValueError):
+        TurnBudget(10.0, 3, lambda: 0.0, **kwargs)
+
+
+def test_turn_budget_checks_deadline_before_model_call_limit():
+    now = [0.0]
+    budget = TurnBudget(1.0, 3, lambda: now[0], max_model_calls=1)
+    budget.claim_model()
+    now[0] = 1.0
+
+    with pytest.raises(BudgetExceeded, match="TIME_BUDGET"):
+        budget.claim_model()

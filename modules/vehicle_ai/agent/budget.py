@@ -64,16 +64,32 @@ class TurnBudget:
     signatures: set[str] = field(default_factory=set)
     used_calls: set[str] = field(default_factory=set)
     retry_signatures: set[str] = field(default_factory=set)
+    max_model_calls: int = 5
+    model_calls: int = 0
 
     def __post_init__(self):
         if not math.isfinite(self.seconds) or self.seconds <= 0 or self.max_calls < 1:
             raise ValueError("turn timeout and tool call budget must be positive")
+        if type(self.max_model_calls) is not int or self.max_model_calls < 1:
+            raise ValueError("model call budget must be a positive integer")
+        if (
+            type(self.model_calls) is not int
+            or not 0 <= self.model_calls <= self.max_model_calls
+        ):
+            raise ValueError("model calls must be a non-negative integer within budget")
         self.deadline = self.clock() + self.seconds
 
     def remaining(self) -> float:
         remaining = self.deadline - self.clock()
         if remaining <= 0:
             raise BudgetExceeded("TIME_BUDGET")
+        return remaining
+
+    def claim_model(self) -> float:
+        remaining = self.remaining()
+        if self.model_calls >= self.max_model_calls:
+            raise BudgetExceeded("MODEL_BUDGET")
+        self.model_calls += 1
         return remaining
 
     def claim(self, name: str, arguments: dict) -> None:
