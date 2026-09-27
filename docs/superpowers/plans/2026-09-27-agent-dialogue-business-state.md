@@ -35,7 +35,8 @@
 | `agent/task_state.py`、`agent/plan.py` | 原权威对象上增加业务字段、候选元数据及序列化 |
 | `agent/budget.py` | `TurnBudget` 增加模型计数，原工具预算/重试语义不变 |
 | `agent/dialogue_interpreter.py`（新） | 规则快速路径、精确摘要、一次模型调用与纯校验衔接；不写业务 |
-| `agent/dialogue_validation.py`（新） | 固定提议 schema、递归 schema 检查、距离/序号/原文/意图组合纯校验；不依赖模型或业务状态 |
+| `agent/dialogue_validation.py`（新） | 固定提议 schema、递归 schema 检查、提议结构及意图组合核验；调用 source 解析结果，不依赖模型或业务状态 |
+| `agent/dialogue_source.py`（新） | 完整源句肯定命令语法与完整数值词元解析；不调用模型、不分句丢失作用域 |
 | `agent/dialogue_reducer.py`（新） | 纯业务决策；不访问模型、工具、pending store 或 clock |
 | `agent/dialogue_candidates.py`（新） | 候选有效性、展示映射、失效、原计划搜索/选择接口衔接；不是第二套计划器 |
 | `agent/dialogue_coordinator.py`（新） | B1 分流、提交 reducer 结果、任务/会话边界、调用统一预算、确定性中文回复 |
@@ -126,7 +127,9 @@ def claim_model(self) -> float:
 
 **Files:** Create `modules/vehicle_ai/agent/dialogue_interpreter.py`、`modules/vehicle_ai/agent/dialogue_validation.py`、`modules/vehicle_ai/agent/dialogue_reducer.py`、`tests/vehicle_ai/test_dialogue_interpreter.py`、`tests/vehicle_ai/test_dialogue_reducer.py`。
 
-Sol 单点职责审查已批准：提议的固定 schema、递归 evaluator、距离/序号规范化、原文操作与意图组合校验移入 `dialogue_validation.py`；解释器只保留 rules、精确六键 summary、Interpretation、一次模型调用和预算/错误封装。共享纯文本规范化也由 validation 提供，依赖方向仅 interpreter → validation，validation 不导入解释器/LLM/任务状态。此划分基于纯校验与调用编排两种职责，不按行数切片；两文件分别遵守新模块原则。`validate_proposal` 定义于 validation，并从 interpreter 显式兼容导出，已有测试和后续任务导入路径保持不变；PROPOSAL_SCHEMA 可同样导出供 prompt 构造使用。
+Task2 第二轮职责审查增加 `modules/vehicle_ai/agent/dialogue_source.py`：完整源句/数值规范化属于独立的纯文本解析职责；validation 保留固定 schema、递归 evaluator、提议结构及跨字段组合核验，调用 source 的结果。依赖方向 interpreter → validation → source（interpreter 可导入 source 的规则规范化），source 不导入其他业务模块。必须先执行 Ruff format 再检查行数，不以未格式化的299行声称满足300行原则，也不通过压缩多条语句规避；本次不授予超长例外。
+
+上一轮 Sol 已批准将纯校验从解释器分离；本轮最终职责以上述 `dialogue_source.py` 划分为准，替代上一轮“全部纯文本规范化放 validation”的安排。解释器只保留 rules、精确六键 summary、Interpretation、一次模型调用和预算/错误封装；validation 保留 schema/提议结构/组合，source 保留完整源句/数值规范化。`validate_proposal` 仍定义于 validation，并从 interpreter 显式兼容导出，已有测试和后续任务导入路径保持不变；PROPOSAL_SCHEMA 可同样导出供 prompt 构造使用。
 
 **Interfaces:**
 
@@ -198,6 +201,18 @@ PROPOSAL_SCHEMA = {
 规范规则只在去两端空白和末尾 `。.!！?？` 后 **fullmatch**：`取消|取消任务|取消本次任务` → CANCEL；`继续|继续任务` → RESUME；`(?:就去|选|选择)第([一二三四五六七八九十]|[1-9][0-9]?)个` → SELECT；`第([一二三四五六七八九十]|[1-9][0-9]?)个(?:多远|叫什么|多久能到)` → ASK_CANDIDATE。`好/可以/换一个/如果找不到就取消` 不命中这些规则。后两类含条件/替换对象不明必须 UNCLEAR；单独“好/可以”即使解释为 SELECT 也只可复用当前有效已选候选或唯一候选，不能确认。
 
 源文本校验顺序：schema → intent/changes/reference 组合 → 每条非空 evidence 必须是本轮连续原文子串 → 明确字段/操作语义 → 规范化数值/引用。距离解析支持阿拉伯小数及中文整数 1–99，单位 `公里|千米|km|米|m`，米除 1000；仅接受唯一、正、有限距离值，`15 或 10 公里`、无单位、负号、范围歧义必须澄清。preferred_area 的 SET value 必须是 evidence 内原样文本；REMOVE 的 value 为 null，原文需含明确移除语义及该字段名（如“取消距离限制”“不限制距离”“取消区域偏好”）。unsupported SET value 为用户原文需求；unsupported REMOVE value 为原已存需求，evidence 为本轮明确放弃该需求的语句，reducer 再检查旧需求存在；“按已支持条件继续，放弃其他要求”可明确清除所有未解决条件，此时 REMOVE value 为 `"*"`，只允许这类明确放弃表达。保留未被移除的其他条件。SELECT/ASK 只允许一个 index 或 name；index 必须等于原文序数确定性解析结果，name 是原文子串。不能接受 JSON 列表代替单意图。
+
+**第二轮源句算法收敛（覆盖上段模糊的“明确移除语义”实现方式）：**
+
+1. 原文 evidence 子串校验仍使用未经改写的本轮全文。另对全文建立 NFKC 解析视图，只去两端空白及末尾句号/感叹号；问号不去除、不把问句当指令。不得仅校验模型摘取的 quote，不得通过逗号分句后忽略其余原文。
+2. REMOVE 用完整源句的有限肯定命令语法 `fullmatch`，不维护不断扩展的否定词黑名单。单命令可有一个“请”前缀；支持字段精确句型为“取消/去掉/移除 + 距离限制/区域偏好”或“不限制距离”；未支持条件为“放弃/取消/去掉/移除 + 本条value原样目标 + 可选‘要求’”，或“不需要 + 本条value原样目标 + 可选‘要求’”。目标必须 `re.escape` 后匹配，并由reducer检查它确为旧未解决条件。全文匹配后不能剩下任何前缀/后缀。`value='*'` 只接受全文“按已支持条件继续，放弃其他要求”（逗号中英文皆可）。
+3. 仅允许两种有明确顺序的组合句：上述单删除命令后接“，仍保留 + 一个非标点名称 + 偏好”（只表示保留旧字段，不提取新SET）；或“，按 + 一个合法距离 + 以内继续”。第二种必须在同一proposal中有与该距离一致的max_distance_km SET，缺失则澄清；同值SET由reducer现有no-op规则处理。整个组合句一次fullmatch、所有字符被语法消耗，禁止任意前后缀、任意连接词、递归复句、按标点丢弃不匹配片段。除此之外的混合删除句统一 SOURCE_OPERATION_MISMATCH 并保留所有条件。
+4. 因此“按摩椅，别放弃”“如果没有合适的，就放弃按摩椅”“我不想放弃按摩椅”“先别取消距离限制”“放弃按摩椅吗”全部拒绝；“放弃按摩椅”“请取消距离限制”“取消距离限制，仍保留西湖偏好”可通过。无须为这些反例逐条添加正则特判，拒绝来自整句不属于肯定命令语法。
+5. 距离识别按“完整词元扫描 → 全词元解析”，禁止从长词元中search一个合法后缀。NFKC后先定位边界正确的单位，并向左扫描最大连续数值词元；词元字符按Unicode数字语义（`isnumeric`）、数学符号/横线类别（`Sm`/`Pd`）、空白及固定数值记号 `. 点 负 正 e E , ，` 归类。只可剥离词元两端空白/逗号，内部字符保留。随后对整个词元fullmatch：阿拉伯正整数/小数（无符号、无指数、无千位分隔）或规范中文整数1–99；无法全匹配立即 INVALID_DISTANCE，不再尝试短后缀。负号包括NFKC后的全角减号及Unicode数学减号，均不能通过无符号语法；中文小数/百以上整数本期不支持，明确澄清。
+6. 当前原文若存在多个数值词元/距离或未被唯一距离解释的数值内容（如“15或10公里”），判 AMBIGUOUS_VALUE；不通过取最后数字规避歧义。这是保守边界，可对未支持句式澄清，不承诺任意中文数值表达。解析后再按单位换算，验证正且有限，与模型值比较。必须验证 evidence覆盖完整数值和单位，不能只引用同一句的无关子串。
+7. 必须先补失败用例，再改算法：`十五点五公里以内→5`、`－15公里以内→15`、`−15公里以内→15`、`一百五十公里以内→50`、`1 5公里以内→5`、`15或10公里以内→10` 均拒绝；15公里/15000米/十五公里/15.5公里的对应正确值通过。前述4个删除反例和2个合法组合句回归一并通过；修复不改变旧条件保持/no-op语义。
+
+裸“好/可以”在本期精确摘要没有选择状态、原文没有可核验指代时，统一UNCLEAR，不新增selected摘要字段，也不猜序号；这是“最多选择且永不确认”的保守实现，不宣称支持裸肯定词复用候选。
 
 模型调用核心必须按以下顺序，不在异常后重试：
 
