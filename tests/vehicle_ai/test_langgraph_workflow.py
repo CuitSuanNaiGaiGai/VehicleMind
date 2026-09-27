@@ -72,9 +72,7 @@ def test_sensitive_action_interrupts_and_resume_executes_once() -> None:
     assert app.context_manager.get_context().vehicle.driver_window_open is True
     history = app.tools.execution_history()
     successful_writes = [
-        item
-        for item in history
-        if item.name == "set_driver_window" and item.success
+        item for item in history if item.name == "set_driver_window" and item.success
     ]
     assert len(successful_writes) == 1
     assert completed.graph_trace[-3:] == (
