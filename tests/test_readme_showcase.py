@@ -35,6 +35,7 @@ def test_showcase_first_screen_tells_a_verifiable_business_story() -> None:
         "PendingAction",
         "真实视频路径",
         "录制语义观测回放",
+        "ReplayRunner 与确定性脚本模型验证 Agent 决策和工具流程",
         "结构化 trace",
         'href="#demo"',
         'href="#architecture"',
@@ -50,6 +51,9 @@ def test_showcase_first_screen_tells_a_verifiable_business_story() -> None:
         "用户批准",
         "模拟导航",
         "assets/scenarios/drowsy_rest_stop.yaml",
+        "ReplayRunner 通过 PendingAction 确认并调用工具",
+        "LangGraph `interrupt()` / `Command(resume=...)` 状态图路径",
+        "[无密钥审批 / 恢复演示](#quickstart)",
     ):
         assert detail in demo, detail
     assert "截图展示录制语义观测驱动的 Agent 回放" in demo

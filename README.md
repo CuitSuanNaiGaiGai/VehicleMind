@@ -32,14 +32,14 @@
 
 VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工作流。视频感知把舱内驾驶员状态与舱外道路画面转换为**语义观测**；Agent 消费这些观测、车辆状态和用户请求，形成上下文并处理风险事件、信息查询与车机动作。LangGraph `StateGraph` 管理请求、事件、审批暂停与恢复；敏感写操作形成待确认动作，恢复后再由 ToolRegistry 检查授权并执行工具。
 
-**两条输入路径、同一套 Agent 工作流：**真实视频路径使用本地离线视频和模型权重生成语义观测；录制语义观测回放读取场景中的观测，以确定性脚本模型无密钥复现 Agent 流程。两条路径均从统一上下文进入 Agent 决策与工具执行，见[系统架构](#architecture)。
+**两类 Agent 运行入口：**真实视频路径运行舱内外模型并将语义观测接入 Agent Runtime；录制语义观测回放由 ReplayRunner 与确定性脚本模型验证 Agent 决策和工具流程。LangGraph 审批中断与恢复由[独立无密钥演示](#quickstart)展示。
 
 <a id="demo"></a>
 ## 🎬 演示效果
 
 ### 疲劳风险下的休息服务区协助
 
-舱内外感知产生疲劳与道路语义观测 → 统一上下文与事件管线汇总车辆状态并形成高风险事件，将其送入 Agent 工作流 → 用户提出休息需求 → Agent 搜索服务区 → 敏感导航写入形成 PendingAction 并暂停 → 用户批准 → 图恢复并由 ToolRegistry 执行 → 返回**模拟导航结果**。以下截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成。上方媒体展示较早的 NORMAL 视频画面，下方统一上下文展示场景末尾的 DROWSY / HIGH 与导航 ACTIVE。
+**场景链路：**舱内外语义观测与车辆状态形成疲劳风险上下文 → 用户提出休息需求 → Agent 搜索服务区 → 敏感导航操作形成 PendingAction → 用户确认 → 工具执行并回读**模拟导航结果**。下方截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成，ReplayRunner 通过 PendingAction 确认并调用工具。LangGraph `interrupt()` / `Command(resume=...)` 状态图路径见[无密钥审批 / 恢复演示](#quickstart)。上方媒体展示较早的 NORMAL 视频画面，下方统一上下文展示场景末尾的 DROWSY / HIGH 与导航 ACTIVE。
 
 <p align="center">
   <a href="assets/demo/vehiclemind_report_full.png"><img src="assets/demo/vehiclemind_report.png" width="95%" alt="VehicleMind 中文离线回放报告，含舱内外画面与最终统一上下文；点击查看完整时间线和断言"/></a>
