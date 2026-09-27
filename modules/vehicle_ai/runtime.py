@@ -48,6 +48,7 @@ from modules.vehicle_ai.tools import (
     ToolRegistry,
     build_default_tool_registry,
 )
+from modules.vehicle_ai.workflow import VehicleAgentWorkflow, WorkflowResult
 from modules.observation import ObservationMetadata
 from modules.config.events import EventTimingConfig
 
@@ -168,6 +169,10 @@ class VehicleMindRuntime:
             historical_event_sink=(
                 self._persist_agent_trace if trip_event_store is not None else None
             ),
+        )
+        self.workflow = VehicleAgentWorkflow(
+            self.agent,
+            thread_id=f"vehiclemind-trip-{self.trip_id}",
         )
         recommendation = AgentPolicy.from_yaml().recommendation
         if not enable_event_recommendations:
@@ -453,6 +458,33 @@ class VehicleMindRuntime:
             text,
             debug=debug,
         )
+
+    def chat_stateful(
+        self,
+        text: str,
+        debug: bool = True,
+    ) -> WorkflowResult:
+        """Run a user turn through the checkpointed LangGraph workflow."""
+
+        return self.workflow.invoke_user(text, debug=debug)
+
+    def resume_stateful(
+        self,
+        decision: str,
+    ) -> WorkflowResult:
+        """Resume a graph paused at the sensitive-action approval gate."""
+
+        if decision not in {"approve", "reject"}:
+            raise ValueError("decision must be 'approve' or 'reject'")
+        return self.workflow.resume(decision)
+
+    def handle_event_stateful(
+        self,
+        event: VehicleEvent,
+    ) -> WorkflowResult:
+        """Run a semantic perception event through the same stateful graph."""
+
+        return self.workflow.invoke_event(event)
 
     # ========================================================
     # Context snapshot
