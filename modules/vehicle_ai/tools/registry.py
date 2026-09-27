@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
@@ -84,6 +85,7 @@ class ToolRegistry:
             ToolDefinition,
         ] = {}
         self._execution_history: list[ToolExecutionRecord] = []
+        self._trace_recorder = None
         self._issued_confirmations: dict[str, _ConfirmationGrant] = {}
         self._used_confirmation_ids: set[str] = set()
         self.__issuer_key = object()
@@ -167,6 +169,9 @@ class ToolRegistry:
     def execution_history(self) -> tuple[ToolExecutionRecord, ...]:
         return tuple(deepcopy(self._execution_history))
 
+    def set_trace_recorder(self, trace_recorder) -> None:
+        self._trace_recorder = trace_recorder
+
     def _retire_live_confirmation(self, confirmation: object | None) -> None:
         if (
             isinstance(confirmation, _ConfirmationGrant)
@@ -185,6 +190,9 @@ class ToolRegistry:
         result: ToolResult,
         user_intent: str,
         policy: dict[str, Any],
+        started_at: float | None = None,
+        policy_latency_ms: float | None = None,
+        trace_correlation_id: str | None = None,
     ) -> ToolResult:
         result.policy = deepcopy(policy)
         self._execution_history.append(
@@ -200,6 +208,39 @@ class ToolRegistry:
                 policy=deepcopy(policy),
             )
         )
+        if self._trace_recorder is not None:
+            correlation = (
+                {"correlation_id": trace_correlation_id}
+                if trace_correlation_id is not None
+                else {}
+            )
+            self._trace_recorder.emit(
+                "policy_decision",
+                latency_ms=policy_latency_ms,
+                attributes={
+                    **correlation,
+                    "tool_name": name,
+                    "decision": policy.get("decision"),
+                    "risk": policy.get("risk"),
+                    "reason": policy.get("reason"),
+                },
+            )
+            self._trace_recorder.emit(
+                "tool_result",
+                latency_ms=(
+                    (time.perf_counter() - started_at) * 1000
+                    if started_at is not None
+                    else None
+                ),
+                attributes={
+                    **correlation,
+                    "tool_name": name,
+                    "success": result.success,
+                    "error": result.error,
+                    "requires_confirmation": requires_confirmation,
+                    "confirmed": confirmed,
+                },
+            )
         return result
 
     # ========================================================
@@ -213,8 +254,10 @@ class ToolRegistry:
         *,
         confirmation: object | None = None,
         user_intent: str = "",
+        trace_correlation_id: str | None = None,
     ) -> ToolResult:
 
+        started_at = time.perf_counter()
         if arguments is None:
             arguments = {}
 
@@ -231,6 +274,9 @@ class ToolRegistry:
                     error="UNKNOWN_TOOL",
                 ),
                 user_intent=user_intent,
+                started_at=started_at,
+                policy_latency_ms=0.0,
+                trace_correlation_id=trace_correlation_id,
                 policy={
                     "decision": "DENY",
                     "reason": "Tool is not registered.",
@@ -241,6 +287,7 @@ class ToolRegistry:
 
         tool = self._tools[name]
         confirmed = False
+        policy_started = time.perf_counter()
         try:
             decision = self._policy.evaluate(tool, self._context_provider(user_intent))
             policy = {
@@ -256,7 +303,14 @@ class ToolRegistry:
                 "risk": None,
                 "warnings": [],
             }
-        record = partial(self._record, user_intent=user_intent, policy=policy)
+        record = partial(
+            self._record,
+            user_intent=user_intent,
+            policy=policy,
+            started_at=started_at,
+            policy_latency_ms=(time.perf_counter() - policy_started) * 1000,
+            trace_correlation_id=trace_correlation_id,
+        )
 
         if policy["decision"] == "DENY":
             self._retire_live_confirmation(confirmation)

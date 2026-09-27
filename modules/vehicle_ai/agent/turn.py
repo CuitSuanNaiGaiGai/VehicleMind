@@ -190,6 +190,15 @@ def run_turn(
                         "工具参数格式不正确，本轮已停止，未执行该操作。",
                     )
                 arguments = agent._ground_tool_arguments(call.name, call.arguments)
+                if agent.trace_recorder is not None:
+                    agent.trace_recorder.emit(
+                        "tool_call",
+                        attributes={
+                            "correlation_id": call.id,
+                            "tool_name": call.name,
+                            "argument_names": sorted(arguments),
+                        },
+                    )
                 try:
                     definition = agent.tool_registry.get(call.name)
                     schema = definition.parameters
@@ -238,9 +247,13 @@ def run_turn(
                             else None
                         ),
                         metadata={"candidate": candidate} if candidate else None,
+                        tool_call_id=call.id,
                     )
                 result = agent.tool_registry.execute(
-                    call.name, arguments, user_intent=user_text
+                    call.name,
+                    arguments,
+                    user_intent=user_text,
+                    trace_correlation_id=call.id,
                 )
                 if call.name == "play_music" and result.success and result.policy:
                     warning = next(
@@ -303,7 +316,10 @@ def run_turn(
                 if retry_allowed:
                     did_retry = True
                     retry_result = agent.tool_registry.execute(
-                        call.name, arguments, user_intent=user_text
+                        call.name,
+                        arguments,
+                        user_intent=user_text,
+                        trace_correlation_id=call.id,
                     )
                     agent.task.last_tool_result = retry_result.to_dict()
                     agent.task.tool_results.append(retry_result.to_dict())

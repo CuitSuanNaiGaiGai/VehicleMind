@@ -30,6 +30,27 @@ def record(agent, kind: str, **data) -> None:
     del agent.trace[: -agent.max_task_trace_events]
     if agent.historical_event_sink is not None:
         agent.historical_event_sink(agent.trace[-1])
+    trace_recorder = getattr(agent, "trace_recorder", None)
+    if trace_recorder is not None:
+        action = data.get("action")
+        result = data.get("result")
+        attributes = {
+            "agent_event": kind,
+            "task_status": agent.task.status.value,
+            "reason": agent.task.reason,
+        }
+        if isinstance(data.get("source"), str):
+            attributes["source"] = data["source"]
+        if isinstance(action, dict) and action.get("action_id"):
+            attributes["action_id"] = action["action_id"]
+        if isinstance(result, dict):
+            attributes["success"] = result.get("success")
+            attributes["error"] = result.get("error")
+        event_type = {
+            "confirmation": "confirmation",
+            "rejection": "action_rejected",
+        }.get(kind, "agent_event")
+        trace_recorder.emit(event_type, attributes=attributes)
 
 
 def evidence_message(agent) -> dict:

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Literal
+import time
+from typing import Any, Callable, Literal
 from uuid import uuid4
 
 from langgraph.checkpoint.memory import InMemorySaver
@@ -13,6 +14,7 @@ from langgraph.types import Command, interrupt
 
 from modules.vehicle_ai.agent import VehicleAgent
 from modules.vehicle_ai.events import EventPriority, EventType, VehicleEvent
+from modules.vehicle_ai.observability import AgentTraceRecorder
 from modules.vehicle_ai.tools import ToolResult
 from modules.vehicle_ai.workflow.state import VehicleWorkflowState
 
@@ -33,6 +35,8 @@ class WorkflowResult:
     interrupted: bool
     interrupt: dict[str, Any] | None
     graph_trace: tuple[str, ...]
+    task_id: str = ""
+    trace_events: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return deepcopy(
@@ -46,6 +50,8 @@ class WorkflowResult:
                 "interrupted": self.interrupted,
                 "interrupt": self.interrupt,
                 "graph_trace": list(self.graph_trace),
+                "task_id": self.task_id,
+                "trace_events": self.trace_events,
             }
         )
 
@@ -67,9 +73,14 @@ class VehicleAgentWorkflow:
         *,
         thread_id: str | None = None,
         checkpointer: Any | None = None,
+        trace_recorder: AgentTraceRecorder | None = None,
     ) -> None:
         self.agent = agent
         self.thread_id = thread_id or f"vehiclemind-{uuid4().hex}"
+        self.trace_recorder = trace_recorder or AgentTraceRecorder(
+            self.thread_id,
+            task_id_provider=lambda: self.agent.task.task_id,
+        )
         self.checkpointer = checkpointer or InMemorySaver()
         self.graph = self._build_graph()
 
@@ -79,14 +90,31 @@ class VehicleAgentWorkflow:
 
     def _build_graph(self):
         builder = StateGraph(VehicleWorkflowState)
-        builder.add_node("user_turn", self._user_turn)
-        builder.add_node("event_turn", self._event_turn)
-        builder.add_node("approval_gate", self._approval_gate)
-        builder.add_node("execute_approved", self._execute_approved)
-        builder.add_node("reject_action", self._reject_action)
-        builder.add_node("invalid_approval", self._invalid_approval)
-        builder.add_node("recovery_router", self._recovery_router)
-        builder.add_node("verify", self._verify)
+        builder.add_node(
+            "user_turn", self._instrument_node("user_turn", self._user_turn)
+        )
+        builder.add_node(
+            "event_turn", self._instrument_node("event_turn", self._event_turn)
+        )
+        builder.add_node(
+            "approval_gate", self._instrument_node("approval_gate", self._approval_gate)
+        )
+        builder.add_node(
+            "execute_approved",
+            self._instrument_node("execute_approved", self._execute_approved),
+        )
+        builder.add_node(
+            "reject_action", self._instrument_node("reject_action", self._reject_action)
+        )
+        builder.add_node(
+            "invalid_approval",
+            self._instrument_node("invalid_approval", self._invalid_approval),
+        )
+        builder.add_node(
+            "recovery_router",
+            self._instrument_node("recovery_router", self._recovery_router),
+        )
+        builder.add_node("verify", self._instrument_node("verify", self._verify))
 
         builder.add_conditional_edges(
             START,
@@ -118,6 +146,29 @@ class VehicleAgentWorkflow:
         )
         builder.add_edge("verify", END)
         return builder.compile(checkpointer=self.checkpointer)
+
+    def _instrument_node(self, name: str, handler: Callable) -> Callable:
+        def invoke(state: VehicleWorkflowState):
+            started = time.perf_counter()
+            outcome = "COMPLETED"
+            try:
+                return handler(state)
+            except BaseException as error:
+                outcome = (
+                    "INTERRUPTED"
+                    if type(error).__name__ in {"GraphInterrupt", "GraphBubbleUp"}
+                    else "FAILED"
+                )
+                raise
+            finally:
+                self.trace_recorder.emit(
+                    "graph_node",
+                    graph_node=name,
+                    latency_ms=(time.perf_counter() - started) * 1000,
+                    attributes={"outcome": outcome},
+                )
+
+        return invoke
 
     @staticmethod
     def _append_trace(state: VehicleWorkflowState, node: str) -> list[str]:
@@ -268,6 +319,19 @@ class VehicleAgentWorkflow:
         # Existing bounded plan recovery may stage a new PendingAction (for example
         # after a simulated POI becomes unavailable). The graph never auto-replays
         # that write: it routes the recovered candidate through approval again.
+        tool_result = state.get("tool_result") or {}
+        pending = self.agent.pending_actions.get()
+        if tool_result.get("error") == "ALTERNATIVE_PENDING":
+            plan = self.agent.task.plan
+            self.trace_recorder.emit(
+                "recovery",
+                graph_node="recovery_router",
+                attributes={
+                    "error": tool_result.get("error"),
+                    "pending_action_id": pending.action_id if pending else None,
+                    "recovery_count": plan.recovery_count if plan else None,
+                },
+            )
         return {
             **self._agent_snapshot(state, "recovery_router"),
         }
@@ -293,6 +357,30 @@ class VehicleAgentWorkflow:
             and isinstance(pending_interrupt.value, dict)
             else None
         )
+        ingress = values.get("ingress")
+        if pending_interrupt is not None and ingress == "user":
+            pending = values.get("pending_action") or {}
+            self.trace_recorder.emit(
+                "interrupt",
+                graph_node="approval_gate",
+                attributes={
+                    "action_id": pending.get("action_id"),
+                    "tool_name": pending.get("tool_name"),
+                },
+            )
+        elif ingress in {"user", "event"}:
+            event_type = (
+                "task_final_status" if ingress == "user" else "workflow_final_status"
+            )
+            self.trace_recorder.emit(
+                event_type,
+                graph_node="verify",
+                attributes={
+                    "ingress": ingress,
+                    "status": values.get("status"),
+                    "reason": values.get("reason"),
+                },
+            )
         return WorkflowResult(
             thread_id=self.thread_id,
             response=str(values.get("response", "")),
@@ -303,9 +391,22 @@ class VehicleAgentWorkflow:
             interrupted=pending_interrupt is not None,
             interrupt=interrupt_value,
             graph_trace=tuple(values.get("graph_trace", [])),
+            task_id=self.agent.task.task_id,
+            trace_events=self.trace_recorder.to_dicts(),
         )
 
+    def _ensure_not_waiting(self) -> None:
+        snapshot = self.graph.get_state(self.config)
+        if snapshot.interrupts:
+            self.trace_recorder.emit(
+                "ingress_rejected",
+                graph_node="approval_gate",
+                attributes={"reason": "WAITING_FOR_APPROVAL"},
+            )
+            raise RuntimeError("workflow is waiting for approval")
+
     def invoke_user(self, text: str, *, debug: bool = True) -> WorkflowResult:
+        self._ensure_not_waiting()
         self.graph.invoke(
             {
                 "ingress": "user",
@@ -319,6 +420,7 @@ class VehicleAgentWorkflow:
         return self._result()
 
     def invoke_event(self, event: VehicleEvent) -> WorkflowResult:
+        self._ensure_not_waiting()
         self.graph.invoke(
             {
                 "ingress": "event",
@@ -340,6 +442,15 @@ class VehicleAgentWorkflow:
         pending = snapshot.values.get("pending_action")
         if not isinstance(pending, dict) or not pending.get("action_id"):
             raise RuntimeError("workflow interrupt has no pending action")
+        started = time.perf_counter()
+        self.trace_recorder.emit(
+            "resume",
+            graph_node="approval_gate",
+            attributes={
+                "decision": decision,
+                "action_id": str(pending["action_id"]),
+            },
+        )
         self.graph.invoke(
             Command(
                 resume={
@@ -348,5 +459,14 @@ class VehicleAgentWorkflow:
                 }
             ),
             self.config,
+        )
+        self.trace_recorder.emit(
+            "resume_completed",
+            graph_node="approval_gate",
+            latency_ms=(time.perf_counter() - started) * 1000,
+            attributes={
+                "decision": decision,
+                "action_id": str(pending["action_id"]),
+            },
         )
         return self._result()
