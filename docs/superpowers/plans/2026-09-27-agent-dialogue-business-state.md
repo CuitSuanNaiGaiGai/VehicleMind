@@ -34,7 +34,8 @@
 | `agent/dialogue_state.py`（新） | session/turn、条件来源类型、候选元数据类型；没有另一份 task status/candidates/pending |
 | `agent/task_state.py`、`agent/plan.py` | 原权威对象上增加业务字段、候选元数据及序列化 |
 | `agent/budget.py` | `TurnBudget` 增加模型计数，原工具预算/重试语义不变 |
-| `agent/dialogue_interpreter.py`（新） | 规则快速路径、一次模型调用、提议 schema、源文本核验；不写业务 |
+| `agent/dialogue_interpreter.py`（新） | 规则快速路径、精确摘要、一次模型调用与纯校验衔接；不写业务 |
+| `agent/dialogue_validation.py`（新） | 固定提议 schema、递归 schema 检查、距离/序号/原文/意图组合纯校验；不依赖模型或业务状态 |
 | `agent/dialogue_reducer.py`（新） | 纯业务决策；不访问模型、工具、pending store 或 clock |
 | `agent/dialogue_candidates.py`（新） | 候选有效性、展示映射、失效、原计划搜索/选择接口衔接；不是第二套计划器 |
 | `agent/dialogue_coordinator.py`（新） | B1 分流、提交 reducer 结果、任务/会话边界、调用统一预算、确定性中文回复 |
@@ -123,7 +124,9 @@ def claim_model(self) -> float:
 
 ## Task 2：一次解释、来源验证与纯 reducer
 
-**Files:** Create `modules/vehicle_ai/agent/dialogue_interpreter.py`、`modules/vehicle_ai/agent/dialogue_reducer.py`、`tests/vehicle_ai/test_dialogue_interpreter.py`、`tests/vehicle_ai/test_dialogue_reducer.py`。
+**Files:** Create `modules/vehicle_ai/agent/dialogue_interpreter.py`、`modules/vehicle_ai/agent/dialogue_validation.py`、`modules/vehicle_ai/agent/dialogue_reducer.py`、`tests/vehicle_ai/test_dialogue_interpreter.py`、`tests/vehicle_ai/test_dialogue_reducer.py`。
+
+Sol 单点职责审查已批准：提议的固定 schema、递归 evaluator、距离/序号规范化、原文操作与意图组合校验移入 `dialogue_validation.py`；解释器只保留 rules、精确六键 summary、Interpretation、一次模型调用和预算/错误封装。共享纯文本规范化也由 validation 提供，依赖方向仅 interpreter → validation，validation 不导入解释器/LLM/任务状态。此划分基于纯校验与调用编排两种职责，不按行数切片；两文件分别遵守新模块原则。`validate_proposal` 定义于 validation，并从 interpreter 显式兼容导出，已有测试和后续任务导入路径保持不变；PROPOSAL_SCHEMA 可同样导出供 prompt 构造使用。
 
 **Interfaces:**
 
@@ -164,7 +167,7 @@ def test_update_and_remove_are_explicit_and_source_checked():
 ```
 
 - [ ] **Step 2 — RED。** `uv run --group dev python -m pytest tests/vehicle_ai/test_dialogue_interpreter.py tests/vehicle_ai/test_dialogue_reducer.py -q`；新接口缺失失败。
-- [ ] **Step 3 — 实现固定协议与有限校验。** 在解释器中递归检查下列 JSON schema 的对象/数组/联合 type，再做跨字段/原文约束；现有 `tools.validation.valid_arguments` 仅适用工具的标量参数，不能直接接收这里的联合 type。禁止用自由工具调用或模型给出的 POI ID 执行。模型 prompt 明示 current text 是数据、只输出此 JSON、缺条件用空 changes、暂不支持的需求用 unsupported、一个话语不能提交多个控制意图。
+- [ ] **Step 3 — 实现固定协议与有限校验。** 在 dialogue_validation 中递归检查下列 JSON schema 的对象/数组/联合 type，再做跨字段/原文约束；解释器调用该纯校验接口。现有 `tools.validation.valid_arguments` 仅适用工具的标量参数，不能直接接收这里的联合 type。禁止用自由工具调用或模型给出的 POI ID 执行。模型 prompt 明示 current text 是数据、只输出此 JSON、缺条件用空 changes、暂不支持的需求用 unsupported、一个话语不能提交多个控制意图。
 
 ```python
 PROPOSAL_SCHEMA = {
