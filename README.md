@@ -39,7 +39,7 @@ VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工�
 
 ### 疲劳风险下的休息服务区协助
 
-舱内外感知产生疲劳与道路语义观测 → Agent 汇总车辆状态并识别高风险事件 → 用户提出休息需求 → Agent 搜索服务区 → 敏感导航写入形成 PendingAction 并暂停 → 用户批准 → 图恢复并由 ToolRegistry 执行 → 返回**模拟导航结果**。以下截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成。上方媒体停在较早视频画面（仍显示 NORMAL），下方统一上下文是场景末尾的 DROWSY / HIGH 与导航 ACTIVE；不要把两处当作同一时刻的推理结果。
+舱内外感知产生疲劳与道路语义观测 → 统一上下文与事件管线汇总车辆状态并形成高风险事件，将其送入 Agent 工作流 → 用户提出休息需求 → Agent 搜索服务区 → 敏感导航写入形成 PendingAction 并暂停 → 用户批准 → 图恢复并由 ToolRegistry 执行 → 返回**模拟导航结果**。以下截图由仓库内[离线场景](assets/scenarios/drowsy_rest_stop.yaml)基于提交 `96192de` 生成。上方媒体停在较早视频画面（仍显示 NORMAL），下方统一上下文是场景末尾的 DROWSY / HIGH 与导航 ACTIVE；不要把两处当作同一时刻的推理结果。
 
 <p align="center">
   <a href="assets/demo/vehiclemind_report_full.png"><img src="assets/demo/vehiclemind_report.png" width="95%" alt="VehicleMind 中文离线回放报告，含舱内外画面与最终统一上下文；点击查看完整时间线和断言"/></a>
@@ -91,15 +91,15 @@ flowchart LR
     G --> A[VehicleAgent]
     A -. 可选知识支持 .-> L[LightRAG]
     A -. 可选历史支持 .-> M[SQLite 行程记忆]
-    A --> T[ToolRegistry：策略检查与执行边界]
-    T --> Q{敏感写操作?}
-    Q -- 否 --> X[工具执行]
-    Q -- 是 --> W[PendingAction]
+    A --> T[ToolRegistry / Policy：执行时授权检查与工具边界]
+    T --> Q{策略与授权状态}
+    Q -- 已授权且无需确认 --> X[工具执行]
+    Q -- 需要用户批准 --> W[PendingAction]
     W --> I[interrupt + Checkpoint]
     I --> H{用户决定}
     H -- 拒绝 --> Z[取消并结束]
     H -- 批准 --> RS[Command resume：图工作流继续]
-    RS --> A
+    RS --> T
     X --> F{执行结果}
     F -- 成功 --> K[状态回读 / Verify]
     F -- 可恢复失败 --> RC[Recovery Router]
