@@ -46,7 +46,10 @@ PROPOSAL_SCHEMA = {
 }
 
 _CHINESE_NUMBER = r"(?:[一二三四五六七八九]?十[一二三四五六七八九]?|[一二三四五六七八九])"
-_NUMBER = rf"(?:负|-)?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+|{_CHINESE_NUMBER})"
+_NUMBER = (
+    rf"(?<![0-9A-Za-z.＋+−\-零〇一二三四五六七八九十百千万])"
+    rf"(?:负|-)?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+|{_CHINESE_NUMBER})"
+)
 _UNIT = r"(?:公里|千米|km|米|m)"
 _SINGLE_DISTANCE = re.compile(rf"(?P<number>{_NUMBER})\s*(?P<unit>{_UNIT})(?![a-z])", re.I)
 _DISTANCE_RANGE = re.compile(
@@ -144,10 +147,8 @@ def _distance_in_text(text: str) -> tuple[float | None, str | None]:
     if _DISTANCE_RANGE.search(text):
         return None, "AMBIGUOUS_VALUE"
     mentions = list(_SINGLE_DISTANCE.finditer(text))
-    if len(mentions) > 1:
-        return None, "AMBIGUOUS_VALUE"
-    if not mentions:
-        return None, "INVALID_DISTANCE"
+    if len(mentions) > 1 or not mentions:
+        return None, "AMBIGUOUS_VALUE" if mentions else "INVALID_DISTANCE"
     value = _numeric_distance(mentions[0]["number"], mentions[0]["unit"])
     return (value, None) if value is not None else (None, "INVALID_DISTANCE")
 
@@ -163,17 +164,33 @@ def _ordinal_from_source(text: str, intent: str) -> int | None:
 
 
 def _explicit_removal(field: str, value, evidence: str) -> bool:
-    if value is not None:
-        return False
-    if field == "max_distance_km":
-        return bool(re.search(r"(?:取消|去掉|移除|不限制).{0,12}(?:距离|公里|千米)", evidence))
-    if field == "preferred_area":
-        return bool(re.search(r"(?:取消|去掉|移除|不再需要).{0,12}(?:区域|地区|地域).{0,8}(?:偏好|要求)?", evidence))
-    return False
+    patterns = {
+        "max_distance_km": r"(?:取消|去掉|移除|不限制).{0,12}(?:距离|公里|千米)",
+        "preferred_area": r"(?:取消|去掉|移除|不再需要).{0,12}(?:区域|地区|地域).{0,8}(?:偏好|要求)?",
+    }
+    return value is None and field in patterns and bool(re.search(patterns[field], evidence))
 
 
-def _removal_semantics(change: dict) -> str | None:
+def _ambiguous_removal_source(text: str, value: str) -> bool:
+    blocked = (
+        r"(?:如果|若|要是|假如|除非|万一).{0,40}(?:放弃|取消|去掉|移除|不限制)|"
+        r"(?:不想|不愿|不要|别|并非|不是|没有|没|未|不打算|不希望|不能|不可以|不该|没必要|不必).{0,12}(?:放弃|取消|去掉|移除|不限制|不要|不需要)|"
+        r"要不要|是否|会不会|能不能|不确定|可能|考虑|[吗呢][?？]?$"
+    )
+    return any(
+        re.search(value, clause) and re.search(blocked, clause)
+        for clause in re.split(r"[，,。；;！？?!]|但是|不过|然而", text)
+    )
+
+
+def _removal_semantics(change: dict, text: str) -> str | None:
     field, value, evidence = change["field"], change["value"], change["evidence"]
+    target = {
+        "max_distance_km": r"(?:距离|公里|千米)",
+        "preferred_area": r"(?:区域|地区|地域|偏好)",
+    }.get(field, r"其他要求" if value == "*" else re.escape(str(value)))
+    if _ambiguous_removal_source(text, target):
+        return "SOURCE_OPERATION_MISMATCH"
     if field in {"max_distance_km", "preferred_area"}:
         return None if _explicit_removal(field, value, evidence) else "SOURCE_OPERATION_MISMATCH"
     clear_all = value == "*" and bool(
@@ -189,12 +206,12 @@ def _removal_semantics(change: dict) -> str | None:
     return None if clear_all or remove_one else "SOURCE_OPERATION_MISMATCH"
 
 
-def _field_semantics(change: dict) -> str | None:
+def _field_semantics(change: dict, text: str) -> str | None:
     field, op, value, evidence = (
         change["field"], change["op"], change["value"], change["evidence"]
     )
     if op == "REMOVE":
-        return _removal_semantics(change)
+        return _removal_semantics(change, text)
     if field == "max_distance_km":
         return None if type(value) in {int, float} else "INVALID_PROPOSAL"
     if field in {"preferred_area", "unsupported"}:
@@ -245,6 +262,8 @@ def validate_proposal(proposal: dict, text: str) -> str | None:
     if intent in {"CANCEL", "RESUME", "SIDE_QUESTION", "UNCLEAR"} and (reference is not None or changes):
         return "CONFLICTING_INTENTS"
     if intent in {"SELECT", "ASK_CANDIDATE"}:
+        if changes:
+            return "CONFLICTING_INTENTS"
         if reference is None or (reference["index"] is None) == (reference["name"] is None):
             return "INVALID_REFERENCE"
     elif reference is not None:
@@ -263,7 +282,7 @@ def validate_proposal(proposal: dict, text: str) -> str | None:
         return "SOURCE_EVIDENCE_MISMATCH"
 
     for change in changes:
-        error = _field_semantics(change)
+        error = _field_semantics(change, text)
         if error:
             return error
     if intent in {"SELECT", "ASK_CANDIDATE"}:

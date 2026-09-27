@@ -58,7 +58,8 @@ def _apply_changes(constraints: dict, unresolved: list, changes: list[dict], tur
                     del constraints[field]
                     changed = True
             elif field not in constraints or constraints[field].value != value:
-                constraints[field] = ConstraintValue(value, turn_id, item["evidence"])
+                stored_value = float(value) if field == "max_distance_km" else value
+                constraints[field] = ConstraintValue(stored_value, turn_id, item["evidence"])
                 changed = True
         elif op == "SET":
             if not any(current.value == value for current in unresolved):
@@ -158,7 +159,7 @@ def reduce_dialogue(task: AgentTask, proposal: dict, *, turn_id: int,
     if not is_new and changed and task.revision >= max_revisions:
         return _clarify(task, "REVISION_LIMIT", proposal)
     revision = 0 if is_new else task.revision + int(changed)
-    operation = "start" if is_new else "search"
+    operation = "start" if is_new else ("search" if changed else "resume")
     if unresolved:
         return _clarify(task, "UNSUPPORTED_CONSTRAINT", proposal, goal=goal,
                         constraints=constraints, unresolved=unresolved, revision=revision,

@@ -83,6 +83,7 @@ def test_removing_a_missing_supported_constraint_is_a_noop():
     decision = reduce_dialogue(task, update, turn_id=2)
 
     assert decision.changed is False
+    assert decision.operation == "resume"
     assert decision.revision == 1
     assert decision.constraints == {}
 
@@ -176,6 +177,7 @@ def test_setting_an_existing_value_is_not_a_real_revision():
     decision = reduce_dialogue(task, update, turn_id=3)
 
     assert decision.changed is False
+    assert decision.operation == "resume"
     assert decision.revision == 2
     assert decision.constraints["max_distance_km"].source_turn_id == 1
 

@@ -7,6 +7,8 @@ from modules.vehicle_ai.agent.dialogue_interpreter import (
     interpret_turn,
     validate_proposal,
 )
+from modules.vehicle_ai.agent.dialogue_reducer import reduce_dialogue
+from modules.vehicle_ai.agent.task_state import AgentTask, TaskStatus
 from modules.vehicle_ai.llm.base import LLMResponse, LLMToolCall
 
 
@@ -89,7 +91,13 @@ def test_conditional_and_mixed_controls_are_not_rule_cancelled():
 
 
 def test_kilometers_and_meters_normalize_to_the_same_distance():
-    for text, value in (("15公里以内", 15.0), ("15000米以内", 15.0)):
+    for text, value in (
+        ("1公里以内", 1.0),
+        ("15公里以内", 15.0),
+        ("99公里以内", 99.0),
+        ("1.5公里以内", 1.5),
+        ("15000米以内", 15.0),
+    ):
         item = proposal(
             "UPDATE_CONSTRAINTS",
             [change("max_distance_km", value, text)],
@@ -105,6 +113,44 @@ def test_chinese_integer_distance_is_source_checked():
         evidence="十五公里以内",
     )
     assert validate_proposal(item, "十五公里以内") is None
+
+
+def test_integer_distance_survives_reduction_into_the_next_model_summary():
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [change("max_distance_km", 15, "15公里以内")],
+    )
+    task = AgentTask(goal="找服务区", status=TaskStatus.RUNNING)
+    decision = reduce_dialogue(task, item, turn_id=2)
+    summary = {
+        "goal": decision.goal,
+        "status": task.status.value,
+        "revision": decision.revision,
+        "constraints": {
+            key: {
+                "value": value.value,
+                "source_turn_id": value.source_turn_id,
+                "evidence": value.evidence,
+            }
+            for key, value in decision.constraints.items()
+        },
+        "unresolved_constraints": [],
+        "candidates": [],
+    }
+    client = Client(
+        [
+            LLMResponse(
+                '{"intent":"UNCLEAR","changes":[],"reference":null,'
+                '"evidence":"","clarification_reason":"不明确"}',
+                [],
+            )
+        ]
+    )
+
+    interpret_turn(client, "这条件还在吗", summary, budget())
+
+    sent_summary = json.loads(client.calls[0][0][1]["content"])["summary"]
+    assert sent_summary["constraints"]["max_distance_km"]["value"] == 15.0
 
 
 def test_distance_source_value_must_match_even_when_the_quote_is_present():
@@ -146,6 +192,20 @@ def test_distance_rejects_negative_infinite_and_boolean_values():
     assert validate_proposal(boolean, "15公里以内") == "INVALID_PROPOSAL"
 
 
+def test_distance_parser_rejects_suffix_matches_inside_invalid_numeric_tokens():
+    for text, suffix_value in (
+        ("一百五十公里以内", 50.0),
+        ("1e3公里以内", 3.0),
+        ("−15公里以内", 15.0),
+    ):
+        item = proposal(
+            "UPDATE_CONSTRAINTS",
+            [change("max_distance_km", suffix_value, text)],
+            evidence=text,
+        )
+        assert validate_proposal(item, text) == "INVALID_DISTANCE"
+
+
 def test_evidence_must_be_a_contiguous_quote_from_the_current_turn():
     item = proposal(
         "UPDATE_CONSTRAINTS",
@@ -153,6 +213,16 @@ def test_evidence_must_be_a_contiguous_quote_from_the_current_turn():
         evidence="附近西湖",
     )
     assert validate_proposal(item, "西湖附近") == "SOURCE_EVIDENCE_MISMATCH"
+
+
+def test_candidate_intents_cannot_include_constraint_changes():
+    for intent in ("SELECT", "ASK_CANDIDATE"):
+        item = proposal(
+            intent,
+            [change("preferred_area", "西湖", "西湖")],
+            reference={"index": None, "name": "西湖", "evidence": "西湖"},
+        )
+        assert validate_proposal(item, "西湖") == "CONFLICTING_INTENTS"
 
 
 def test_remove_requires_explicit_semantics_and_null_value():
@@ -168,6 +238,22 @@ def test_remove_requires_explicit_semantics_and_null_value():
     )
     assert validate_proposal(valid, "取消距离限制") is None
     assert validate_proposal(invalid, "距离限制") == "SOURCE_OPERATION_MISMATCH"
+
+
+def test_remove_must_be_affirmative_in_the_full_source_not_just_its_quote():
+    cases = [
+        ("我不想放弃按摩椅", "放弃按摩椅", "unsupported", "按摩椅"),
+        ("不要放弃按摩椅", "放弃按摩椅", "unsupported", "按摩椅"),
+        ("并非要取消区域偏好", "取消区域偏好", "preferred_area", None),
+        ("如果需要放弃按摩椅", "放弃按摩椅", "unsupported", "按摩椅"),
+        ("按摩椅要不要放弃", "按摩椅要不要放弃", "unsupported", "按摩椅"),
+    ]
+    for text, evidence, field, value in cases:
+        item = proposal(
+            "UPDATE_CONSTRAINTS",
+            [change(field, value, evidence, "REMOVE")],
+        )
+        assert validate_proposal(item, text) == "SOURCE_OPERATION_MISMATCH"
 
 
 def test_extra_model_tool_and_authorization_fields_are_rejected():
