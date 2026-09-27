@@ -15,6 +15,11 @@ _CHINESE_INTEGER = re.compile(
 )
 _ARABIC_NUMBER = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)")
 _UNIT = re.compile(r"(?i)(?:公里|千米|km|米|m)(?![a-z])")
+_DISTANCE_FRAGMENT = re.compile(
+    rf"(?:{_ARABIC_NUMBER.pattern}|{_CHINESE_INTEGER.pattern})\s*"
+    r"(?:公里|千米|km|米|m)(?![a-z])",
+    re.IGNORECASE,
+)
 _TOKEN_EDGE_CHARS = ",，"
 _TOKEN_EXTRA_CHARS = frozenset(".点负正eE,，")
 
@@ -188,11 +193,15 @@ def parse_removal_source(field: str, value, text: str) -> RemovalSource | None:
     if retained and retained.group("name").strip():
         return RemovalSource(keeps_preferred_area=True)
 
-    continuation = re.fullmatch(rf"(?:请)?(?:{command}),\s*按.+以内继续", source)
+    continuation = re.fullmatch(
+        rf"(?:请)?(?:{command}),\s*按(?P<distance>.+)以内继续", source
+    )
     if continuation:
-        distance = parse_distance_source(source)
-        if distance.error is None:
-            return RemovalSource(continuation_distance_km=distance.value_km)
+        distance_text = continuation.group("distance")
+        if _DISTANCE_FRAGMENT.fullmatch(distance_text):
+            distance = parse_distance_source(distance_text)
+            if distance.error is None:
+                return RemovalSource(continuation_distance_km=distance.value_km)
     return None
 
 

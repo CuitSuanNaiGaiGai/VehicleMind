@@ -384,6 +384,20 @@ def test_cancel_and_resume_controls_remain_ambiguous():
     assert validate_proposal(item, text) == "AMBIGUOUS_CONTROL"
 
 
+def test_removal_distance_continuation_rejects_unparsed_control_prose():
+    text = "取消区域偏好，按原计划先取消任务，再按15公里以内继续"
+    item = proposal(
+        "UPDATE_CONSTRAINTS",
+        [
+            change("preferred_area", None, "取消区域偏好", "REMOVE"),
+            change("max_distance_km", 15.0, "15公里以内"),
+        ],
+        evidence=text,
+    )
+
+    assert validate_proposal(item, text) == "SOURCE_OPERATION_MISMATCH"
+
+
 @pytest.mark.parametrize(
     "text,suffix_value",
     [("十五点五公里以内", 5.0), ("－15公里以内", 15.0)],
