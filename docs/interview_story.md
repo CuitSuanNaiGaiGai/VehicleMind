@@ -34,3 +34,18 @@ M01 在线候选 pilot 中，`CONFIRMATION_REQUIRED` 曾被当成普通工具失
 新增一句可选的 A5 讲述：“我把服务区导航收敛成一个最多 9 步、最多一次恢复的任务计划。首选不可用时系统只提供一个新候选并重新请求确认，未知写入结果不会盲目重试。7 个固定故障场景全部通过；这证明状态机和确认流程满足预设断言，不代表在线模型或实车成功率。”
 
 还可以补充：“我用 4 类用户/检索提示注入载荷故意诱导脚本模型越权请求导航，执行层 4/4 均要求独立确认，未确认敏感写入为 0；这是确认门核验，不是模型防注入能力评测。”
+
+## LangGraph Stateful Agent：怎么讲这次升级
+
+**一句话：**我没有把原有 Tool Calling 逻辑简单套一层框架，而是把用户请求、语义感知事件、敏感操作审批和失败恢复抽象成 LangGraph 状态图，同时保留 ToolRegistry 作为独立执行权限边界。
+
+可以按下面的因果链讲：
+
+1. **问题**：原实现虽然已有 PendingAction 和有限状态 Planner，但“暂停、恢复、审批、失败分支”分散在过程代码里，难以直接表达可恢复工作流。
+2. **改造**：增加 `StateGraph` 外层 Runtime；用户请求和 VehicleEvent 分流进入图，VehicleAgent 仍负责 bounded LLM/tool loop。
+3. **HITL**：敏感动作先产生 PendingAction，在纯 `approval_gate` 节点调用 `interrupt()`；用户批准后用 `Command(resume=...)` 恢复到独立执行节点。
+4. **安全点**：LangGraph resume 不等于授权。执行仍由 ToolRegistry 根据当前车况重新 policy check，并消费与原工具/参数绑定的一次性 grant。
+5. **恢复点**：首选 POI 执行失败时，Planner 只能提出本轮候选中的替代项；替代项拥有新的 action ID，Graph 必须再次 interrupt，禁止自动重放写操作。
+6. **边界**：当前 checkpointer 是 `InMemorySaver`，因此我只把它定义为单座舱 Demo/测试级可恢复状态，不包装成跨进程生产持久化。
+
+**面试追问：为什么不把所有 Planner 都删掉改成 LangGraph？** 业务 Planner 已有候选校验、步数预算和恢复约束，直接重写会扩大回归面。LangGraph 更适合作为 control-plane：显式化 checkpoint / HITL / routing；原 Planner 和 ToolRegistry 继续作为 domain logic 与 safety/data plane。这样升级成本更低，也能保持既有回归证据。
