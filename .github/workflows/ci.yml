@@ -25,13 +25,7 @@ jobs:
           enable-cache: true
 
       - name: Install locked core environment
-        run: uv sync --group dev
-
-      - name: Upload resolved lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: resolved-uv-lock
-          path: uv.lock
+        run: uv sync --frozen --group dev
 
       - name: Lint
         run: uv run --group dev ruff check apps modules scripts tests
