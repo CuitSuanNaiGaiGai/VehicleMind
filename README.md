@@ -4,7 +4,7 @@
 
 ### 舱内外感知与车机 Agent 协同原型
 
-**离线视频感知 · 统一语义上下文 · 风险事件 · Agent 工具编排 · 用户确认 · 可复现展示**
+**离线视频感知 · LangGraph Stateful Agent · 风险事件 · Human-in-the-loop · RAG / Memory · 可复现评测**
 
 <a href="#demo">查看演示</a> · <a href="#architecture">理解架构</a> · <a href="#evidence">核对结果</a>
 
@@ -15,6 +15,7 @@
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-Cabin-0097A7)
 ![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-Road-005CED)
 ![Qwen + GLM](https://img.shields.io/badge/Qwen_%2B_GLM-Agent_API-7C3AED)
+![LangGraph](https://img.shields.io/badge/LangGraph-Stateful_Agent-1C3C3C)
 ![LightRAG](https://img.shields.io/badge/LightRAG-Scoped_RAG-0F766E)
 ![pytest](https://img.shields.io/badge/pytest-Regression-0A9EDC?logo=pytest&logoColor=white)
 
@@ -32,6 +33,8 @@
 ## ✨ 项目简介
 
 **一个具体场景：**驾驶员出现疲劳驾驶迹象，舱内状态与舱外道路观测进入统一上下文；风险事件触发提醒。用户提出休息需求后，Agent 搜索服务区，但只有经过用户确认，才会启动**模拟导航**。[查看可复现场景](assets/scenarios/drowsy_rest_stop.yaml) · [看演示画面](#demo) · [核对结果与边界](#evidence)。这条业务链路展示的是感知结果如何参与 Agent 决策和受控车机动作，不是真实车辆控制。
+
+**Agent Runtime 升级：**在原有 ToolRegistry、PendingAction 和受限 Planner 之上增加 LangGraph `StateGraph`，把用户请求、语义感知事件、敏感动作审批和恢复路径纳入同一可检查点工作流。敏感写操作通过 `interrupt()` 暂停，用户明确批准后用 `Command(resume=...)` 恢复；恢复得到的新候选必须生成新的 PendingAction 并再次审批，不能自动重放写操作。当前默认 `InMemorySaver` 面向单座舱 Demo / 测试，不宣称跨进程或多租户持久化；详见[LangGraph Runtime 设计](docs/guide/langgraph-stateful-agent.md)。
 
 **两条输入路径、同一套下游协同：**真实视频感知使用本地离线视频和模型权重生成观测，适合展示舱内外算法；录制语义观测回放（下称录制观测）直接读取场景内的观测，不运行感知模型，适合无密钥复现“统一上下文 → 风险事件 → Agent 决策 → 用户确认 → 模拟车机动作”。两条路径汇入同一语义上下文，见[系统架构](#architecture)。回放截图不能作为感知精度证据。
 
@@ -63,7 +66,7 @@
 | **舱内状态感知** | 面部关键点、眼口状态、PERCLOS、哈欠等时序证据形成驾驶员状态；见[算法说明](docs/cabin_perception.md)与上方 GIF |
 | **舱外道路感知** | 目标、车道和可行驶区域转为结构化观测；支持 YOLOPv2 多任务路径与可选传统车道路径，见[算法说明](docs/road_perception.md) |
 | **统一上下文** | Driver / Road / Vehicle 语义状态集中管理，区分未知、无效和过期观测 |
-| **事件与 Agent 编排** | 高风险变化触发事件；Agent 结合用户请求和上下文选择回复或车机工具；模型不可用时事件路径保留确定性安全建议，不调用车机工具 |
+| **事件驱动 Stateful Agent** | LangGraph `StateGraph` 接收用户请求或语义感知事件；通过 Checkpoint 保存图状态，敏感动作 `interrupt/resume`，失败恢复后新写操作再次确认 |
 | **受控车机动作** | 搜索、空调、媒体和模拟导航等工具由注册表执行；导航进入待确认状态后才可执行，见[确认设计](docs/agent_pending_actions.md) |
 | **可复现结果** | 离线回放保存配置快照、语义 trace、断言和中文 HTML 报告；在线 Agent 使用 40 条 AI 自审内部基准、80 条开发回归变体和逐 trial 语义审查 |
 
@@ -75,21 +78,28 @@ flowchart LR
     V[本地离线视频] --> P[舱内 / 舱外感知适配]
     R[录制语义观测] --> C[统一 Context Manager]
     P --> C
-    C --> E[风险事件检测]
-    C --> A[Agent 上下文选择与决策]
-    E --> A
-    U[用户请求] --> A
-    A --> T[ToolRegistry]
-    T --> Q{需要确认?}
+    C --> E[语义风险事件]
+    U[用户请求] --> G
+    E --> G[LangGraph StateGraph]
+    C --> G
+    G --> A[VehicleAgent\nContext / RAG / Memory / Plan]
+    A --> T[ToolRegistry + Policy]
+    T --> Q{敏感写操作?}
     Q -- 否 --> X[模拟车机执行]
     Q -- 是 --> W[PendingAction]
-    W --> H[用户确认 / 拒绝]
-    H -- 有效确认 --> X
-    C --> O[Trace / 中文报告]
-    E --> O
-    A --> O
+    W --> I[interrupt + Checkpoint]
+    I --> H{用户决定}
+    H -- reject --> Z[取消并结束]
+    H -- approve --> RS[Command resume]
+    RS --> X
+    X --> F{执行结果}
+    F -- 成功 --> K[状态回读 / Verify]
+    F -- 可恢复失败 --> RC[Recovery Router]
+    RC --> W
+    F -- 不确定/不可恢复 --> S[安全停止 / Reconcile]
+    G --> O[Graph Trace / Task Trace]
     T --> O
-    X --> O
+    K --> O
 ```
 
 真实视频路径调用本地感知模型；录制观测路径跳过推理，只验证下游协同。两者共用语义上下文与工具边界，但**不能用录制观测回放估计感知准确率**。Agent 可接 Qwen / GLM 在线 API；无网络的演示使用确定性离线 Agent，以保证复现。
@@ -102,7 +112,7 @@ flowchart LR
 | **舱内感知** | 离线驾驶员视频 → 面部特征、时序疲劳证据和驾驶员风险；为提醒提供状态依据 | OpenCV 处理视频帧、第三方 MediaPipe 提取关键点；项目内实现眼口与头姿特征、PERCLOS/哈欠累计和状态判定，不宣称自研关键点模型 | [感知服务](modules/cabin/perception_service.py) · [算法说明](docs/cabin_perception.md) |
 | **舱外感知** | 离线道路视频 → 目标、车道、可行驶区；为道路上下文提供观测 | 第三方预训练 YOLOPv2 经 ONNX Runtime 推理，CoreML 可用时优先、CPU 回退；项目内实现预处理、后处理及结构化输出，另有 OpenCV 传统车道路径，不宣称自研模型训练 | [道路感知服务](modules/driving/perception_service.py) · [算法说明](docs/road_perception.md) |
 | **统一上下文与事件** | 舱内外语义观测 + 车辆状态 → Driver/Road/Vehicle 上下文与风险事件；隔离低层帧和决策层 | 项目内实现[舱内适配](modules/vehicle_ai/integration/cabin_adapter.py)、[舱外适配](modules/vehicle_ai/integration/driving_adapter.py)、字段契约、质量/过期状态及事件去抖 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [事件检测](modules/vehicle_ai/events/event_detector.py) |
-| **Agent 编排** | 用户请求 + 相关上下文/事件 → 回复或工具请求；决定何时读取车机状态与建议动作 | Qwen/GLM 是第三方在线 API；项目内实现上下文选择、对话与工具调用编排，也支持确定性离线脚本客户端 | [Agent](modules/vehicle_ai/agent/vehicle_agent.py) · [模型适配](modules/vehicle_ai/llm/factory.py) |
+| **Stateful Agent 编排** | 用户请求 / 语义事件 → Graph State → LLM/工具 → 审批 / 恢复 / 验证 | LangGraph `StateGraph` + Checkpointer；项目内定义用户/事件双入口、条件路由、`interrupt()` 审批、`Command(resume=...)` 恢复；既有 VehicleAgent 保留有界模型/工具循环 | [Graph Runtime](modules/vehicle_ai/workflow/runtime.py) · [Agent](modules/vehicle_ai/agent/vehicle_agent.py) · [设计说明](docs/guide/langgraph-stateful-agent.md) |
 | **可选知识增强** | 问题 + 有效车况 → 有来源的知识片段 → Agent 引用回答；未知或过期状态不参与查询 | LightRAG 1.5.7；tiktoken `o200k_base` 编码、`text-embedding-v3` / 1024 维；NetworkX 图谱 + NanoVectorDB 余弦检索，以 `mix` 合并实体/关系/文本证据、去重取 Top-5；当前未启用 reranker。项目内实现双 profile 隔离、来源校验与只读取证工具 | [具体技术与指标](docs/guide/rag-agent-technical-details.md) · [运行指南](docs/guide/knowledge-rag-demo.md) · [知识工具](modules/vehicle_ai/knowledge/tool.py) |
 | **行程事件记忆** | 风险、提醒、用户选择与动作结果 → 可按当前行程和时间范围检索的历史证据 | Python `sqlite3` 持久化、事件 ID 去重、按行程隔离；Agent 只读查询，不将旧风险当作当前感知 | [运行指南](docs/guide/trip-memory-demo.md) · [事件存储](modules/vehicle_ai/memory/event_store.py) |
 | **受限计划与恢复** | 休息地点搜索 → 候选核验 → 用户确认 → 模拟导航 → 状态回读；失败时安全停止或提供一个需重新确认的候选 | 项目内有限状态计划，最多 9 步 / 1 次恢复；A4 SQLite 保存 `TASK_STEP`；确定性七场景验收：恢复 **1/1**、安全停止 **4/4**、预算 **7/7**、重复写违规 **0/7** | [运行指南](docs/guide/agent-plan-recovery.md) · [验收报告](docs/reports/2026-09-26-a5-bounded-plan-recovery.md) |
@@ -148,6 +158,15 @@ LightRAG 到底如何分词、切块、向量化和排序，见[实际技术链�
 
 <a id="quickstart"></a>
 ## 🚀 快速开始
+
+### LangGraph Stateful Agent：无密钥审批 / 恢复演示
+
+```bash
+uv sync --group dev
+uv run --group dev python -m apps.vehicle_ai_demo.langgraph_demo
+```
+
+该演示使用确定性脚本模型：Agent 请求打开驾驶员车窗后，图在敏感动作前进入 `interrupt`；调用 `resume_stateful("approve")` 后才执行原始 PendingAction。测试还覆盖“首选服务区确认后不可用 → 替代候选再次 interrupt → 第二次确认后执行”，用于验证恢复路径不会自动重放写操作。
 
 ### 无密钥运行完整离线 Demo
 
