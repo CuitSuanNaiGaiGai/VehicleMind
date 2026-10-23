@@ -45,7 +45,7 @@ VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工�
   <a href="assets/demo/vehiclemind_report_full.png"><img src="assets/demo/vehiclemind_report.png" width="95%" alt="VehicleMind 中文离线回放报告，含舱内外画面与最终统一上下文；点击查看完整时间线和断言"/></a>
 </p>
 
-点击截图可查看[完整报告画面](assets/demo/vehiclemind_report_full.png)，其中保留了风险事件、待确认动作、显式确认、工具结果和 9 项场景断言。原始运行产物保存在本地 `runs/`。带可渲染状态机图与跨进程确认实录的终端操作演示见[GitHub 实机演示文档](docs/demo/2026-10-23-github-demo-walkthrough.md)。
+点击截图可查看[完整报告画面](assets/demo/vehiclemind_report_full.png)，其中保留了风险事件、待确认动作、显式确认、工具结果和 9 项场景断言。原始运行产物保存在本地 `runs/`。终端实机演示见[演示文档](docs/demo/2026-10-23-github-demo-walkthrough.md)。
 
 截图展示录制语义观测驱动的 Agent 回放；下方两张 GIF 分别展示独立运行的舱内驾驶员状态感知与舱外道路感知。
 
