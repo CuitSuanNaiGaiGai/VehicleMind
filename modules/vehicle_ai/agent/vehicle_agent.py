@@ -3,18 +3,17 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
+from modules.config.agent_dialogue import AgentDialogueConfig
 from modules.vehicle_ai.agent.action_state import (
     PendingActionStore,
 )
 from modules.vehicle_ai.agent.confirmation import ActionConfirmationController
 from modules.vehicle_ai.agent.task_state import AgentTask, TaskStatus
-from modules.vehicle_ai.agent.turn import run_turn, reconcile
+from modules.vehicle_ai.agent.turn import reconcile
 from modules.vehicle_ai.agent.session import (
-    evidence_message,
     is_pointer,
     record,
     record_final_response,
-    trip_memory_message,
 )
 from modules.vehicle_ai.agent.context_message import build_context_message
 from modules.vehicle_ai.agent.event_advice import build_event_advice_messages
@@ -24,10 +23,10 @@ from modules.vehicle_ai.agent.pending_intent import (
     requested_target,
 )
 from modules.vehicle_ai.agent.plan import PlanStatus
+from modules.vehicle_ai.agent.dialogue_candidates import validate_pending_candidate
+from modules.vehicle_ai.agent.dialogue_coordinator import DialogueCoordinator
+from modules.vehicle_ai.agent.dialogue_state import DialogueSession
 
-from modules.vehicle_ai.agent.prompts import (
-    SYSTEM_PROMPT,
-)
 from modules.vehicle_ai.agent.message_helpers import (
     assistant_tool_message,
     pending_action_message,
@@ -65,10 +64,12 @@ class VehicleAgent:
         max_task_trace_events: int = 200,
         trip_id: str | None = None,
         historical_event_sink: Callable[[dict], None] | None = None,
-        trace_recorder=None,
+        dialogue_config: AgentDialogueConfig | None = None,
+        checkpoint_path: str = ":memory:",
+        thread_id: str | None = None,
+        graph_recursion_limit: int = 256,
     ):
         self.llm = llm
-        self.trace_recorder = trace_recorder
 
         self.context_manager = context_manager
 
@@ -81,6 +82,8 @@ class VehicleAgent:
         self.turn_timeout_seconds = turn_timeout_seconds
         self.max_tool_calls = max_tool_calls
         self.budget_clock = budget_clock
+        self.dialogue_config = dialogue_config or AgentDialogueConfig()
+        self.dialogue_session = DialogueSession()
         if max_task_trace_events < 1:
             raise ValueError("max_task_trace_events must be positive")
         self.max_task_trace_events = max_task_trace_events
@@ -95,12 +98,36 @@ class VehicleAgent:
             self.pending_actions,
             self.tool_registry,
             self.tool_registry.take_confirmation_issuer(),
-            trace_recorder=self.trace_recorder,
         )
         self.context_selector = ContextSelector()
         self.trip_id = trip_id
         self.historical_event_sink = historical_event_sink
         self.plan_flow = TaskPlanFlow()
+        self.dialogue = DialogueCoordinator(self, self.dialogue_config)
+        from modules.vehicle_ai.agent.graph.workflow import VehicleAgentWorkflow
+
+        self.workflow = VehicleAgentWorkflow(
+            self, checkpoint_path, thread_id, graph_recursion_limit
+        )
+        self.graph = self.workflow.graph
+
+    @property
+    def thread_id(self) -> str:
+        return self.workflow.thread_id
+
+    def chat(self, user_text: str, debug: bool = True) -> str:
+        """通过 LangGraph 推进用户任务或恢复等待中的任务。"""
+        return self.workflow.chat(user_text, debug)
+
+    def confirm_pending(self, action_id: str) -> ToolResult:
+        """显式确认通过 Command(resume=...) 进入独立执行节点。"""
+        return self.workflow.confirm(action_id)
+
+    def reject_pending(self, action_id: str) -> ToolResult:
+        return self.workflow.reject(action_id)
+
+    def close(self) -> None:
+        self.workflow.close()
 
     def _context_message(
         self,
@@ -155,11 +182,28 @@ class VehicleAgent:
         elif tool_name == "cancel_navigation":
             self.pending_actions.clear()
 
-    def confirm_pending(self, action_id: str) -> ToolResult:
+    def _confirm_pending_business(self, action_id: str) -> ToolResult:
         pending = self.pending_actions.get()
         action = (
             pending.to_dict() if pending and pending.action_id == action_id else None
         )
+        if not validate_pending_candidate(self, action_id):
+            result = ToolResult(
+                False,
+                "候选已失效，请重新查询后选择。",
+                error="INVALID_CONFIRMATION",
+            )
+            self.task.last_tool_result = result.to_dict()
+            self.task.tool_results.append(result.to_dict())
+            record(
+                self,
+                "confirmation",
+                source="confirmation_controller",
+                quality="TOOL_RESULT",
+                action=action,
+                result=result.to_dict(),
+            )
+            return result
         planned = self.plan_flow.begin_confirmation(self, action)
         result = self.confirmations.confirm(action_id)
         if planned:
@@ -205,7 +249,7 @@ class VehicleAgent:
         )
         return result
 
-    def reject_pending(self, action_id: str) -> ToolResult:
+    def _reject_pending_business(self, action_id: str) -> ToolResult:
         pending = self.pending_actions.get()
         action = (
             pending.to_dict() if pending and pending.action_id == action_id else None
@@ -228,30 +272,11 @@ class VehicleAgent:
     def _record_final_response(self, user_text: str, answer: str) -> str:
         return record_final_response(self, user_text, answer)
 
-    def chat(
+    def _prepare_request(
         self,
         user_text: str,
         debug: bool = True,
-    ) -> str:
-        started = time.perf_counter()
-        try:
-            return self._chat(user_text, debug=debug)
-        finally:
-            if self.trace_recorder is not None:
-                self.trace_recorder.emit(
-                    "task_status",
-                    latency_ms=(time.perf_counter() - started) * 1000,
-                    attributes={
-                        "status": self.task.status.value,
-                        "reason": self.task.reason,
-                    },
-                )
-
-    def _chat(
-        self,
-        user_text: str,
-        debug: bool = True,
-    ) -> str:
+    ) -> dict | str:
 
         user_text = user_text.strip()
 
@@ -291,11 +316,10 @@ class VehicleAgent:
                 quality="SELF_REPORTED",
                 text=user_text,
             )
-            return self._record_final_response(
-                user_text,
+            return (
                 "待确认操作已过期，请重新选择目标。"
                 if expired
-                else "目前没有可确认的目标，请说明要执行什么操作。",
+                else "目前没有可确认的目标，请说明要执行什么操作。"
             )
         if (
             pending is None
@@ -336,9 +360,7 @@ class VehicleAgent:
             previous_action = pending.to_dict()
             if not self.confirmations.reject(pending.action_id).success:
                 self.task.transition(TaskStatus.AWAITING_INPUT, "PENDING_CHANGED")
-                return self._record_final_response(
-                    user_text, "待确认操作已变更，请重新确认当前操作。"
-                )
+                return "待确认操作已变更，请重新确认当前操作。"
             if intent == "change_target":
                 record(
                     self,
@@ -360,7 +382,7 @@ class VehicleAgent:
                 action=previous_action if pending is not None else None,
                 result={"success": True, "message": "用户取消待确认操作。"},
             )
-            return self._record_final_response(user_text, "已取消待确认操作。")
+            return "已取消待确认操作。"
         target = requested_target(user_text) if intent == "change_target" else None
         if intent == "change_target":
             self.task.goal = user_text
@@ -368,32 +390,7 @@ class VehicleAgent:
 
         self.plan_flow.begin(self, self.task.goal or user_text)
 
-        # ----------------------------------------------------
-        # Rebuild dynamic system state every user turn.
-        # ----------------------------------------------------
-
-        messages = [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            self._context_message(
-                user_text=f"{self.task.goal} {user_text}",
-                debug=debug,
-            ),
-            self._pending_action_message(),
-            evidence_message(self),
-            *self.history,
-            {
-                "role": "user",
-                "content": user_text,
-            },
-        ]
-        memory_message = trip_memory_message(self.tool_registry.names())
-        if memory_message is not None:
-            messages.insert(3, memory_message)
-
-        return run_turn(self, user_text, messages, target)
+        return {"target": target}
 
     # ========================================================
     # Reset
@@ -426,10 +423,12 @@ class VehicleAgent:
         self,
     ) -> None:
 
+        self.workflow.reset_thread()
         self.history.clear()
 
         self.pending_actions.clear()
         self.task = AgentTask()
+        self.dialogue_session = DialogueSession()
         self.trace.clear()
         self.trace_sequence = 0
         self.current_user_intent = ""

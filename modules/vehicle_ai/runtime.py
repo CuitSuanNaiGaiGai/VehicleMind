@@ -41,7 +41,6 @@ from modules.vehicle_ai.knowledge.profile_router import ProfileRouter
 from modules.vehicle_ai.knowledge.tool import KnowledgeClient, build_knowledge_tool
 from modules.vehicle_ai.memory import TripEvent, TripEventStore, build_trip_memory_tool
 from modules.vehicle_ai.memory.trace_persistence import trace_to_trip_event
-from modules.vehicle_ai.observability.runtime import RuntimeTracing, TraceBackend
 
 from modules.vehicle_ai.tools import (
     NavigationConfig,
@@ -49,9 +48,9 @@ from modules.vehicle_ai.tools import (
     ToolRegistry,
     build_default_tool_registry,
 )
-from modules.vehicle_ai.workflow import WorkflowResult
 from modules.observation import ObservationMetadata
 from modules.config.events import EventTimingConfig
+from modules.config.agent_dialogue import AgentDialogueConfig
 
 
 class VehicleMindRuntime:
@@ -85,7 +84,11 @@ class VehicleMindRuntime:
         trip_id: str | None = None,
         trip_event_retention_days: int = 30,
         navigation_config: NavigationConfig | None = None,
-        trace_backend: TraceBackend | None = None,
+        dialogue_config: AgentDialogueConfig | None = None,
+        budget_clock: Callable[[], float] = time.monotonic,
+        checkpoint_path: str | Path = ":memory:",
+        thread_id: str | None = None,
+        graph_recursion_limit: int = 256,
     ):
         # ====================================================
         # Shared context
@@ -111,9 +114,6 @@ class VehicleMindRuntime:
         self.trip_event_store = trip_event_store
         self.trip_memory_errors: list[str] = []
         self.trip_id = trip_id or uuid.uuid4().hex
-        self.thread_id = f"vehiclemind-trip-{self.trip_id}"
-
-        self.tracing = RuntimeTracing(self, self.thread_id, trace_backend)
         if trip_event_store is not None:
             if not self.trip_id.strip():
                 raise ValueError("trip_id must not be empty")
@@ -156,6 +156,7 @@ class VehicleMindRuntime:
             extra_tools=knowledge_tools + memory_tools,
             navigation_config=navigation_config,
         )
+
         # ====================================================
         # Vehicle Agent
         # ====================================================
@@ -173,9 +174,11 @@ class VehicleMindRuntime:
             historical_event_sink=(
                 self._persist_agent_trace if trip_event_store is not None else None
             ),
-        )
-        self.workflow = self.tracing.configure_workflow(
-            self.agent, self.tools, self.thread_id
+            dialogue_config=dialogue_config,
+            budget_clock=budget_clock,
+            checkpoint_path=str(checkpoint_path),
+            thread_id=thread_id,
+            graph_recursion_limit=graph_recursion_limit,
         )
         recommendation = AgentPolicy.from_yaml().recommendation
         if not enable_event_recommendations:
@@ -462,33 +465,6 @@ class VehicleMindRuntime:
             debug=debug,
         )
 
-    def chat_stateful(
-        self,
-        text: str,
-        debug: bool = True,
-    ) -> WorkflowResult:
-        """Run a user turn through the checkpointed LangGraph workflow."""
-
-        return self.workflow.invoke_user(text, debug=debug)
-
-    def resume_stateful(
-        self,
-        decision: str,
-    ) -> WorkflowResult:
-        """Resume a graph paused at the sensitive-action approval gate."""
-
-        if decision not in {"approve", "reject"}:
-            raise ValueError("decision must be 'approve' or 'reject'")
-        return self.workflow.resume(decision)
-
-    def handle_event_stateful(
-        self,
-        event: VehicleEvent,
-    ) -> WorkflowResult:
-        """Run a semantic perception event through the same stateful graph."""
-
-        return self.workflow.invoke_event(event)
-
     # ========================================================
     # Context snapshot
     # ========================================================
@@ -498,3 +474,8 @@ class VehicleMindRuntime:
     ) -> str:
 
         return self.context_manager.summary()
+
+    def close(self) -> None:
+        """先等待事件建议线程退出，再关闭图持久化连接。"""
+        self._recommendation_executor.shutdown(wait=True)
+        self.agent.close()

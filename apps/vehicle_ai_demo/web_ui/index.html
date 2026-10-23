@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VehicleMind · LangGraph 交互演示</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/graph.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <div class="brand"><span class="brand-mark">VM</span><div><strong>VehicleMind</strong><span>PERCEPTION TO ACTION</span></div></div>
+    <div class="header-status"><span class="connection-dot" id="connection-dot"></span><span id="connection">连接中</span><span class="local-label">本地演示 / 模拟车机</span></div>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">LANGGRAPH LIVE WORKSPACE</p><h1>看见 Agent 如何做出行动。</h1><p class="subtitle">输入请求，观察真实节点流转，在执行敏感操作前亲自确认。</p></div>
+      <div class="session-controls"><label for="provider">新会话模型</label><div><select id="provider"><option value="scripted">离线脚本</option><option value="qwen">Qwen</option><option value="glm">GLM</option></select><button id="new-session" class="secondary">新会话</button></div></div>
+    </section>
+    <div id="error" role="alert" hidden></div>
+    <div class="workspace">
+      <aside class="console panel">
+        <div class="panel-heading"><div><span class="section-number">01</span><h2>请求与确认</h2></div><span id="model-badge" class="badge">连接中</span></div>
+        <p id="model-note" class="model-note"></p>
+        <div id="conversation" class="conversation" role="log" aria-label="请求与回复">
+          <div class="empty-chat"><span class="empty-mark">VM</span><h3>从一个真实请求开始</h3><p>选一个示例，或输入自己的请求。</p></div>
+        </div>
+        <section id="pending" class="pending" hidden aria-label="待确认操作">
+          <div class="pending-heading"><span class="badge warning">等待用户确认</span><span id="expiry"></span></div>
+          <h3 id="pending-title"></h3><code id="pending-tool"></code><pre id="pending-arguments"></pre>
+          <div class="pending-actions"><button id="confirm" class="primary">确认执行</button><button id="reject" class="secondary">拒绝</button></div>
+          <p class="pending-note">确认绑定当前动作 ID 与原始参数。</p>
+        </section>
+        <div class="examples" aria-label="示例请求"><button data-example="帮我找附近服务区并导航">查找服务区并导航</button><button data-example="打开驾驶员车窗">打开车窗</button><button data-example="把温度设为22度">温度设为 22 度</button><button data-example="查询车辆状态">查询车辆状态</button></div>
+        <form id="chat-form"><label class="sr-only" for="request">输入请求</label><textarea id="request" rows="2" placeholder="例如：帮我找附近服务区并导航" maxlength="4000"></textarea><div class="composer-footer"><span>Enter 发送 · Shift + Enter 换行</span><button class="primary" id="send" type="submit">发送请求 <span aria-hidden="true">→</span></button></div></form>
+        <code id="thread-id" class="thread-id"></code>
+      </aside>
+      <section class="execution">
+        <section class="graph-panel panel">
+          <div class="panel-heading"><div><span class="section-number">02</span><h2>真实工作流</h2></div><label class="edge-toggle"><input type="checkbox" id="all-edges">全部条件边</label></div>
+          <div class="execution-status"><span id="execution-label">准备就绪</span><code id="active-node">等待请求</code><span id="node-count">0 次节点执行</span></div>
+          <div class="graph-scroll"><svg id="graph" viewBox="0 0 900 565" role="img" aria-label="LangGraph 实际节点和条件边"></svg></div>
+          <div class="graph-footer"><div class="legend"><span><i class="idle"></i>未执行</span><span><i class="done"></i>已执行</span><span><i class="active"></i>执行中</span><span><i class="waiting"></i>等待确认</span></div><span id="node-detail">点击节点查看职责</span></div>
+        </section>
+        <section class="details panel">
+          <div class="panel-heading"><div><span class="section-number">03</span><h2>执行证据</h2></div><button id="recover" class="secondary" hidden>恢复中断执行</button><span id="task-status" class="badge">尚无任务</span></div>
+          <div class="tabs" role="tablist" aria-label="执行证据"><button role="tab" aria-selected="true" data-tab="timeline" id="tab-timeline" aria-controls="evidence">节点事件</button><button role="tab" aria-selected="false" data-tab="state" id="tab-state" aria-controls="evidence">State</button><button role="tab" aria-selected="false" data-tab="tools" id="tab-tools" aria-controls="evidence">工具结果</button><button role="tab" aria-selected="false" data-tab="context" id="tab-context" aria-controls="evidence">Context / Messages</button><button role="tab" aria-selected="false" data-tab="vehicle" id="tab-vehicle" aria-controls="evidence">模拟车辆</button></div>
+          <div id="evidence" class="evidence" role="tabpanel" aria-labelledby="tab-timeline"><p class="empty-evidence">执行事件将在这里实时出现。</p></div>
+        </section>
+      </section>
+    </div>
+  </main>
+  <footer>LangGraph 原生 tasks / values 事件驱动 · SQLite checkpoint · 动作由独立安全执行层校验</footer>
+</body>
+</html>
