@@ -14,6 +14,17 @@ def is_pointer(text: str) -> bool:
 def record(agent, kind: str, **data) -> None:
     pending = agent.pending_actions.get()
     agent.task.pending_action = pending.to_dict() if pending else None
+    config = getattr(agent, "dialogue_config", None)
+    dialogue_context = (
+        {
+            "session_id": agent.dialogue_session.session_id,
+            "turn_id": agent.dialogue_session.turn_id,
+            "task_id": agent.task.task_id,
+            "task_revision": agent.task.revision,
+        }
+        if config is not None and config.enabled
+        else {}
+    )
     agent.trace.append(
         deepcopy(
             {
@@ -21,6 +32,7 @@ def record(agent, kind: str, **data) -> None:
                 "at_seconds": agent.pending_actions.now(),
                 "clock": "runtime_action_clock",
                 "kind": kind,
+                **dialogue_context,
                 "task": agent.task.to_dict(),
                 **data,
             }

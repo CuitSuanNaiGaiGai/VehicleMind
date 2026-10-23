@@ -38,6 +38,7 @@ class TrialResult:
     interaction_events: tuple[dict[str, Any], ...]
     agent_trace: tuple[dict[str, Any], ...] = ()
     policy_trace: tuple[dict[str, Any], ...] = ()
+    graph_trace: tuple[dict[str, Any], ...] = ()
 
 
 class RecordingClient(BaseLLMClient):
@@ -259,6 +260,8 @@ def run_trial(
         }
         for item in runtime.tools.execution_history()
     )
+    graph_state = runtime.agent.graph.get_state(runtime.agent.workflow.config)
+    runtime.close()
     return TrialResult(
         case_id=case.id,
         provider=provider,
@@ -301,9 +304,13 @@ def run_trial(
             "max_tool_calls": max_tool_calls,
             "max_task_trace_events": max_task_trace_events,
             "client_max_retries": 0,
+            "orchestration": "langgraph",
+            "graph_recursion_limit": runtime.agent.workflow.recursion_limit,
+            "checkpoint_backend": "sqlite",
         },
         interaction_events=tuple(interaction_events),
         agent_trace=tuple(plain_value(runtime.agent.trace)),
+        graph_trace=tuple(plain_value(graph_state.values.get("graph_trace", []))),
         policy_trace=tuple(
             plain_value(asdict(item))
             for item in runtime.recommendation_coordinator.trace

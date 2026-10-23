@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from modules.vehicle_ai.agent.action_state import PendingAction, PendingActionStore
@@ -27,6 +28,7 @@ class ActionConfirmationController:
         *,
         display_text: str | None = None,
         metadata: dict[str, Any] | None = None,
+        expires_at: float | None = None,
     ) -> None:
         try:
             tool = self.tool_registry.get(tool_name)
@@ -35,12 +37,29 @@ class ActionConfirmationController:
         if not tool.requires_confirmation:
             return
 
+        now = self.pending_actions.now()
+        ttl = 120.0
+        if expires_at is not None:
+            ttl = min(ttl, expires_at - now)
+            if ttl <= 0:
+                return
+
         pending = self.pending_actions.get()
         if (
             pending is not None
             and pending.tool_name == tool_name
             and pending.arguments == arguments
         ):
+            if expires_at is not None:
+                deadline = min(
+                    pending.created_at + pending.expires_after_seconds,
+                    expires_at,
+                )
+                shorter = deadline - pending.created_at
+                if shorter < pending.expires_after_seconds:
+                    self.pending_actions.set(
+                        replace(pending, expires_after_seconds=shorter)
+                    )
             return
         self.pending_actions.set(
             PendingAction(
@@ -48,7 +67,8 @@ class ActionConfirmationController:
                 arguments=dict(arguments),
                 display_text=display_text or f"确认车机操作：{tool_name}",
                 metadata={"user_intent": user_intent, **(metadata or {})},
-                created_at=self.pending_actions.now(),
+                created_at=now,
+                expires_after_seconds=ttl,
             )
         )
 

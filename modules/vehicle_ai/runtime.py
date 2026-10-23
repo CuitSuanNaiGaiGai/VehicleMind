@@ -50,6 +50,7 @@ from modules.vehicle_ai.tools import (
 )
 from modules.observation import ObservationMetadata
 from modules.config.events import EventTimingConfig
+from modules.config.agent_dialogue import AgentDialogueConfig
 
 
 class VehicleMindRuntime:
@@ -83,6 +84,11 @@ class VehicleMindRuntime:
         trip_id: str | None = None,
         trip_event_retention_days: int = 30,
         navigation_config: NavigationConfig | None = None,
+        dialogue_config: AgentDialogueConfig | None = None,
+        budget_clock: Callable[[], float] = time.monotonic,
+        checkpoint_path: str | Path = ":memory:",
+        thread_id: str | None = None,
+        graph_recursion_limit: int = 256,
     ):
         # ====================================================
         # Shared context
@@ -168,6 +174,11 @@ class VehicleMindRuntime:
             historical_event_sink=(
                 self._persist_agent_trace if trip_event_store is not None else None
             ),
+            dialogue_config=dialogue_config,
+            budget_clock=budget_clock,
+            checkpoint_path=str(checkpoint_path),
+            thread_id=thread_id,
+            graph_recursion_limit=graph_recursion_limit,
         )
         recommendation = AgentPolicy.from_yaml().recommendation
         if not enable_event_recommendations:
@@ -463,3 +474,8 @@ class VehicleMindRuntime:
     ) -> str:
 
         return self.context_manager.summary()
+
+    def close(self) -> None:
+        """先等待事件建议线程退出，再关闭图持久化连接。"""
+        self._recommendation_executor.shutdown(wait=True)
+        self.agent.close()
