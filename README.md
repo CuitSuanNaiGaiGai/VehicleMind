@@ -56,10 +56,10 @@ VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工�
 
 **Agent 工程要点**
 
-- **有状态工作流：**用户请求与语义事件进入 LangGraph `StateGraph`，checkpoint 保存可恢复状态；见 [LangGraph Runtime](modules/vehicle_ai/workflow/runtime.py) 和[设计指南](docs/guide/langgraph-stateful-agent.md)。
+- **有状态工作流：**用户请求与语义事件进入 LangGraph `StateGraph`，checkpoint 保存可恢复状态；见 [LangGraph Runtime](modules/vehicle_ai/agent/graph/workflow.py) 和[设计指南](docs/guide/langgraph-stateful-agent.md)。
 - **执行时授权：**敏感写操作先形成 PendingAction 并由 `interrupt()` 暂停；批准后图以 `Command(resume=...)` 继续，ToolRegistry 仍是实际工具执行与策略检查边界；见[工具注册表](modules/vehicle_ai/tools/registry.py)和[确认设计](docs/agent_pending_actions.md)。
 - **有界恢复并重新确认：**失败恢复产生的新候选需要新的 PendingAction 和用户批准，不会自动重放写操作；见[计划与恢复指南](docs/guide/agent-plan-recovery.md)。
-- **关联追踪与评测：**结构化 trace 关联 `thread_id` / `task_id`，记录图节点、模型/工具调用、策略、审批、恢复、状态和耗时，并可附到 trial 结果；见[Trace 实现](modules/vehicle_ai/observability/trace.py)与[评测运行器](modules/vehicle_ai/evaluation/runner.py)。
+- **关联追踪与评测：**图执行 trace（`graph_trace`）记录图节点与状态并可附到 trial 结果；见[评测运行器](modules/vehicle_ai/evaluation/runner.py)。
 
 Runtime 默认使用进程内 `InMemorySaver` 保存单座舱 Demo / 测试的 checkpoint。结构化 trace 记录关联 ID、执行状态与耗时等元数据，默认保存在进程内，可通过可选 `TraceBackend` 导出。
 
@@ -70,10 +70,10 @@ Runtime 默认使用进程内 `InMemorySaver` 保存单座舱 Demo / 测试的 c
 |---|---|
 | **多模态语义观测** | 舱内驾驶员状态与舱外道路画面经感知适配成为结构化观测；Agent 消费语义观测，不直接把视频帧作为工具动作 |
 | **统一决策上下文** | Driver / Road / Vehicle 语义状态集中管理，区分未知、无效和过期观测，并与用户请求一起提供给 Agent；见[上下文管理](modules/vehicle_ai/context/context_manager.py) |
-| **Stateful Agent 编排** | LangGraph `StateGraph` 连接请求/事件、VehicleAgent、工具策略、审批中断与恢复；见[Graph Runtime](modules/vehicle_ai/workflow/runtime.py) |
+| **Stateful Agent 编排** | LangGraph `StateGraph` 连接请求/事件、VehicleAgent、工具策略、审批中断与恢复；见[Graph Runtime](modules/vehicle_ai/agent/graph/workflow.py) |
 | **受控工具执行** | ToolRegistry 是策略检查和工具调用边界；敏感写操作先形成 PendingAction、暂停等待用户批准，恢复后仍须经过注册表执行；见[工具注册表](modules/vehicle_ai/tools/registry.py)与[确认设计](docs/agent_pending_actions.md) |
 | **支持模块** | 可选 LightRAG 提供知识检索，SQLite 行程记忆提供只读历史事件查询；见[知识工具](modules/vehicle_ai/knowledge/tool.py)与[事件存储](modules/vehicle_ai/memory/event_store.py) |
-| **追踪与评测** | 结构化 trace 关联 Agent 工作流与 trial；离线回放保留配置快照、断言和中文 HTML 报告，见[Trace](modules/vehicle_ai/observability/trace.py)与[评测运行器](modules/vehicle_ai/evaluation/runner.py) |
+| **追踪与评测** | 图执行 trace 关联 Agent 工作流与 trial；离线回放保留配置快照、断言和中文 HTML 报告，见[评测运行器](modules/vehicle_ai/evaluation/runner.py) |
 
 <a id="architecture"></a>
 ## 🧠 系统架构
@@ -121,10 +121,10 @@ flowchart LR
 
 | Agent 主线 | 技术与项目内工作 | 实现与设计 |
 |---|---|---|
-| **上下文与 Runtime** | 语义观测和车辆状态汇入统一上下文；LangGraph `StateGraph` 编排用户/事件双入口，VehicleAgent 在有界模型/工具循环中连接 Qwen / GLM API 并选择工具 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [Graph Runtime](modules/vehicle_ai/workflow/runtime.py) · [VehicleAgent](modules/vehicle_ai/agent/vehicle_agent.py) · [设计指南](docs/guide/langgraph-stateful-agent.md) |
+| **上下文与 Runtime** | 语义观测和车辆状态汇入统一上下文；LangGraph `StateGraph` 编排用户/事件双入口，VehicleAgent 在有界模型/工具循环中连接 Qwen / GLM API 并选择工具 | [上下文管理](modules/vehicle_ai/context/context_manager.py) · [Graph Runtime](modules/vehicle_ai/agent/graph/workflow.py) · [VehicleAgent](modules/vehicle_ai/agent/vehicle_agent.py) · [设计指南](docs/guide/langgraph-stateful-agent.md) |
 | **执行时授权** | ToolRegistry 执行策略检查；敏感动作形成 PendingAction，经 `interrupt()` 等待批准，再以 `Command(resume=...)` 恢复并执行 | [工具注册表](modules/vehicle_ai/tools/registry.py) · [确认设计](docs/agent_pending_actions.md) |
 | **有界计划与恢复** | 搜索、候选核验、确认、模拟导航与状态回读；最多 9 步 / 1 次恢复，替代候选需要重新确认 | [计划与恢复指南](docs/guide/agent-plan-recovery.md) |
-| **结构化 Trace** | 关联 `thread_id` / `task_id`，记录图节点、模型/工具调用、策略、审批、恢复、状态和耗时；支持可选导出 backend | [Trace](modules/vehicle_ai/observability/trace.py) · [Runtime 集成](modules/vehicle_ai/observability/runtime.py) |
+| **结构化 Trace** | 图执行 trace（`graph_trace`）随 trial 结果落盘，支持离线回放与判分 | [评测运行器](modules/vehicle_ai/evaluation/runner.py) |
 | **评测与回放** | YAML 场景、自动断言、配置快照和中文 HTML 报告；Agent evaluator 可将工作流 trace 附到 trial | [回放运行器](modules/vehicle_ai/replay/runner.py) · [Agent Trial](modules/vehicle_ai/evaluation/runner.py) · [在线回归指南](docs/guide/agent-regression.md) |
 
 **支持输入：**[舱内感知](docs/cabin_perception.md)（OpenCV / MediaPipe，驾驶员状态）· [舱外感知](docs/road_perception.md)（YOLOPv2 / ONNX Runtime，道路语义）· [LightRAG](docs/guide/rag-agent-technical-details.md)（知识证据）· [SQLite 行程记忆](docs/guide/trip-memory-demo.md)（只读历史查询）。
@@ -139,7 +139,7 @@ flowchart LR
 | **确定性工作流** | 确认导航 **9/9**、取消导航 **7/7** 断言通过；两个场景的未确认敏感动作执行均为 0 次 | [确认场景](assets/scenarios/drowsy_rest_stop.yaml) · [取消场景](assets/scenarios/drowsy_rest_stop_cancel.yaml) |
 | **A5 计划与恢复** | 固定场景 **7/7**；恢复 **1/1**、安全停止 **4/4**、确认合规 **7/7**、双次回放一致 **7/7**、重复写违规 **0/7** | [A5 验收报告](docs/reports/2026-09-26-a5-bounded-plan-recovery.md) · [交互结果](docs/reports/a5-bounded-plan-recovery/report.html) |
 | **A6 在线回归（阶段记录）** | Qwen / GLM：Task Success **80/120 / 90/120**；Mechanical Pass **116/120 / 107/120**；Context Grounding **38/66 / 48/66**；stale/UNKNOWN Handling **4/18 / 9/18** | [A6 回归报告](docs/reports/2026-09-26-a6-online-regression.md) · [交互报告](docs/reports/a6-post-a5-regression/report.html) |
-| **关联追踪** | 结构化事件将工作流、模型/工具调用与 trial 关联；现有测试覆盖关联 ID、节点与耗时等字段 | [Trace 实现](modules/vehicle_ai/observability/trace.py) · [可观测性测试](tests/vehicle_ai/test_agent_observability.py) · [评测运行器](modules/vehicle_ai/evaluation/runner.py) |
+| **关联追踪** | 图执行 trace 将工作流节点与 trial 关联；现有测试覆盖图状态导出等字段 | [评测运行器](modules/vehicle_ai/evaluation/runner.py) |
 
 工作流与 A5 使用确定性脚本模型、合成语义观测和模拟工具。A6 使用 **40 条冻结场景 × 3 次、每模型 120 trial**，由 Qwen v4 AI 辅助语义审核；历史预算配置不完整，前后结果并列展示。最新完整重测与其他阶段记录保留在下方证据表。
 
