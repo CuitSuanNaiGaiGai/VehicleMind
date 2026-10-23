@@ -339,6 +339,47 @@ def test_matching_pending_survives_other_blocked_call_in_same_batch() -> None:
     assert len(runtime.tools.execution_history()) == 1
 
 
+def test_candidate_expiration_caps_and_can_only_shorten_matching_pending() -> None:
+    now = [10.0]
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient((ScriptedResponse(content="unused"),)),
+        action_clock=lambda: now[0],
+    )
+    runtime.agent.confirmations.stage(
+        "start_navigation", {"poi_id": "rest_area_001"}, expires_at=100.0
+    )
+    original = runtime.agent.pending_actions.get()
+    assert original.expires_after_seconds == 90.0
+
+    now[0] = 20.0
+    runtime.agent.confirmations.stage(
+        "start_navigation", {"poi_id": "rest_area_001"}, expires_at=60.0
+    )
+    shortened = runtime.agent.pending_actions.get()
+    assert shortened.action_id == original.action_id
+    assert shortened.created_at == original.created_at
+    assert shortened.expires_after_seconds == 50.0
+
+    now[0] = 30.0
+    runtime.agent.confirmations.stage(
+        "start_navigation", {"poi_id": "rest_area_001"}, expires_at=95.0
+    )
+    unchanged = runtime.agent.pending_actions.get()
+    assert unchanged.action_id == original.action_id
+    assert unchanged.expires_after_seconds == 50.0
+
+
+def test_candidate_expiration_at_now_does_not_create_pending_action() -> None:
+    runtime = VehicleMindRuntime(
+        llm=ScriptedLLMClient((ScriptedResponse(content="unused"),)),
+        action_clock=lambda: 25.0,
+    )
+    runtime.agent.confirmations.stage(
+        "start_navigation", {"poi_id": "rest_area_001"}, expires_at=25.0
+    )
+    assert runtime.agent.pending_actions.get() is None
+
+
 def test_sensitive_pending_cannot_be_replaced_by_later_search_in_batch() -> None:
     llm = ScriptedLLMClient(
         responses=(

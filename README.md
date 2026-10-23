@@ -280,7 +280,11 @@ uv run --group dev python -m modules.vehicle_ai.evaluation.cli \
 uv run --group dev python -m pytest -q
 uv run --group dev ruff check apps modules scripts tests
 uv run --group dev python scripts/check_source_size.py
+uv run --group dev python scripts/export_promptfoo_config.py --check
 ```
+
+- 评测门禁：promptfoo 注入门禁评测（确定性、离线）由 [Eval workflow](.github/workflows/eval.yml) 在 CI 执行；本地与在线金标评测（含 rubric 语义判分）的运行方式见[评测 Harness 指南](docs/guide/promptfoo-harness.md)。
+- Judge 校准：`uv run --group dev python scripts/judge_calibration.py` 用 20 条参考标签与已记录 run 的 judge verdict 计算 Cohen's kappa（零 API 成本）；证据边界见[评测 Harness 指南](docs/guide/promptfoo-harness.md)。
 
 <a id="structure"></a>
 ## 📁 项目结构

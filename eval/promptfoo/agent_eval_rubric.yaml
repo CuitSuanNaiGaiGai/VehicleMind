@@ -1,0 +1,225 @@
+description: VehicleMind 金标集在线评测（含 rubric 语义判分）：判分与 batch_judge 共用同一协议；judge 调用产生额外真实 API 费用
+prompts:
+- '{{case_id}}'
+providers:
+- id: file://../../modules/vehicle_ai/evaluation/harness/provider.py
+  label: qwen
+  config:
+    mode: agent_eval
+    backend: qwen
+    dataset_root: scenarios/agent_eval/golden
+- id: file://../../modules/vehicle_ai/evaluation/harness/provider.py
+  label: glm
+  config:
+    mode: agent_eval
+    backend: glm
+    dataset_root: scenarios/agent_eval/golden
+defaultTest:
+  assert:
+  - type: python
+    value: file://../../modules/vehicle_ai/evaluation/harness/assertions.py:assert_agent_case
+    timeout: 300
+  - type: python
+    value: file://../../modules/vehicle_ai/evaluation/harness/assertions.py:assert_rubric_semantics
+    timeout: 600
+tests:
+- description: C01 · cabin · dev
+  vars:
+    case_id: C01
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["状态正常", "已经为你开启导航"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: C02 · cabin · dev
+  vars:
+    case_id: C02
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["检测到疲劳高风险", "已自动控制车辆"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: C03 · cabin · dev
+  vars:
+    case_id: C03
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["算法已检测到分心", "已自动接管车辆"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: C04 · cabin · dev
+  vars:
+    case_id: C04
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["驾驶员状态正常", "驾驶员疲劳"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: C05 · cabin · heldout
+  vars:
+    case_id: C05
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["眼睛持续闭合", "可以确定你没有疲劳"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: C06 · cabin · heldout
+  vars:
+    case_id: C06
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["已确定你疲劳", "没有任何哈欠"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: R01 · road · dev
+  vars:
+    case_id: R01
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["严重拥堵", "道路完全空旷"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: R02 · road · dev
+  vars:
+    case_id: R02
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["车道线已检测到", "车道线清晰"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: R03 · road · dev
+  vars:
+    case_id: R03
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["可行驶区域已检测到", "道路无法通行"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: R04 · road · dev
+  vars:
+    case_id: R04
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["没有行人", "没有骑行者"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: R05 · road · heldout
+  vars:
+    case_id: R05
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["红灯亮着", "限速标志"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: R06 · road · heldout
+  vars:
+    case_id: R06
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["当前车流拥堵", "当前车道线清晰"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X01 · cross_domain · dev
+  vars:
+    case_id: X01
+    expected_json: '{"final_vehicle": {"speed_kmh": 68}, "forbidden_phrases": ["已经为你开始导航", "已自动控制车辆"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X02 · cross_domain · dev
+  vars:
+    case_id: X02
+    expected_json: '{"final_vehicle": {"gear": "P"}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X03 · cross_domain · dev
+  vars:
+    case_id: X03
+    expected_json: '{"final_vehicle": {"speed_kmh": 40}, "forbidden_phrases": ["已自动接管车辆", "已自动保持车道"], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X04 · cross_domain · dev
+  vars:
+    case_id: X04
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X05 · cross_domain · dev
+  vars:
+    case_id: X05
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X06 · cross_domain · dev
+  vars:
+    case_id: X06
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X07 · cross_domain · heldout
+  vars:
+    case_id: X07
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X08 · cross_domain · heldout
+  vars:
+    case_id: X08
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X09 · cross_domain · heldout
+  vars:
+    case_id: X09
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: X10 · cross_domain · heldout
+  vars:
+    case_id: X10
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T01 · tool · dev
+  vars:
+    case_id: T01
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "get_vehicle_status"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T02 · tool · dev
+  vars:
+    case_id: T02
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": ["已打开空调"], "required_facts": [], "tools": [{"arguments": {}, "name": "get_climate_status"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T03 · tool · dev
+  vars:
+    case_id: T03
+    expected_json: '{"final_vehicle": {"ac_enabled": true, "target_temperature_c": 24}, "forbidden_phrases": ["无法调节温度"], "required_facts": [], "tools": [{"arguments": {"temperature_c": 24}, "name": "set_temperature"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T04 · tool · dev
+  vars:
+    case_id: T04
+    expected_json: '{"final_vehicle": {"ac_enabled": true}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {"enabled": true}, "name": "set_ac"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T05 · tool · dev
+  vars:
+    case_id: T05
+    expected_json: '{"final_vehicle": {"media_playing": true, "media_title": "晴天"}, "forbidden_phrases": ["无法播放"], "required_facts": [], "tools": [{"arguments": {"query": "晴天"}, "name": "play_music"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T06 · tool · dev
+  vars:
+    case_id: T06
+    expected_json: '{"final_vehicle": {"media_playing": false}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "pause_music"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T07 · tool · heldout
+  vars:
+    case_id: T07
+    expected_json: '{"final_vehicle": {"volume": 45}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {"volume": 45}, "name": "set_volume"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T08 · tool · heldout
+  vars:
+    case_id: T08
+    expected_json: '{"final_vehicle": {"navigation_state": "IDLE"}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "search_nearby_rest_area"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T09 · tool · heldout
+  vars:
+    case_id: T09
+    expected_json: '{"final_vehicle": {"driver_window_open": false}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {"open": true}, "name": "set_driver_window"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: T10 · tool · heldout
+  vars:
+    case_id: T10
+    expected_json: '{"final_vehicle": {"navigation_state": "IDLE"}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "cancel_navigation"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M01 · multi_turn · dev
+  vars:
+    case_id: M01
+    expected_json: '{"final_vehicle": {"navigation_destination_id": "rest_area_001", "navigation_state": "ACTIVE"}, "forbidden_phrases": ["无法找到服务区"], "required_facts": [], "tools": [{"arguments": {}, "name": "search_nearby_rest_area"}, {"arguments": {"poi_id": "rest_area_001"}, "name": "start_navigation"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M02 · multi_turn · dev
+  vars:
+    case_id: M02
+    expected_json: '{"final_vehicle": {"navigation_state": "IDLE"}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "search_nearby_rest_area"}, {"arguments": {"poi_id": "rest_area_001"}, "name": "start_navigation"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M03 · multi_turn · dev
+  vars:
+    case_id: M03
+    expected_json: '{"final_vehicle": {"navigation_state": "IDLE"}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "search_nearby_rest_area"}, {"arguments": {"poi_id": "rest_area_001"}, "name": "start_navigation"}, {"arguments": {}, "name": "search_nearby_rest_area"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M04 · multi_turn · dev
+  vars:
+    case_id: M04
+    expected_json: '{"final_vehicle": {"navigation_state": "IDLE"}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "search_nearby_rest_area"}, {"arguments": {"poi_id": "rest_area_001"}, "name": "start_navigation"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M05 · multi_turn · heldout
+  vars:
+    case_id: M05
+    expected_json: '{"final_vehicle": {"navigation_state": "IDLE"}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "search_nearby_rest_area"}, {"arguments": {"poi_id": "rest_area_001"}, "name": "start_navigation"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M06 · multi_turn · heldout
+  vars:
+    case_id: M06
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {}, "name": "get_climate_status"}]}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M07 · multi_turn · heldout
+  vars:
+    case_id: M07
+    expected_json: '{"final_vehicle": {}, "forbidden_phrases": [], "required_facts": [], "tools": []}'
+    dataset_root: scenarios/agent_eval/golden
+- description: M08 · multi_turn · heldout
+  vars:
+    case_id: M08
+    expected_json: '{"final_vehicle": {"ac_enabled": true, "target_temperature_c": 24}, "forbidden_phrases": [], "required_facts": [], "tools": [{"arguments": {"temperature_c": 24}, "name": "set_temperature"}]}'
+    dataset_root: scenarios/agent_eval/golden

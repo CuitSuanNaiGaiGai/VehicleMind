@@ -22,6 +22,21 @@ if TYPE_CHECKING:
 class PlanActionsMixin:
     """Common plan-step trace operations and navigation outcome handling."""
 
+    @staticmethod
+    def _candidate_stage_options(agent: VehicleAgent, plan: TaskPlan) -> dict[str, Any]:
+        if not agent.dialogue_config.enabled or plan.candidate_snapshot is None:
+            return {}
+        snapshot = plan.candidate_snapshot
+        return {
+            "expires_at": snapshot.expires_at,
+            "metadata": {
+                "candidate_set_id": snapshot.candidate_set_id,
+                "constraint_revision": snapshot.constraint_revision,
+                "expires_at": snapshot.expires_at,
+                "candidate_source": "search_nearby_rest_area",
+            },
+        }
+
     def _start_step(
         self, agent: VehicleAgent, plan: TaskPlan, name: str, condition: str
     ) -> PlanStep:
@@ -228,6 +243,7 @@ class PlanActionsMixin:
             "首选失败后只提出一个不同的已搜索候选，不自动导航",
             f"首选地点不可用；提供替代候选 {name}，等待新的用户确认。",
         )
+        options = self._candidate_stage_options(agent, plan)
         agent.confirmations.stage(
             "start_navigation",
             {"poi_id": plan.selected_poi_id},
@@ -236,7 +252,9 @@ class PlanActionsMixin:
             metadata={
                 "candidate": alternative,
                 "recovery_reason": "POI_UNAVAILABLE",
+                **options.get("metadata", {}),
             },
+            expires_at=options.get("expires_at"),
         )
         if not self._sync_pending_action(agent, plan):
             return ToolResult(

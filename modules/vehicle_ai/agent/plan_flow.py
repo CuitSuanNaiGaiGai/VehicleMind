@@ -474,12 +474,18 @@ class TaskPlanFlow(PlanActionsMixin):
             "AWAIT_CONFIRMATION",
             "只准备用户明确指定的规范 POI，等待本次动作确认",
         )
+        options = self._candidate_stage_options(agent, plan)
         agent.confirmations.stage(
             "start_navigation",
             {"poi_id": plan.selected_poi_id},
             user_intent=agent.current_user_intent,
             display_text=f"确认导航至{name}",
-            metadata={"candidate": candidate, "selection_reason": reason},
+            metadata={
+                "candidate": candidate,
+                "selection_reason": reason,
+                **options.get("metadata", {}),
+            },
+            expires_at=options.get("expires_at"),
         )
         if not self._sync_pending_action(agent, plan):
             return

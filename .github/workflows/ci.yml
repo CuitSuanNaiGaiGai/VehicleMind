@@ -39,6 +39,13 @@ jobs:
           modules/config
           modules/vehicle_ai/context/enums.py
           modules/vehicle_ai/integration/cabin_adapter.py
+          modules/vehicle_ai/agent/graph
+          modules/vehicle_ai/evaluation/runner.py
+          apps/vehicle_ai_demo/langgraph_demo.py
+          apps/vehicle_ai_demo/web_demo.py
+          apps/vehicle_ai_demo/web_http.py
+          apps/vehicle_ai_demo/web_session.py
+          apps/vehicle_ai_demo/web_model.py
           scripts/verify_assets.py
 
       - name: Enforce source-size policy
