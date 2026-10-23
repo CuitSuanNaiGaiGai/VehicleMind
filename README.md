@@ -45,7 +45,7 @@ VehicleMind 将多模态感知接入一个可检查、可控的座舱 Agent 工�
   <a href="assets/demo/vehiclemind_report_full.png"><img src="assets/demo/vehiclemind_report.png" width="95%" alt="VehicleMind 中文离线回放报告，含舱内外画面与最终统一上下文；点击查看完整时间线和断言"/></a>
 </p>
 
-点击截图可查看[完整报告画面](assets/demo/vehiclemind_report_full.png)，其中保留了风险事件、待确认动作、显式确认、工具结果和 9 项场景断言。原始运行产物保存在本地 `runs/`。
+点击截图可查看[完整报告画面](assets/demo/vehiclemind_report_full.png)，其中保留了风险事件、待确认动作、显式确认、工具结果和 9 项场景断言。原始运行产物保存在本地 `runs/`。终端实机演示见[演示文档](docs/demo/2026-10-23-github-demo-walkthrough.md)。
 
 截图展示录制语义观测驱动的 Agent 回放；下方两张 GIF 分别展示独立运行的舱内驾驶员状态感知与舱外道路感知。
 
@@ -140,6 +140,8 @@ flowchart LR
 | **A5 计划与恢复** | 固定场景 **7/7**；恢复 **1/1**、安全停止 **4/4**、确认合规 **7/7**、双次回放一致 **7/7**、重复写违规 **0/7** | [A5 验收报告](docs/reports/2026-09-26-a5-bounded-plan-recovery.md) · [交互结果](docs/reports/a5-bounded-plan-recovery/report.html) |
 | **A6 在线回归（阶段记录）** | Qwen / GLM：Task Success **80/120 / 90/120**；Mechanical Pass **116/120 / 107/120**；Context Grounding **38/66 / 48/66**；stale/UNKNOWN Handling **4/18 / 9/18** | [A6 回归报告](docs/reports/2026-09-26-a6-online-regression.md) · [交互报告](docs/reports/a6-post-a5-regression/report.html) |
 | **关联追踪** | 图执行 trace 将工作流节点与 trial 关联；现有测试覆盖图状态导出等字段 | [评测运行器](modules/vehicle_ai/evaluation/runner.py) |
+| **Judge 校准（离线）** | 机械断言自动裁定 **3.3% → rubric 判分 100%**（120/120）；一致率 **0.900**、Cohen's κ **0.794**；零漏判 fail；校准 0 API 费用、0.08s | [标签](eval/judge_calibration/labels.yaml) · [校准脚本](scripts/judge_calibration.py) |
+| **在线 judged eval（双模型）** | 80 trials（Qwen/GLM 各 40）rubric 全自动判分：通过率 **75% / 85%**；平均延迟 **4.3s / 44.6s** | [Actions 实跑](https://github.com/CuitSuanNaiGaiGai/VehicleMind/actions/runs/39938693568) · [技术与收益总览](docs/reports/2026-10-23-tech-and-benefits.md) |
 
 工作流与 A5 使用确定性脚本模型、合成语义观测和模拟工具。A6 使用 **40 条冻结场景 × 3 次、每模型 120 trial**，由 Qwen v4 AI 辅助语义审核；历史预算配置不完整，前后结果并列展示。最新完整重测与其他阶段记录保留在下方证据表。
 
