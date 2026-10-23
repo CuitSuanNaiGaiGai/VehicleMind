@@ -28,8 +28,12 @@ def main(argv: list[str] | None = None) -> int:
     report = calibrate(labels)
     provenance = report["label_provenance"]
     run = report["run"]
-    print(f"参考标签：{provenance['labeler']}（独立人工标注：{provenance['independent_human_review']}）")
-    print(f"被校准 run：{run['provider']}/{run['model']} source={run['source_sha256'][:12]}…")
+    print(
+        f"参考标签：{provenance['labeler']}（独立人工标注：{provenance['independent_human_review']}）"
+    )
+    print(
+        f"被校准 run：{run['provider']}/{run['model']} source={run['source_sha256'][:12]}…"
+    )
     print(f"样本数：{report['total']}")
     print(f"一致率：{report['agreement']:.3f}")
     print(f"Cohen's kappa：{report['cohens_kappa']:.3f}")

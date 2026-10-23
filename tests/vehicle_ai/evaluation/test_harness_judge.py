@@ -86,7 +86,10 @@ def _decision_json(verdict: str) -> str:
 def test_judge_case_summary_returns_verdict_and_evidence() -> None:
     client = FakeJudgeClient(_decision_json("pass"))
     decision = judge_case_summary(_summary(), _case(), "rubric", client)
-    assert decision == {"verdict": "pass", "evidence": "回答覆盖了全部必需事实，无捏造。"}
+    assert decision == {
+        "verdict": "pass",
+        "evidence": "回答覆盖了全部必需事实，无捏造。",
+    }
     system, user = client.messages
     assert system["role"] == "system"
     assert "审查员" in system["content"]
@@ -201,4 +204,3 @@ def test_build_judge_client_routes_through_env(monkeypatch) -> None:
     monkeypatch.setenv("VEHICLEMIND_JUDGE_PROVIDER", "no-such-backend")
     with pytest.raises(ValueError):
         build_judge_client()
-

@@ -158,7 +158,9 @@ def judge_batch(
             unaccounted[case_id] -= 1
             _save_progress(progress_path, progress)
         try:
-            parsed = parse_judge_decisions(content, {item["trial_index"] for item in trials})
+            parsed = parse_judge_decisions(
+                content, {item["trial_index"] for item in trials}
+            )
         except ValueError as exc:
             response_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
             progress["review_errors"][case_id] = {

@@ -52,12 +52,16 @@ def load_calibration_labels(path: Path) -> dict[str, Any]:
     document = _mapping(
         yaml.safe_load(path.read_text(encoding="utf-8")), "calibration labels"
     )
-    if set(document) != {
-        "schema_version",
-        "run",
-        "label_provenance",
-        "entries",
-    } or document["schema_version"] != 1:
+    if (
+        set(document)
+        != {
+            "schema_version",
+            "run",
+            "label_provenance",
+            "entries",
+        }
+        or document["schema_version"] != 1
+    ):
         raise ValueError("calibration labels schema mismatch")
     run = _mapping(document["run"], "run")
     if set(run) != {"directory", "provider", "model", "source_sha256"}:

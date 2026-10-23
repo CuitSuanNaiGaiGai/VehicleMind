@@ -107,7 +107,9 @@ def test_loader_accepts_the_checked_in_labels() -> None:
 @pytest.mark.parametrize(
     "document",
     [
-        _labels_document([], ),
+        _labels_document(
+            [],
+        ),
         _labels_document([_entry(verdict="maybe")]),
         _labels_document([_entry(extra="field")]),
         _labels_document([_entry(trial_index=0)]),
@@ -154,13 +156,18 @@ def test_calibrate_computes_agreement_and_disagreements(tmp_path: Path) -> None:
 def test_calibrate_rejects_labels_bound_to_a_different_run(tmp_path: Path) -> None:
     _write_run(tmp_path, [_trial("C01", "pass")], source_sha256="b" * 64)
     with pytest.raises(ValueError):
-        calibrate(_write_labels(tmp_path, _labels_document([_entry()])), repo_root=tmp_path)
+        calibrate(
+            _write_labels(tmp_path, _labels_document([_entry()])), repo_root=tmp_path
+        )
 
 
 def test_calibrate_rejects_entries_missing_from_the_run(tmp_path: Path) -> None:
     _write_run(tmp_path, [_trial("C01", "pass")])
     document = _labels_document(
-        [_entry(case_id="C01"), _entry(case_id="C404", verdict="fail", note="不在 run 中。")]
+        [
+            _entry(case_id="C01"),
+            _entry(case_id="C404", verdict="fail", note="不在 run 中。"),
+        ]
     )
     with pytest.raises(ValueError):
         calibrate(_write_labels(tmp_path, document), repo_root=tmp_path)

@@ -51,7 +51,13 @@ def test_prompt_is_frozen_and_deterministic() -> None:
     assert "仅输出 JSON 数组" in first
     assert "T02" in first
     # The steps payload keeps the frozen tuple-as-array serialization.
-    assert json.dumps({"id": "T02", "steps": list(_case().steps), "expected": _case().expected}, ensure_ascii=False) in first
+    assert (
+        json.dumps(
+            {"id": "T02", "steps": list(_case().steps), "expected": _case().expected},
+            ensure_ascii=False,
+        )
+        in first
+    )
 
 
 def _decision(verdict: str = "pass") -> dict:
@@ -63,9 +69,9 @@ def _decision(verdict: str = "pass") -> dict:
 
 
 def test_parse_accepts_valid_decisions() -> None:
-    assert parse_judge_decisions(json.dumps([_decision()], ensure_ascii=False), {1}) == [
-        _decision()
-    ]
+    assert parse_judge_decisions(
+        json.dumps([_decision()], ensure_ascii=False), {1}
+    ) == [_decision()]
 
 
 def test_parse_accepts_fenced_json() -> None:
@@ -79,10 +85,14 @@ def test_parse_accepts_fenced_json() -> None:
         "not json",
         json.dumps([_decision(), _decision()]),
         json.dumps([{"trial_index": 2, "verdict": "pass", "evidence": "索引不对。"}]),
-        json.dumps([{"trial_index": 1, "verdict": "maybe", "evidence": "非法判定值。"}]),
+        json.dumps(
+            [{"trial_index": 1, "verdict": "maybe", "evidence": "非法判定值。"}]
+        ),
         json.dumps([{"trial_index": 1, "verdict": "pass", "evidence": "短"}]),
         json.dumps([{"trial_index": 1, "verdict": "pass"}]),
-        json.dumps({"trial_index": 1, "verdict": "pass", "evidence": "不是数组的回复。"}),
+        json.dumps(
+            {"trial_index": 1, "verdict": "pass", "evidence": "不是数组的回复。"}
+        ),
     ],
 )
 def test_parse_rejects_malformed_output(content: str) -> None:
